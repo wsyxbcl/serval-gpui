@@ -1,0 +1,9 @@
+[package]
+name = "serval-gpui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gpui = "0.2.2"
+unicode-segmentation = "1.11"
+portable-pty = "0.9"
