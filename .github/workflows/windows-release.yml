@@ -1,0 +1,53 @@
+name: windows-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: serval-gpui
+  TARGET: x86_64-pc-windows-msvc
+
+jobs:
+  build-windows-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release --target $env:TARGET
+
+      - name: Package release archive
+        shell: pwsh
+        run: |
+          $artifactName = "${{ env.BIN_NAME }}-${{ github.ref_name }}-${{ env.TARGET }}"
+          $stagingDir = Join-Path $env:RUNNER_TEMP $artifactName
+          New-Item -ItemType Directory -Path $stagingDir | Out-Null
+          Copy-Item "target/${{ env.TARGET }}/release/${{ env.BIN_NAME }}.exe" $stagingDir
+          if (Test-Path "README.md") {
+            Copy-Item "README.md" $stagingDir
+          }
+          if (Test-Path "LICENSE") {
+            Copy-Item "LICENSE" $stagingDir
+          }
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath "$artifactName.zip"
+          "ASSET_NAME=$artifactName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ASSET_NAME }}.zip
