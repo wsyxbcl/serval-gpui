@@ -13,10 +13,15 @@ mod help_texts;
 mod i18n;
 mod text_input;
 
+#[cfg(not(windows))]
+use portable_pty_upstream as portable_pty;
+#[cfg(windows)]
+use portable_pty_windows as portable_pty;
+
 use commands::{CommandKind, CommandState, XmpSubcommand};
 use i18n::{t, Language};
-use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
 struct RootView {
     command_state: CommandState,

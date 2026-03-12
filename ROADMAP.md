@@ -54,6 +54,7 @@ Rules:
 - [x] Add a i18n support for languages and let user config in setup
 - [x] Add language support for simplified Chinese
 - [x] Add a GitHub Actions workflow to build a Windows release binary and upload it as an artifact
+- [x] Fix Windows PTY interactive prompt/input forwarding for `serval capture`
 
 ---
 
