@@ -56,6 +56,7 @@ Rules:
 - [x] Add a GitHub Actions workflow to build a Windows release binary and upload it as an artifact
 - [x] Fix Windows PTY interactive prompt/input forwarding for `serval capture`
 - [x] Rename the Cargo package to `maze-serval-gpui` for publishing
+- [x] Fix `cargo publish --dry-run` by using a single `portable-pty` dependency source plus local patch override
 - [ ] Fix the Windows stack overflow triggered by browsing for the `capture` CSV path
 
 ---

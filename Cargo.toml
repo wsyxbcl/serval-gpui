@@ -6,9 +6,4 @@ edition = "2021"
 [dependencies]
 gpui = "0.2.2"
 unicode-segmentation = "1.11"
-
-[target.'cfg(windows)'.dependencies]
-portable-pty-windows = { package = "portable-pty", version = "0.9", path = "vendor/portable-pty" }
-
-[target.'cfg(not(windows))'.dependencies]
-portable-pty-upstream = { package = "portable-pty", version = "0.9" }
+portable-pty = "0.9"

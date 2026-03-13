@@ -13,11 +13,6 @@ mod help_texts;
 mod i18n;
 mod text_input;
 
-#[cfg(not(windows))]
-use portable_pty_upstream as portable_pty;
-#[cfg(windows)]
-use portable_pty_windows as portable_pty;
-
 use commands::{CommandKind, CommandState, XmpSubcommand};
 use i18n::{t, Language};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};

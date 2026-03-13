@@ -3049,8 +3049,7 @@ name = "maze-serval-gpui"
 version = "0.1.0"
 dependencies = [
  "gpui",
- "portable-pty 0.9.0",
- "portable-pty 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "portable-pty",
  "unicode-segmentation",
 ]
 
@@ -3780,27 +3779,6 @@ checksum = "5da3b0203fd7ee5720aa0b5e790b591aa5d3f41c3ed2c34a3a393382198af2f7"
 [[package]]
 name = "portable-pty"
 version = "0.9.0"
-dependencies = [
- "anyhow",
- "bitflags 1.3.2",
- "downcast-rs",
- "filedescriptor",
- "lazy_static",
- "libc",
- "log",
- "nix 0.28.0",
- "serial2",
- "shared_library",
- "shell-words",
- "winapi",
- "winreg 0.10.1",
-]
-
-[[package]]
-name = "portable-pty"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4a596a2b3d2752d94f51fac2d4a96737b8705dddd311a32b9af47211f08671e"
 dependencies = [
  "anyhow",
  "bitflags 1.3.2",
