@@ -1,5 +1,5 @@
 [package]
-name = "serval-gpui"
+name = "maze-serval-gpui"
 version = "0.1.0"
 edition = "2021"
 

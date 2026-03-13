@@ -55,6 +55,7 @@ Rules:
 - [x] Add language support for simplified Chinese
 - [x] Add a GitHub Actions workflow to build a Windows release binary and upload it as an artifact
 - [x] Fix Windows PTY interactive prompt/input forwarding for `serval capture`
+- [x] Rename the Cargo package to `maze-serval-gpui` for publishing
 - [ ] Fix the Windows stack overflow triggered by browsing for the `capture` CSV path
 
 ---
