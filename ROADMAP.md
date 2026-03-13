@@ -57,6 +57,7 @@ Rules:
 - [x] Fix Windows PTY interactive prompt/input forwarding for `serval capture`
 - [x] Rename the Cargo package to `maze-serval-gpui` for publishing
 - [x] Fix `cargo publish --dry-run` by using a single `portable-pty` dependency source plus local patch override
+- [x] Add basic Cargo publish metadata: description, repository, and Apache-2.0 license
 - [ ] Fix the Windows stack overflow triggered by browsing for the `capture` CSV path
 
 ---
