@@ -321,7 +321,6 @@ impl RootView {
             self.pty_input.update(cx, |input, cx| input.set_value("", cx));
         }
     }
-    }
 
     fn resolve_input_dir(&self) -> Option<PathBuf> {
         match self.command_state.kind {
