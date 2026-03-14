@@ -65,6 +65,73 @@ struct SetupView {
     serval_binary_input: Entity<TextInput>,
 }
 
+fn apply_browse_result(
+    result: Result<Option<Vec<PathBuf>>>,
+    input: Entity<TextInput>,
+    root: Entity<RootView>,
+    language: Language,
+    app: &mut App,
+) {
+    match result {
+        Ok(Some(paths)) => {
+            if let Some(path) = paths.first() {
+                let value = path.to_string_lossy().to_string();
+                let _ = input.update(app, |input, cx| {
+                    input.set_value(value, cx);
+                });
+            }
+        }
+        Ok(None) => {}
+        Err(err) => {
+            let _ = root.update(app, |view, cx| {
+                view.append_output(
+                    format!("{}: {err}", t(language, "message.path_dialog_error")),
+                    cx,
+                );
+            });
+        }
+    }
+}
+
+fn spawn_path_prompt(
+    cx: &mut App,
+    options: PathPromptOptions,
+    input: Entity<TextInput>,
+    root: Entity<RootView>,
+    language: Language,
+) {
+    let receiver = cx.prompt_for_paths(options);
+    cx.spawn(async move |cx| {
+        if let Ok(result) = receiver.await {
+            let _ = cx.update(|app| {
+                apply_browse_result(result, input, root, language, app);
+            });
+        }
+    })
+    .detach();
+}
+
+fn browse_into_text_input(
+    window: &mut Window,
+    cx: &mut App,
+    options: PathPromptOptions,
+    input: Entity<TextInput>,
+    root: Entity<RootView>,
+    language: Language,
+) {
+    #[cfg(windows)]
+    {
+        window.defer(cx, move |_window, cx| {
+            spawn_path_prompt(cx, options, input, root, language);
+        });
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = window;
+        spawn_path_prompt(cx, options, input, root, language);
+    }
+}
 impl RootView {
     fn set_language(&mut self, language: Language, cx: &mut Context<Self>) {
         if self.language != language {
@@ -208,6 +275,20 @@ impl RootView {
             self.output_log.push('\n');
         }
         self.output_log.push_str(&line);
+        if !self.output_log.ends_with('\n') {
+            self.output_log.push('\n');
+        }
+        self.output_scroll_handle.scroll_to_bottom();
+        cx.notify();
+    }
+
+    fn append_output_chunk(&mut self, chunk: impl AsRef<str>, cx: &mut Context<Self>) {
+        let chunk = sanitize_terminal_output(chunk.as_ref());
+        if chunk.is_empty() {
+            return;
+        }
+
+        self.output_log.push_str(&chunk);
         self.output_scroll_handle.scroll_to_bottom();
         cx.notify();
     }
@@ -217,25 +298,34 @@ impl RootView {
         cx.notify();
     }
 
+    fn write_pty_value(&mut self, value: &str, cx: &mut Context<Self>) -> bool {
+        let writer = self.pty_writer.clone();
+        if let Some(writer) = writer {
+            if let Ok(mut guard) = writer.lock() {
+                let _ = guard.write_all(value.as_bytes());
+                let newline = if cfg!(windows) { b"\r\n".as_slice() } else { b"\n".as_slice() };
+                let _ = guard.write_all(newline);
+                let _ = guard.flush();
+                true
+            } else {
+                self.append_output(t(self.language, "message.pty_writer_locked"), cx);
+                false
+            }
+        } else {
+            self.append_output(t(self.language, "message.no_pty_input"), cx);
+            false
+        }
+    }
     fn send_pty_input(&mut self, cx: &mut Context<Self>) {
         let input_value = self.pty_input.read(cx).value().to_string();
         if input_value.trim().is_empty() {
             return;
         }
 
-        let writer = self.pty_writer.clone();
-        if let Some(writer) = writer {
-            if let Ok(mut guard) = writer.lock() {
-                let _ = guard.write_all(input_value.as_bytes());
-                let _ = guard.write_all(b"\n");
-                let _ = guard.flush();
-                self.pty_input.update(cx, |input, cx| input.set_value("", cx));
-            } else {
-                self.append_output(t(self.language, "message.pty_writer_locked"), cx);
-            }
-        } else {
-            self.append_output(t(self.language, "message.no_pty_input"), cx);
+        if self.write_pty_value(&input_value, cx) {
+            self.pty_input.update(cx, |input, cx| input.set_value("", cx));
         }
+    }
     }
 
     fn resolve_input_dir(&self) -> Option<PathBuf> {
@@ -466,47 +556,22 @@ impl Render for SetupView {
                             .text_color(rgb(0x111827))
                             .p(px(8.0))
                             .cursor_pointer()
-                            .on_click(move |_, _window, cx| {
-                                let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                    files: true,
-                                    directories: false,
-                                    multiple: false,
-                                    prompt: Some(t(language, "setup.select_serval_executable").into()),
-                                });
-                                let input = serval_binary_input.clone();
-                                let root = root.clone();
-                                cx.spawn(async move |cx| {
-                                    let result = receiver.await;
-                                    if let Ok(result) = result {
-                                        match result {
-                                            Ok(Some(paths)) => {
-                                                if let Some(path) = paths.first() {
-                                                    let value = path.to_string_lossy().to_string();
-                                                    let _ = cx.update(|app| {
-                                                        input.update(app, |input, cx| {
-                                                            input.set_value(value, cx);
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                            Ok(None) => {}
-                                            Err(err) => {
-                                                let _ = cx.update(|app| {
-                                                    root.update(app, |view, cx| {
-                                                        view.append_output(
-                                                            format!(
-                                                                "{}: {err}",
-                                                                t(language, "message.path_dialog_error")
-                                                            ),
-                                                            cx,
-                                                        );
-                                                    })
-                                                });
-                                            }
-                                        }
-                                    }
-                                })
-                                .detach();
+                            .on_click(move |_, window, cx| {
+                                browse_into_text_input(
+                                    window,
+                                    cx,
+                                    PathPromptOptions {
+                                        files: true,
+                                        directories: false,
+                                        multiple: false,
+                                        prompt: Some(
+                                            t(language, "setup.select_serval_executable").into(),
+                                        ),
+                                    },
+                                    serval_binary_input.clone(),
+                                    root.clone(),
+                                    language,
+                                );
                             })
                             .child(t(language, "action.browse"))
                     }),
@@ -535,6 +600,7 @@ impl Render for SetupView {
 
 enum OutputEvent {
     Line(String),
+    Chunk(String),
     Error(String),
     Exit(i32),
     PtyWriter(Arc<Mutex<Box<dyn Write + Send>>>),
@@ -545,13 +611,28 @@ fn strip_ansi_escapes(input: &str) -> String {
     let mut chars = input.chars().peekable();
     while let Some(ch) = chars.next() {
         if ch == '\u{001b}' {
-            if let Some('[') = chars.peek().copied() {
-                let _ = chars.next();
-                while let Some(next) = chars.next() {
-                    if next.is_ascii_alphabetic() {
-                        break;
+            match chars.peek().copied() {
+                Some('[') => {
+                    let _ = chars.next();
+                    while let Some(next) = chars.next() {
+                        if next.is_ascii_alphabetic() {
+                            break;
+                        }
                     }
                 }
+                Some(']') => {
+                    let _ = chars.next();
+                    while let Some(next) = chars.next() {
+                        if next == '\u{0007}' {
+                            break;
+                        }
+                        if next == '\u{001b}' && matches!(chars.peek().copied(), Some('\\')) {
+                            let _ = chars.next();
+                            break;
+                        }
+                    }
+                }
+                _ => {}
             }
             continue;
         }
@@ -563,6 +644,19 @@ fn strip_ansi_escapes(input: &str) -> String {
     out
 }
 
+fn sanitize_terminal_output(input: &str) -> String {
+    let mut line = input.to_string();
+    if line.contains('\t') {
+        line = line.replace('\t', "    ");
+    }
+    if line.contains('\r') {
+        line = line.replace('\r', "");
+    }
+    if line.contains('\u{001b}') {
+        line = strip_ansi_escapes(&line);
+    }
+    line
+}
 impl Render for RootView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
@@ -637,52 +731,22 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: false,
-                                        directories: true,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_media_directory").into()),
-                                    });
-
-                                    let observe_input = observe_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            observe_input.update(
-                                                                app,
-                                                                |input, cx| {
-                                                                    input.set_value(value, cx);
-                                                                },
-                                                            )
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: false,
+                                            directories: true,
+                                            multiple: false,
+                                            prompt: Some(
+                                                t(language, "prompt.select_media_directory").into(),
+                                            ),
+                                        },
+                                        observe_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -702,52 +766,22 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: false,
-                                        directories: true,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_output_directory").into()),
-                                    });
-
-                                    let observe_output_input = observe_output_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            observe_output_input.update(
-                                                                app,
-                                                                |input, cx| {
-                                                                    input.set_value(value, cx);
-                                                                },
-                                                            )
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: false,
+                                            directories: true,
+                                            multiple: false,
+                                            prompt: Some(
+                                                t(language, "prompt.select_output_directory").into(),
+                                            ),
+                                        },
+                                        observe_output_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -989,52 +1023,20 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: true,
-                                        directories: false,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_tags_csv").into()),
-                                    });
-
-                                    let capture_input = capture_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            capture_input.update(
-                                                                app,
-                                                                |input, cx| {
-                                                                    input.set_value(value, cx);
-                                                                },
-                                                            )
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: true,
+                                            directories: false,
+                                            multiple: false,
+                                            prompt: Some(t(language, "prompt.select_tags_csv").into()),
+                                        },
+                                        capture_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -1054,52 +1056,22 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: false,
-                                        directories: true,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_output_directory").into()),
-                                    });
-
-                                    let capture_output_input = capture_output_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            capture_output_input.update(
-                                                                app,
-                                                                |input, cx| {
-                                                                    input.set_value(value, cx);
-                                                                },
-                                                            )
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: false,
+                                            directories: true,
+                                            multiple: false,
+                                            prompt: Some(
+                                                t(language, "prompt.select_output_directory").into(),
+                                            ),
+                                        },
+                                        capture_output_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -1355,49 +1327,23 @@ impl Render for RootView {
                                         .text_color(rgb(0x111827))
                                         .p(px(8.0))
                                         .cursor_pointer()
-                                        .on_click(move |_, _window, cx| {
-                                            let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                                files: false,
-                                                directories: true,
-                                                multiple: false,
-                                                prompt: Some(t(language, "prompt.select_source_directory").into()),
-                                            });
-                                            let input = xmp_source_input.clone();
-                                            let entity = entity.clone();
-                                            cx.spawn(async move |cx| {
-                                                let result = receiver.await;
-                                                if let Ok(result) = result {
-                                                    match result {
-                                                        Ok(Some(paths)) => {
-                                                            if let Some(path) = paths.first() {
-                                                                let value = path
-                                                                    .to_string_lossy()
-                                                                    .to_string();
-                                                                let _ = cx.update(|app| {
-                                                                    input.update(app, |input, cx| {
-                                                                        input.set_value(value, cx);
-                                                                    })
-                                                                });
-                                                            }
-                                                        }
-                                                        Ok(None) => {}
-                                                        Err(err) => {
-                                                            let _ = cx.update(|app| {
-                                                                entity.update(app, |view, cx| {
-                                                                    view.append_output(
-                                                                        format!(
-                                                                            "{}: {err}",
-                                                                            t(language, "message.path_dialog_error")
-                                                                        ),
-                                                                        cx,
-                                                                    );
-                                                                })
-                                                            });
-                                                        }
-                                                    }
-                                                }
-                                            })
-                                            .detach();
+                                        .on_click(move |_, window, cx| {
+                                            browse_into_text_input(
+                                                window,
+                                                cx,
+                                                PathPromptOptions {
+                                                    files: false,
+                                                    directories: true,
+                                                    multiple: false,
+                                                    prompt: Some(
+                                                        t(language, "prompt.select_source_directory")
+                                                            .into(),
+                                                    ),
+                                                },
+                                                xmp_source_input.clone(),
+                                                entity.clone(),
+                                                language,
+                                            );
                                         })
                                         .child(t(language, "action.browse"))
                                 }),
@@ -1422,49 +1368,26 @@ impl Render for RootView {
                                                 .text_color(rgb(0x111827))
                                                 .p(px(8.0))
                                                 .cursor_pointer()
-                                                .on_click(move |_, _window, cx| {
-                                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                                        files: false,
-                                                        directories: true,
-                                                        multiple: false,
-                                                        prompt: Some(t(language, "prompt.select_output_directory").into()),
-                                                    });
-                                                    let input = xmp_output_input.clone();
-                                                    let entity = entity.clone();
-                                                    cx.spawn(async move |cx| {
-                                                        let result = receiver.await;
-                                                        if let Ok(result) = result {
-                                                            match result {
-                                                                Ok(Some(paths)) => {
-                                                                    if let Some(path) = paths.first() {
-                                                                        let value = path
-                                                                            .to_string_lossy()
-                                                                            .to_string();
-                                                                        let _ = cx.update(|app| {
-                                                                            input.update(app, |input, cx| {
-                                                                                input.set_value(value, cx);
-                                                                            })
-                                                                        });
-                                                                    }
-                                                                }
-                                                                Ok(None) => {}
-                                                                Err(err) => {
-                                                                    let _ = cx.update(|app| {
-                                                                        entity.update(app, |view, cx| {
-                                                                            view.append_output(
-                                                                                format!(
-                                                                                    "{}: {err}",
-                                                                                    t(language, "message.path_dialog_error")
-                                                                                ),
-                                                                                cx,
-                                                                            );
-                                                                        })
-                                                                    });
-                                                                }
-                                                            }
-                                                        }
-                                                    })
-                                                    .detach();
+                                                .on_click(move |_, window, cx| {
+                                                    browse_into_text_input(
+                                                        window,
+                                                        cx,
+                                                        PathPromptOptions {
+                                                            files: false,
+                                                            directories: true,
+                                                            multiple: false,
+                                                            prompt: Some(
+                                                                t(
+                                                                    language,
+                                                                    "prompt.select_output_directory",
+                                                                )
+                                                                .into(),
+                                                            ),
+                                                        },
+                                                        xmp_output_input.clone(),
+                                                        entity.clone(),
+                                                        language,
+                                                    );
                                                 })
                                                 .child(t(language, "action.browse"))
                                         }),
@@ -1492,49 +1415,22 @@ impl Render for RootView {
                                         .text_color(rgb(0x111827))
                                         .p(px(8.0))
                                         .cursor_pointer()
-                                        .on_click(move |_, _window, cx| {
-                                            let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                                files: true,
-                                                directories: false,
-                                                multiple: false,
-                                                prompt: Some(t(language, "prompt.select_csv_path").into()),
-                                            });
-                                            let input = xmp_csv_input.clone();
-                                            let entity = entity.clone();
-                                            cx.spawn(async move |cx| {
-                                                let result = receiver.await;
-                                                if let Ok(result) = result {
-                                                    match result {
-                                                        Ok(Some(paths)) => {
-                                                            if let Some(path) = paths.first() {
-                                                                let value = path
-                                                                    .to_string_lossy()
-                                                                    .to_string();
-                                                                let _ = cx.update(|app| {
-                                                                    input.update(app, |input, cx| {
-                                                                        input.set_value(value, cx);
-                                                                    })
-                                                                });
-                                                            }
-                                                        }
-                                                        Ok(None) => {}
-                                                        Err(err) => {
-                                                            let _ = cx.update(|app| {
-                                                                entity.update(app, |view, cx| {
-                                                                    view.append_output(
-                                                                        format!(
-                                                                            "{}: {err}",
-                                                                            t(language, "message.path_dialog_error")
-                                                                        ),
-                                                                        cx,
-                                                                    );
-                                                                })
-                                                            });
-                                                        }
-                                                    }
-                                                }
-                                            })
-                                            .detach();
+                                        .on_click(move |_, window, cx| {
+                                            browse_into_text_input(
+                                                window,
+                                                cx,
+                                                PathPromptOptions {
+                                                    files: true,
+                                                    directories: false,
+                                                    multiple: false,
+                                                    prompt: Some(
+                                                        t(language, "prompt.select_csv_path").into(),
+                                                    ),
+                                                },
+                                                xmp_csv_input.clone(),
+                                                entity.clone(),
+                                                language,
+                                            );
                                         })
                                         .child(t(language, "action.browse"))
                                 }),
@@ -1733,47 +1629,22 @@ impl Render for RootView {
                                         .text_color(rgb(0x111827))
                                         .p(px(8.0))
                                         .cursor_pointer()
-                                        .on_click(move |_, _window, cx| {
-                                            let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                                files: false,
-                                                directories: true,
-                                                multiple: false,
-                                                prompt: Some(t(language, "prompt.select_directory").into()),
-                                            });
-                                            let input = xmp_dir_input.clone();
-                                            let entity = entity.clone();
-                                            cx.spawn(async move |cx| {
-                                                let result = receiver.await;
-                                                if let Ok(result) = result {
-                                                    match result {
-                                                        Ok(Some(paths)) => {
-                                                            if let Some(path) = paths.first() {
-                                                                let value = path.to_string_lossy().to_string();
-                                                                let _ = cx.update(|app| {
-                                                                    input.update(app, |input, cx| {
-                                                                        input.set_value(value, cx);
-                                                                    })
-                                                                });
-                                                            }
-                                                        }
-                                                        Ok(None) => {}
-                                                        Err(err) => {
-                                                            let _ = cx.update(|app| {
-                                                                entity.update(app, |view, cx| {
-                                                                    view.append_output(
-                                                                        format!(
-                                                                            "{}: {err}",
-                                                                            t(language, "message.path_dialog_error")
-                                                                        ),
-                                                                        cx,
-                                                                    );
-                                                                })
-                                                            });
-                                                        }
-                                                    }
-                                                }
-                                            })
-                                            .detach();
+                                        .on_click(move |_, window, cx| {
+                                            browse_into_text_input(
+                                                window,
+                                                cx,
+                                                PathPromptOptions {
+                                                    files: false,
+                                                    directories: true,
+                                                    multiple: false,
+                                                    prompt: Some(
+                                                        t(language, "prompt.select_directory").into(),
+                                                    ),
+                                                },
+                                                xmp_dir_input.clone(),
+                                                entity.clone(),
+                                                language,
+                                            );
                                         })
                                         .child(t(language, "action.browse"))
                                 }),
@@ -1793,47 +1664,22 @@ impl Render for RootView {
                                         .text_color(rgb(0x111827))
                                         .p(px(8.0))
                                         .cursor_pointer()
-                                        .on_click(move |_, _window, cx| {
-                                            let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                                files: true,
-                                                directories: false,
-                                                multiple: false,
-                                                prompt: Some(t(language, "prompt.select_csv_path").into()),
-                                            });
-                                            let input = xmp_csv_input.clone();
-                                            let entity = entity.clone();
-                                            cx.spawn(async move |cx| {
-                                                let result = receiver.await;
-                                                if let Ok(result) = result {
-                                                    match result {
-                                                        Ok(Some(paths)) => {
-                                                            if let Some(path) = paths.first() {
-                                                                let value = path.to_string_lossy().to_string();
-                                                                let _ = cx.update(|app| {
-                                                                    input.update(app, |input, cx| {
-                                                                        input.set_value(value, cx);
-                                                                    })
-                                                                });
-                                                            }
-                                                        }
-                                                        Ok(None) => {}
-                                                        Err(err) => {
-                                                            let _ = cx.update(|app| {
-                                                                entity.update(app, |view, cx| {
-                                                                    view.append_output(
-                                                                        format!(
-                                                                            "{}: {err}",
-                                                                            t(language, "message.path_dialog_error")
-                                                                        ),
-                                                                        cx,
-                                                                    );
-                                                                })
-                                                            });
-                                                        }
-                                                    }
-                                                }
-                                            })
-                                            .detach();
+                                        .on_click(move |_, window, cx| {
+                                            browse_into_text_input(
+                                                window,
+                                                cx,
+                                                PathPromptOptions {
+                                                    files: true,
+                                                    directories: false,
+                                                    multiple: false,
+                                                    prompt: Some(
+                                                        t(language, "prompt.select_csv_path").into(),
+                                                    ),
+                                                },
+                                                xmp_csv_input.clone(),
+                                                entity.clone(),
+                                                language,
+                                            );
                                         })
                                         .child(t(language, "action.browse"))
                                 }),
@@ -1859,48 +1705,20 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: true,
-                                        directories: false,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_tags_csv").into()),
-                                    });
-                                    let input = extract_csv_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            input.update(app, |input, cx| {
-                                                                input.set_value(value, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: true,
+                                            directories: false,
+                                            multiple: false,
+                                            prompt: Some(t(language, "prompt.select_tags_csv").into()),
+                                        },
+                                        extract_csv_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -2056,48 +1874,22 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: false,
-                                        directories: true,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_output_directory").into()),
-                                    });
-                                    let input = extract_output_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            input.update(app, |input, cx| {
-                                                                input.set_value(value, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: false,
+                                            directories: true,
+                                            multiple: false,
+                                            prompt: Some(
+                                                t(language, "prompt.select_output_directory").into(),
+                                            ),
+                                        },
+                                        extract_output_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -2278,48 +2070,20 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: true,
-                                        directories: false,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_tags_csv").into()),
-                                    });
-                                    let input = translate_csv_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            input.update(app, |input, cx| {
-                                                                input.set_value(value, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: true,
+                                            directories: false,
+                                            multiple: false,
+                                            prompt: Some(t(language, "prompt.select_tags_csv").into()),
+                                        },
+                                        translate_csv_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -2339,48 +2103,22 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: true,
-                                        directories: false,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_taglist_csv").into()),
-                                    });
-                                    let input = translate_taglist_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            input.update(app, |input, cx| {
-                                                                input.set_value(value, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: true,
+                                            directories: false,
+                                            multiple: false,
+                                            prompt: Some(
+                                                t(language, "prompt.select_taglist_csv").into(),
+                                            ),
+                                        },
+                                        translate_taglist_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -2404,48 +2142,22 @@ impl Render for RootView {
                                 .text_color(rgb(0x111827))
                                 .p(px(8.0))
                                 .cursor_pointer()
-                                .on_click(move |_, _window, cx| {
-                                    let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                        files: false,
-                                        directories: true,
-                                        multiple: false,
-                                        prompt: Some(t(language, "prompt.select_output_directory").into()),
-                                    });
-                                    let input = translate_output_input.clone();
-                                    let entity = entity.clone();
-                                    cx.spawn(async move |cx| {
-                                        let result = receiver.await;
-                                        if let Ok(result) = result {
-                                            match result {
-                                                Ok(Some(paths)) => {
-                                                    if let Some(path) = paths.first() {
-                                                        let value =
-                                                            path.to_string_lossy().to_string();
-                                                        let _ = cx.update(|app| {
-                                                            input.update(app, |input, cx| {
-                                                                input.set_value(value, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                                Ok(None) => {}
-                                                Err(err) => {
-                                                    let _ = cx.update(|app| {
-                                                        entity.update(app, |view, cx| {
-                                                            view.append_output(
-                                                                format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.path_dialog_error")
-                                                                ),
-                                                                cx,
-                                                            );
-                                                        })
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    })
-                                    .detach();
+                                .on_click(move |_, window, cx| {
+                                    browse_into_text_input(
+                                        window,
+                                        cx,
+                                        PathPromptOptions {
+                                            files: false,
+                                            directories: true,
+                                            multiple: false,
+                                            prompt: Some(
+                                                t(language, "prompt.select_output_directory").into(),
+                                            ),
+                                        },
+                                        translate_output_input.clone(),
+                                        entity.clone(),
+                                        language,
+                                    );
                                 })
                                 .child(t(language, "action.browse"))
                         }),
@@ -2719,7 +2431,7 @@ impl Render for RootView {
                                                 Ok(n) => {
                                                     let text = String::from_utf8_lossy(&buf[..n])
                                                         .to_string();
-                                                    let _ = tx.send(OutputEvent::Line(text));
+                                                    let _ = tx.send(OutputEvent::Chunk(text));
                                                 }
                                                 Err(err) => {
                                                     let _ = tx.send(OutputEvent::Error(format!(
@@ -2822,6 +2534,13 @@ impl Render for RootView {
                                             while let Ok(event) = rx.try_recv() {
                                                 let entity = entity.clone();
                                                 match event {
+                                                    OutputEvent::Chunk(chunk) => {
+                                                        let _ = cx.update(|_window, app| {
+                                                            entity.update(app, |view, cx| {
+                                                                view.append_output_chunk(chunk, cx);
+                                                            })
+                                                        });
+                                                    }
                                                     OutputEvent::Line(line) => {
                                                         let _ = cx.update(|_window, app| {
                                                             entity.update(app, |view, cx| {
@@ -3317,8 +3036,11 @@ fn main() {
                 .detach();
 
                 cx.observe(&capture_input, |view: &mut RootView, input, cx| {
-                    view.command_state.capture.csv_path = input.read(cx).value().to_string();
-                    cx.notify();
+                    let value = input.read(cx).value().to_string();
+                    if view.command_state.capture.csv_path != value {
+                        view.command_state.capture.csv_path = value;
+                        cx.notify();
+                    }
                 })
                 .detach();
 

@@ -104,7 +104,12 @@ impl TextInput {
     }
 
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
-        self.content = value.into();
+        let value = value.into();
+        if self.content == value {
+            return;
+        }
+
+        self.content = value;
         let len = self.content.len();
         self.selected_range = len..len;
         self.selection_reversed = false;
