@@ -15,8 +15,97 @@ mod text_input;
 
 use commands::{CommandKind, CommandState, XmpSubcommand};
 use i18n::{t, Language};
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RunState {
+    Idle,
+    Running,
+    Success,
+    Failed,
+    Cancelled,
+}
+
+impl RunState {
+    fn is_running(self) -> bool {
+        matches!(self, Self::Running)
+    }
+
+    fn action_key(self) -> &'static str {
+        if self.is_running() {
+            "action.cancel"
+        } else {
+            "action.run"
+        }
+    }
+
+    fn label_key(self) -> &'static str {
+        match self {
+            Self::Idle => "status.idle",
+            Self::Running => "status.running",
+            Self::Success => "status.success",
+            Self::Failed => "status.failed",
+            Self::Cancelled => "status.cancelled",
+        }
+    }
+
+    fn color(self) -> u32 {
+        match self {
+            Self::Idle => 0x9CA3AF,
+            Self::Running => 0xF59E0B,
+            Self::Success => 0x10B981,
+            Self::Failed => 0xF87171,
+            Self::Cancelled => 0xFBBF24,
+        }
+    }
+}
+
+#[derive(Clone)]
+enum RunningProcessHandle {
+    Pty {
+        pid: Option<u32>,
+        killer: Arc<Mutex<Box<dyn ChildKiller + Send + Sync>>>,
+    },
+    Process {
+        pid: u32,
+        child: Arc<Mutex<std::process::Child>>,
+    },
+}
+
+impl RunningProcessHandle {
+    fn kill(&self) -> std::io::Result<()> {
+        #[cfg(windows)]
+        if let Some(pid) = self.process_id() {
+            let status = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+            if status.success() {
+                return Ok(());
+            }
+        }
+
+        match self {
+            Self::Pty { killer, .. } => killer
+                .lock()
+                .map_err(|_| std::io::Error::other("PTY killer lock poisoned"))?
+                .kill(),
+            Self::Process { child, .. } => child
+                .lock()
+                .map_err(|_| std::io::Error::other("Process handle lock poisoned"))?
+                .kill(),
+        }
+    }
+
+    fn process_id(&self) -> Option<u32> {
+        match self {
+            Self::Pty { pid, .. } => *pid,
+            Self::Process { pid, .. } => Some(*pid),
+        }
+    }
+}
 
 #[derive(Default)]
 struct TerminalBuffer {
@@ -217,7 +306,9 @@ struct RootView {
     pty_input: Entity<TextInput>,
     terminal_buffer: TerminalBuffer,
     output_log: String,
-    running: bool,
+    run_state: RunState,
+    cancel_requested: bool,
+    running_process: Option<RunningProcessHandle>,
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
     helper_mode: bool,
@@ -447,6 +538,49 @@ impl RootView {
         cx.notify();
     }
 
+    fn begin_run(&mut self, display: String, cx: &mut Context<Self>) {
+        self.append_output(display, cx);
+        self.run_state = RunState::Running;
+        self.cancel_requested = false;
+        self.running_process = None;
+        self.pty_writer = None;
+        cx.notify();
+    }
+
+    fn finish_run(&mut self, code: i32, cx: &mut Context<Self>) {
+        let state = if self.cancel_requested {
+            RunState::Cancelled
+        } else if code == 0 {
+            RunState::Success
+        } else {
+            RunState::Failed
+        };
+
+        self.run_state = state;
+        self.cancel_requested = false;
+        self.running_process = None;
+        self.pty_writer = None;
+
+        if state == RunState::Cancelled {
+            self.append_output(t(self.language, "message.process_cancelled"), cx);
+        } else {
+            self.append_output(
+                format!("{}: {code}", t(self.language, "message.process_exited")),
+                cx,
+            );
+        }
+        cx.notify();
+    }
+
+    fn set_running_process(
+        &mut self,
+        handle: Option<RunningProcessHandle>,
+        cx: &mut Context<Self>,
+    ) {
+        self.running_process = handle;
+        cx.notify();
+    }
+
     fn set_pty_writer(
         &mut self,
         writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
@@ -454,6 +588,38 @@ impl RootView {
     ) {
         self.pty_writer = writer;
         cx.notify();
+    }
+
+    fn request_cancel(&mut self, cx: &mut Context<Self>) {
+        if !self.run_state.is_running() {
+            return;
+        }
+
+        if self.cancel_requested {
+            return;
+        }
+
+        let Some(handle) = self.running_process.clone() else {
+            self.append_output(t(self.language, "message.no_running_process"), cx);
+            return;
+        };
+
+        match handle.kill() {
+            Ok(()) => {
+                self.cancel_requested = true;
+                self.append_output(t(self.language, "message.cancelling"), cx);
+                cx.notify();
+            }
+            Err(err) => {
+                self.append_output(
+                    format!(
+                        "{}: {err}",
+                        t(self.language, "message.failed_cancel_process")
+                    ),
+                    cx,
+                );
+            }
+        }
     }
 
     fn write_pty_value(&mut self, value: &str, cx: &mut Context<Self>) -> bool {
@@ -790,6 +956,7 @@ enum OutputEvent {
     Chunk(String),
     Error(String),
     Exit(i32),
+    ProcessHandle(RunningProcessHandle),
     PtyWriter(Arc<Mutex<Box<dyn Write + Send>>>),
 }
 
@@ -2651,8 +2818,8 @@ impl Render for RootView {
                                     .on_click(move |_, window, cx| {
                                 let entity = entity_run.clone();
                                 let (program, args, use_pty) = match entity_run.update(cx, |view, cx| {
-                                    if view.running {
-                                        view.append_output(t(language, "message.already_running"), cx);
+                                    if view.run_state.is_running() {
+                                        view.request_cancel(cx);
                                         return None;
                                     }
 
@@ -2664,8 +2831,7 @@ impl Render for RootView {
                                                 executable,
                                                 command.1.join(" ")
                                             );
-                                            view.append_output(display, cx);
-                                            view.running = true;
+                                            view.begin_run(display, cx);
                                             let use_pty = matches!(
                                                 view.command_state.kind,
                                                 CommandKind::Capture | CommandKind::Observe
@@ -2720,6 +2886,13 @@ impl Render for RootView {
                                         };
                                         drop(pair.slave);
 
+                                        let _ = tx.send(OutputEvent::ProcessHandle(
+                                            RunningProcessHandle::Pty {
+                                                pid: child.process_id(),
+                                                killer: Arc::new(Mutex::new(child.clone_killer())),
+                                            },
+                                        ));
+
                                         if let Ok(writer) = pair.master.take_writer() {
                                             let _ = tx.send(OutputEvent::PtyWriter(Arc::new(
                                                 Mutex::new(writer),
@@ -2738,24 +2911,27 @@ impl Render for RootView {
                                             }
                                         };
 
-                                        let mut buf = [0u8; 8192];
-                                        loop {
-                                            match reader.read(&mut buf) {
-                                                Ok(0) => break,
-                                                Ok(n) => {
-                                                    let text = String::from_utf8_lossy(&buf[..n])
-                                                        .to_string();
-                                                    let _ = tx.send(OutputEvent::Chunk(text));
-                                                }
-                                                Err(err) => {
-                                                    let _ = tx.send(OutputEvent::Error(format!(
-                                                        "{}: {err}",
-                                                        t(language, "message.pty_read_error")
-                                                    )));
-                                                    break;
+                                        let tx_reader = tx.clone();
+                                        thread::spawn(move || {
+                                            let mut buf = [0u8; 8192];
+                                            loop {
+                                                match reader.read(&mut buf) {
+                                                    Ok(0) => break,
+                                                    Ok(n) => {
+                                                        let text = String::from_utf8_lossy(&buf[..n])
+                                                            .to_string();
+                                                        let _ = tx_reader.send(OutputEvent::Chunk(text));
+                                                    }
+                                                    Err(err) => {
+                                                        let _ = tx_reader.send(OutputEvent::Error(format!(
+                                                            "{}: {err}",
+                                                            t(language, "message.pty_read_error")
+                                                        )));
+                                                        break;
+                                                    }
                                                 }
                                             }
-                                        }
+                                        });
 
                                         let status = match child.wait() {
                                             Ok(status) => status.exit_code() as i32,
@@ -2765,7 +2941,7 @@ impl Render for RootView {
                                     });
                                 } else {
                                     thread::spawn(move || {
-                                        let mut child = match Command::new(&program)
+                                        let child = match Command::new(&program)
                                             .args(&args)
                                             .stdout(Stdio::piped())
                                             .stderr(Stdio::piped())
@@ -2782,8 +2958,23 @@ impl Render for RootView {
                                             }
                                         };
 
-                                        let stdout = child.stdout.take();
-                                        let stderr = child.stderr.take();
+                                        let child = Arc::new(Mutex::new(child));
+                                        let pid = child.lock().ok().map(|child| child.id()).unwrap_or(0);
+                                        let _ = tx.send(OutputEvent::ProcessHandle(
+                                            RunningProcessHandle::Process { pid, child: child.clone() },
+                                        ));
+
+                                        let (stdout, stderr) = match child.lock() {
+                                            Ok(mut child) => (child.stdout.take(), child.stderr.take()),
+                                            Err(_) => {
+                                                let _ = tx.send(OutputEvent::Error(
+                                                    t(language, "message.process_wait_error")
+                                                        .to_string(),
+                                                ));
+                                                let _ = tx.send(OutputEvent::Exit(1));
+                                                return;
+                                            }
+                                        };
 
                                         if let Some(stdout) = stdout {
                                             let tx_out = tx.clone();
@@ -2833,11 +3024,35 @@ impl Render for RootView {
                                             });
                                         }
 
-                                        let status = match child.wait() {
-                                            Ok(status) => status.code().unwrap_or(1),
-                                            Err(_) => 1,
-                                        };
-                                        let _ = tx.send(OutputEvent::Exit(status));
+                                        loop {
+                                            let status = match child.lock() {
+                                                Ok(mut child) => match child.try_wait() {
+                                                    Ok(Some(status)) => Some(status.code().unwrap_or(1)),
+                                                    Ok(None) => None,
+                                                    Err(err) => {
+                                                        let _ = tx.send(OutputEvent::Error(format!(
+                                                            "{}: {err}",
+                                                            t(language, "message.process_wait_error")
+                                                        )));
+                                                        Some(1)
+                                                    }
+                                                },
+                                                Err(_) => {
+                                                    let _ = tx.send(OutputEvent::Error(
+                                                        t(language, "message.process_wait_error")
+                                                            .to_string(),
+                                                    ));
+                                                    Some(1)
+                                                }
+                                            };
+
+                                            if let Some(status) = status {
+                                                let _ = tx.send(OutputEvent::Exit(status));
+                                                break;
+                                            }
+
+                                            thread::sleep(Duration::from_millis(50));
+                                        }
                                     });
                                 }
 
@@ -2869,6 +3084,13 @@ impl Render for RootView {
                                                             })
                                                         });
                                                     }
+                                                    OutputEvent::ProcessHandle(handle) => {
+                                                        let _ = cx.update(|_window, app| {
+                                                            entity.update(app, |view, cx| {
+                                                                view.set_running_process(Some(handle), cx);
+                                                            })
+                                                        });
+                                                    }
                                                     OutputEvent::PtyWriter(writer) => {
                                                         let _ = cx.update(|_window, app| {
                                                             entity.update(app, |view, cx| {
@@ -2879,15 +3101,7 @@ impl Render for RootView {
                                                     OutputEvent::Exit(code) => {
                                                         let _ = cx.update(|_window, app| {
                                                             entity.update(app, |view, cx| {
-                                                                view.append_output(
-                                                                    format!(
-                                                                        "{}: {code}",
-                                                                        t(language, "message.process_exited")
-                                                                    ),
-                                                                    cx,
-                                                                );
-                                                                view.running = false;
-                                                                view.set_pty_writer(None, cx);
+                                                                view.finish_run(code, cx);
                                                             })
                                                         });
                                                         finished = true;
@@ -2899,7 +3113,7 @@ impl Render for RootView {
                                     })
                                     .detach();
                             })
-                                    .child(t(language, "action.run"))
+                                    .child(t(language, self.run_state.action_key()))
                             }),
                     ),
             )
@@ -3142,7 +3356,23 @@ impl Render for RootView {
                             .flex_row()
                             .justify_between()
                             .items_center()
-                            .child(div().text_color(rgb(0x9CA3AF)).child(t(language, "panel.output")))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap(px(8.0))
+                                    .items_center()
+                                    .child(div().text_color(rgb(0x9CA3AF)).child(t(language, "panel.output")))
+                                    .child(
+                                        div()
+                                            .text_color(rgb(self.run_state.color()))
+                                            .child(format!(
+                                                "{}: {}",
+                                                t(language, "label.status"),
+                                                t(language, self.run_state.label_key())
+                                            )),
+                                    ),
+                            )
                             .child({
                                 let entity = entity.clone();
                                 div()
@@ -3504,7 +3734,9 @@ fn main() {
                     pty_input,
                     terminal_buffer: TerminalBuffer::default(),
                     output_log: String::new(),
-                    running: false,
+                    run_state: RunState::Idle,
+                    cancel_requested: false,
+                    running_process: None,
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),
                     helper_mode: false,
