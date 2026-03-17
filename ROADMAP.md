@@ -58,7 +58,12 @@ Rules:
 - [x] Rename the Cargo package to `maze-serval-gpui` for publishing
 - [x] Fix `cargo publish --dry-run` by using a single `portable-pty` dependency source plus local patch override
 - [x] Add basic Cargo publish metadata: description, repository, and Apache-2.0 license
-- [ ] Fix the Windows stack overflow triggered by browsing for the `capture` CSV path
+- [x] Fix the Windows stack overflow triggered by browsing for the `capture` CSV path
+- [ ] Add cancellation support for running processes: probably a button that do something like ctrl-c to the terminal (or other better implement)
+- [ ] Implement run state management: idle, running, success, failed, cancelled.
+- [x] Preserve carriage-return progress updates in the integrated output pane so PTY-rendered progress bars remain visible
+- [x] Route `serval observe` through PTY so its progress bars can render in the GUI
+- [ ] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
 
 ---
 
@@ -76,8 +81,6 @@ Rules:
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
 - Add richer output presentation for tables and generated paths.
-- Implement run state management: idle, running, success, failed, cancelled.
-- Add cancellation support for running processes.
 - Improve packaging and distribution for Linux, Windows, and macOS.
 - Explore Ghostty-based terminal components if a richer embedded terminal becomes necessary.
 - Consider extracting reusable Serval command metadata from the CLI project if it materially improves maintainability.

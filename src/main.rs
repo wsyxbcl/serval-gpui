@@ -18,6 +18,182 @@ use i18n::{t, Language};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
+#[derive(Default)]
+struct TerminalBuffer {
+    lines: Vec<Vec<char>>,
+    cursor_row: usize,
+    cursor_col: usize,
+}
+
+impl TerminalBuffer {
+    fn append_log_line(&mut self, text: &str) {
+        let text = sanitize_log_output(text);
+        if text.is_empty() {
+            self.ensure_line(self.cursor_row);
+            return;
+        }
+
+        if !self.current_line_is_empty() && !text.starts_with('\n') {
+            self.new_line();
+        }
+
+        self.push_chunk(&text);
+
+        if !text.ends_with('\n') {
+            self.new_line();
+        }
+    }
+
+    fn push_chunk(&mut self, text: &str) {
+        let mut chars = text.chars().peekable();
+        while let Some(ch) = chars.next() {
+            match ch {
+                '\n' => self.new_line(),
+                '\r' => self.cursor_col = 0,
+                '\t' => {
+                    for _ in 0..4 {
+                        self.write_char(' ');
+                    }
+                }
+                '\u{0008}' => {
+                    if self.cursor_col > 0 {
+                        self.cursor_col -= 1;
+                    }
+                }
+                '\u{001b}' => match chars.peek().copied() {
+                    Some('[') => {
+                        let _ = chars.next();
+                        let mut params = String::new();
+                        while let Some(next) = chars.next() {
+                            if next.is_ascii_alphabetic() {
+                                self.apply_csi(&params, next);
+                                break;
+                            }
+                            params.push(next);
+                        }
+                    }
+                    Some(']') => {
+                        let _ = chars.next();
+                        while let Some(next) = chars.next() {
+                            if next == '\u{0007}' {
+                                break;
+                            }
+                            if next == '\u{001b}' && matches!(chars.peek().copied(), Some('\\')) {
+                                let _ = chars.next();
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                _ if ch.is_control() => {}
+                _ => self.write_char(ch),
+            }
+        }
+    }
+
+    fn render_text(&self) -> String {
+        self.lines
+            .iter()
+            .map(|line| line.iter().collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn apply_csi(&mut self, params: &str, command: char) {
+        if command != 'K' {
+            return;
+        }
+
+        let mode = params
+            .split(';')
+            .next()
+            .filter(|part| !part.is_empty())
+            .unwrap_or("0");
+
+        match mode {
+            "0" => {
+                self.ensure_line(self.cursor_row);
+                self.lines[self.cursor_row].truncate(self.cursor_col);
+            }
+            "1" => {
+                self.ensure_line(self.cursor_row);
+                let line = &mut self.lines[self.cursor_row];
+                let end = self.cursor_col.min(line.len());
+                for ch in &mut line[..end] {
+                    *ch = ' ';
+                }
+            }
+            "2" => {
+                self.ensure_line(self.cursor_row);
+                self.lines[self.cursor_row].clear();
+                self.cursor_col = 0;
+            }
+            _ => {}
+        }
+    }
+
+    fn write_char(&mut self, ch: char) {
+        self.ensure_line(self.cursor_row);
+        let line = &mut self.lines[self.cursor_row];
+        if self.cursor_col < line.len() {
+            line[self.cursor_col] = ch;
+        } else {
+            while line.len() < self.cursor_col {
+                line.push(' ');
+            }
+            line.push(ch);
+        }
+        self.cursor_col += 1;
+    }
+
+    fn new_line(&mut self) {
+        self.cursor_row += 1;
+        self.cursor_col = 0;
+        self.ensure_line(self.cursor_row);
+    }
+
+    fn current_line_is_empty(&mut self) -> bool {
+        self.ensure_line(self.cursor_row);
+        self.lines[self.cursor_row].is_empty()
+    }
+
+    fn ensure_line(&mut self, row: usize) {
+        while self.lines.len() <= row {
+            self.lines.push(Vec::new());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TerminalBuffer;
+
+    #[test]
+    fn carriage_return_overwrites_current_line() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("Progress 1");
+        buffer.push_chunk("\rProgress 2");
+        assert_eq!(buffer.render_text(), "Progress 2");
+    }
+
+    #[test]
+    fn clear_to_end_of_line_removes_old_progress_tail() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("100% complete");
+        buffer.push_chunk("\r42%\u{001b}[K");
+        assert_eq!(buffer.render_text(), "42%");
+    }
+
+    #[test]
+    fn log_lines_start_after_partial_progress_line() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("Working...");
+        buffer.append_log_line("Done");
+        assert_eq!(buffer.render_text(), "Working...\nDone\n");
+    }
+}
+
 struct RootView {
     command_state: CommandState,
     language: Language,
@@ -39,6 +215,7 @@ struct RootView {
     translate_to_input: Entity<TextInput>,
     translate_output_input: Entity<TextInput>,
     pty_input: Entity<TextInput>,
+    terminal_buffer: TerminalBuffer,
     output_log: String,
     running: bool,
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
@@ -253,42 +430,28 @@ impl RootView {
     }
 
     fn append_output(&mut self, line: impl AsRef<str>, cx: &mut Context<Self>) {
-        let mut line = line.as_ref().to_string();
-        if line.contains('\t') {
-            line = line.replace('\t', "    ");
-        }
-        if line.contains('\r') {
-            line = line.replace('\r', "");
-        }
-        if line.contains('\u{001b}') {
-            line = strip_ansi_escapes(&line);
-        }
-        if !self.output_log.is_empty()
-            && !self.output_log.ends_with('\n')
-            && !line.starts_with('\n')
-        {
-            self.output_log.push('\n');
-        }
-        self.output_log.push_str(&line);
-        if !self.output_log.ends_with('\n') {
-            self.output_log.push('\n');
-        }
+        self.terminal_buffer.append_log_line(line.as_ref());
+        self.output_log = self.terminal_buffer.render_text();
         self.output_scroll_handle.scroll_to_bottom();
         cx.notify();
     }
 
     fn append_output_chunk(&mut self, chunk: impl AsRef<str>, cx: &mut Context<Self>) {
-        let chunk = sanitize_terminal_output(chunk.as_ref());
-        if chunk.is_empty() {
+        if chunk.as_ref().is_empty() {
             return;
         }
 
-        self.output_log.push_str(&chunk);
+        self.terminal_buffer.push_chunk(chunk.as_ref());
+        self.output_log = self.terminal_buffer.render_text();
         self.output_scroll_handle.scroll_to_bottom();
         cx.notify();
     }
 
-    fn set_pty_writer(&mut self, writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>, cx: &mut Context<Self>) {
+    fn set_pty_writer(
+        &mut self,
+        writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
+        cx: &mut Context<Self>,
+    ) {
         self.pty_writer = writer;
         cx.notify();
     }
@@ -298,7 +461,11 @@ impl RootView {
         if let Some(writer) = writer {
             if let Ok(mut guard) = writer.lock() {
                 let _ = guard.write_all(value.as_bytes());
-                let newline = if cfg!(windows) { b"\r\n".as_slice() } else { b"\n".as_slice() };
+                let newline = if cfg!(windows) {
+                    b"\r\n".as_slice()
+                } else {
+                    b"\n".as_slice()
+                };
                 let _ = guard.write_all(newline);
                 let _ = guard.flush();
                 true
@@ -318,7 +485,8 @@ impl RootView {
         }
 
         if self.write_pty_value(&input_value, cx) {
-            self.pty_input.update(cx, |input, cx| input.set_value("", cx));
+            self.pty_input
+                .update(cx, |input, cx| input.set_value("", cx));
         }
     }
 
@@ -454,9 +622,10 @@ impl RootView {
     }
 
     fn help_text_for_key(&self, key: &str) -> String {
-        self.help_cache.get(key).cloned().unwrap_or_else(|| {
-            t(self.language, "message.help_missing").to_string()
-        })
+        self.help_cache
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| t(self.language, "message.help_missing").to_string())
     }
 
     fn set_hover_help_key(&mut self, key: &str, cx: &mut Context<Self>) {
@@ -501,7 +670,11 @@ impl Render for SetupView {
             .gap(px(10.0))
             .p(px(16.0))
             .bg(rgb(0xFFFFFF))
-            .child(div().text_color(rgb(0x6B7280)).child(t(language, "setup.language")))
+            .child(
+                div()
+                    .text_color(rgb(0x6B7280))
+                    .child(t(language, "setup.language")),
+            )
             .child(
                 div()
                     .flex()
@@ -511,8 +684,16 @@ impl Render for SetupView {
                         let root = root.clone();
                         div()
                             .id("setup-lang-en")
-                            .bg(rgb(if language == Language::En { 0x111827 } else { 0xF3F4F6 }))
-                            .text_color(rgb(if language == Language::En { 0xF9FAFB } else { 0x111827 }))
+                            .bg(rgb(if language == Language::En {
+                                0x111827
+                            } else {
+                                0xF3F4F6
+                            }))
+                            .text_color(rgb(if language == Language::En {
+                                0xF9FAFB
+                            } else {
+                                0x111827
+                            }))
                             .p(px(8.0))
                             .cursor_pointer()
                             .on_click(move |_, _, cx| {
@@ -524,8 +705,16 @@ impl Render for SetupView {
                         let root = root.clone();
                         div()
                             .id("setup-lang-zh-cn")
-                            .bg(rgb(if language == Language::ZhCn { 0x111827 } else { 0xF3F4F6 }))
-                            .text_color(rgb(if language == Language::ZhCn { 0xF9FAFB } else { 0x111827 }))
+                            .bg(rgb(if language == Language::ZhCn {
+                                0x111827
+                            } else {
+                                0xF3F4F6
+                            }))
+                            .text_color(rgb(if language == Language::ZhCn {
+                                0xF9FAFB
+                            } else {
+                                0x111827
+                            }))
                             .p(px(8.0))
                             .cursor_pointer()
                             .on_click(move |_, _, cx| {
@@ -534,7 +723,11 @@ impl Render for SetupView {
                             .child(t(language, "setup.language_zh_cn"))
                     }),
             )
-            .child(div().text_color(rgb(0x6B7280)).child(t(language, "setup.serval_binary")))
+            .child(
+                div()
+                    .text_color(rgb(0x6B7280))
+                    .child(t(language, "setup.serval_binary")),
+            )
             .child(
                 div()
                     .flex()
@@ -638,7 +831,7 @@ fn strip_ansi_escapes(input: &str) -> String {
     out
 }
 
-fn sanitize_terminal_output(input: &str) -> String {
+fn sanitize_log_output(input: &str) -> String {
     let mut line = input.to_string();
     if line.contains('\t') {
         line = line.replace('\t', "    ");
@@ -710,7 +903,11 @@ impl Render for RootView {
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.media_dir")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.media_dir")),
+                )
                 .child(
                     div()
                         .flex()
@@ -745,7 +942,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.output_dir")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.output_dir")),
+                )
                 .child(
                     div()
                         .flex()
@@ -769,7 +970,8 @@ impl Render for RootView {
                                             directories: true,
                                             multiple: false,
                                             prompt: Some(
-                                                t(language, "prompt.select_output_directory").into(),
+                                                t(language, "prompt.select_output_directory")
+                                                    .into(),
                                             ),
                                         },
                                         observe_output_input.clone(),
@@ -780,7 +982,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.options")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.options")),
+                )
                 .child(
                     div()
                         .flex()
@@ -868,7 +1074,10 @@ impl Render for RootView {
                                         if *hovered {
                                             view.set_hover_help_key("observe|--modified-time", cx);
                                         } else {
-                                            view.clear_hover_help_key("observe|--modified-time", cx);
+                                            view.clear_hover_help_key(
+                                                "observe|--modified-time",
+                                                cx,
+                                            );
                                         }
                                     });
                                 })
@@ -1002,7 +1211,11 @@ impl Render for RootView {
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.csv_path")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.csv_path")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1025,7 +1238,9 @@ impl Render for RootView {
                                             files: true,
                                             directories: false,
                                             multiple: false,
-                                            prompt: Some(t(language, "prompt.select_tags_csv").into()),
+                                            prompt: Some(
+                                                t(language, "prompt.select_tags_csv").into(),
+                                            ),
                                         },
                                         capture_input.clone(),
                                         entity.clone(),
@@ -1035,7 +1250,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.output_dir")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.output_dir")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1059,7 +1278,8 @@ impl Render for RootView {
                                             directories: true,
                                             multiple: false,
                                             prompt: Some(
-                                                t(language, "prompt.select_output_directory").into(),
+                                                t(language, "prompt.select_output_directory")
+                                                    .into(),
                                             ),
                                         },
                                         capture_output_input.clone(),
@@ -1070,7 +1290,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.options")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.options")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1684,7 +1908,11 @@ impl Render for RootView {
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.csv_path")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.csv_path")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1707,7 +1935,9 @@ impl Render for RootView {
                                             files: true,
                                             directories: false,
                                             multiple: false,
-                                            prompt: Some(t(language, "prompt.select_tags_csv").into()),
+                                            prompt: Some(
+                                                t(language, "prompt.select_tags_csv").into(),
+                                            ),
                                         },
                                         extract_csv_input.clone(),
                                         entity.clone(),
@@ -1717,7 +1947,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.filter_type")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.filter_type")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1753,8 +1987,7 @@ impl Render for RootView {
                                 .cursor_pointer()
                                 .on_click(move |_, _, cx| {
                                     entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "path".to_string();
+                                        view.command_state.extract.filter_type = "path".to_string();
                                         cx.notify();
                                     });
                                 })
@@ -1851,9 +2084,23 @@ impl Render for RootView {
                                 .child(t(language, "opt.advanced"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.value")))
-                .child(div().flex().flex_row().gap(px(8.0)).child(div().flex_grow().child(extract_value_input.clone())))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.output_dir")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.value")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .gap(px(8.0))
+                        .child(div().flex_grow().child(extract_value_input.clone())),
+                )
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.output_dir")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1877,7 +2124,8 @@ impl Render for RootView {
                                             directories: true,
                                             multiple: false,
                                             prompt: Some(
-                                                t(language, "prompt.select_output_directory").into(),
+                                                t(language, "prompt.select_output_directory")
+                                                    .into(),
                                             ),
                                         },
                                         extract_output_input.clone(),
@@ -1888,7 +2136,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.options")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.options")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1900,7 +2152,8 @@ impl Render for RootView {
                             let entity_click = entity.clone();
                             let entity_hover = entity.clone();
                             let active = self.command_state.extract.rename;
-                            div().id("extract-rename")
+                            div()
+                                .id("extract-rename")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
                                 .p(px(8.0))
@@ -1928,7 +2181,8 @@ impl Render for RootView {
                             let entity_click = entity.clone();
                             let entity_hover = entity.clone();
                             let active = self.command_state.extract.skip_existing;
-                            div().id("extract-skip-existing")
+                            div()
+                                .id("extract-skip-existing")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
                                 .p(px(8.0))
@@ -1945,7 +2199,10 @@ impl Render for RootView {
                                         if *hovered {
                                             view.set_hover_help_key("extract|--skip-existing", cx);
                                         } else {
-                                            view.clear_hover_help_key("extract|--skip-existing", cx);
+                                            view.clear_hover_help_key(
+                                                "extract|--skip-existing",
+                                                cx,
+                                            );
                                         }
                                     });
                                 })
@@ -1956,7 +2213,8 @@ impl Render for RootView {
                             let entity_click = entity.clone();
                             let entity_hover = entity.clone();
                             let active = self.command_state.extract.use_subdir;
-                            div().id("extract-use-subdir")
+                            div()
+                                .id("extract-use-subdir")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
                                 .p(px(8.0))
@@ -1980,7 +2238,11 @@ impl Render for RootView {
                                 .child(t(language, "opt.use_subdir"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.subdir_type")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.subdir_type")),
+                )
                 .child(
                     div()
                         .flex()
@@ -1989,59 +2251,79 @@ impl Render for RootView {
                         .gap(px(8.0))
                         .child({
                             let entity = entity.clone();
-                            let active = self.command_state.extract.subdir_type.as_deref() == Some("species");
-                            div().id("extract-subdir-species")
+                            let active = self.command_state.extract.subdir_type.as_deref()
+                                == Some("species");
+                            div()
+                                .id("extract-subdir-species")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0)).cursor_pointer()
+                                .p(px(8.0))
+                                .cursor_pointer()
                                 .on_click(move |_, _, cx| {
                                     entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type = Some("species".to_string());
+                                        view.command_state.extract.subdir_type =
+                                            Some("species".to_string());
                                         cx.notify();
                                     });
-                                }).child(t(language, "opt.species"))
+                                })
+                                .child(t(language, "opt.species"))
                         })
                         .child({
                             let entity = entity.clone();
-                            let active = self.command_state.extract.subdir_type.as_deref() == Some("individual");
-                            div().id("extract-subdir-individual")
+                            let active = self.command_state.extract.subdir_type.as_deref()
+                                == Some("individual");
+                            div()
+                                .id("extract-subdir-individual")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0)).cursor_pointer()
+                                .p(px(8.0))
+                                .cursor_pointer()
                                 .on_click(move |_, _, cx| {
                                     entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type = Some("individual".to_string());
+                                        view.command_state.extract.subdir_type =
+                                            Some("individual".to_string());
                                         cx.notify();
                                     });
-                                }).child(t(language, "opt.individual"))
+                                })
+                                .child(t(language, "opt.individual"))
                         })
                         .child({
                             let entity = entity.clone();
-                            let active = self.command_state.extract.subdir_type.as_deref() == Some("rating");
-                            div().id("extract-subdir-rating")
+                            let active =
+                                self.command_state.extract.subdir_type.as_deref() == Some("rating");
+                            div()
+                                .id("extract-subdir-rating")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0)).cursor_pointer()
+                                .p(px(8.0))
+                                .cursor_pointer()
                                 .on_click(move |_, _, cx| {
                                     entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type = Some("rating".to_string());
+                                        view.command_state.extract.subdir_type =
+                                            Some("rating".to_string());
                                         cx.notify();
                                     });
-                                }).child(t(language, "opt.rating"))
+                                })
+                                .child(t(language, "opt.rating"))
                         })
                         .child({
                             let entity = entity.clone();
-                            let active = self.command_state.extract.subdir_type.as_deref() == Some("custom");
-                            div().id("extract-subdir-custom")
+                            let active =
+                                self.command_state.extract.subdir_type.as_deref() == Some("custom");
+                            div()
+                                .id("extract-subdir-custom")
                                 .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
                                 .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0)).cursor_pointer()
+                                .p(px(8.0))
+                                .cursor_pointer()
                                 .on_click(move |_, _, cx| {
                                     entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type = Some("custom".to_string());
+                                        view.command_state.extract.subdir_type =
+                                            Some("custom".to_string());
                                         cx.notify();
                                     });
-                                }).child(t(language, "opt.custom"))
+                                })
+                                .child(t(language, "opt.custom"))
                         }),
                 )
         } else {
@@ -2049,7 +2331,11 @@ impl Render for RootView {
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.csv_path")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.csv_path")),
+                )
                 .child(
                     div()
                         .flex()
@@ -2072,7 +2358,9 @@ impl Render for RootView {
                                             files: true,
                                             directories: false,
                                             multiple: false,
-                                            prompt: Some(t(language, "prompt.select_tags_csv").into()),
+                                            prompt: Some(
+                                                t(language, "prompt.select_tags_csv").into(),
+                                            ),
                                         },
                                         translate_csv_input.clone(),
                                         entity.clone(),
@@ -2082,7 +2370,11 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.taglist_path")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.taglist_path")),
+                )
                 .child(
                     div()
                         .flex()
@@ -2117,11 +2409,35 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.from")))
-                .child(div().flex().flex_row().gap(px(8.0)).child(div().flex_grow().child(translate_from_input.clone())))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.to")))
-                .child(div().flex().flex_row().gap(px(8.0)).child(div().flex_grow().child(translate_to_input.clone())))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.output_dir")))
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.from")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .gap(px(8.0))
+                        .child(div().flex_grow().child(translate_from_input.clone())),
+                )
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.to")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .gap(px(8.0))
+                        .child(div().flex_grow().child(translate_to_input.clone())),
+                )
+                .child(
+                    div()
+                        .text_color(rgb(0x6B7280))
+                        .child(t(language, "label.output_dir")),
+                )
                 .child(
                     div()
                         .flex()
@@ -2145,7 +2461,8 @@ impl Render for RootView {
                                             directories: true,
                                             multiple: false,
                                             prompt: Some(
-                                                t(language, "prompt.select_output_directory").into(),
+                                                t(language, "prompt.select_output_directory")
+                                                    .into(),
                                             ),
                                         },
                                         translate_output_input.clone(),
@@ -2349,7 +2666,10 @@ impl Render for RootView {
                                             );
                                             view.append_output(display, cx);
                                             view.running = true;
-                                            let use_pty = matches!(view.command_state.kind, CommandKind::Capture);
+                                            let use_pty = matches!(
+                                                view.command_state.kind,
+                                                CommandKind::Capture | CommandKind::Observe
+                                            );
                                             Some((executable, command.1, use_pty))
                                         }
                                         Err(message) => {
@@ -2990,30 +3310,45 @@ fn main() {
         bind_text_input_keys(app);
         app.open_window(WindowOptions::default(), |_window, app| {
             app.new(|cx| {
-                let observe_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.observe_media_dir")));
-                let observe_output_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir")));
-                let capture_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
-                let capture_output_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir")));
-                let xmp_source_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.source_dir")));
-                let xmp_output_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.output_dir")));
-                let xmp_csv_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.csv_file")));
-                let xmp_dir_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.directory")));
-                let extract_csv_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
-                let extract_value_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.filter_value")));
-                let extract_output_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir")));
-                let translate_csv_input = cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
+                let observe_input = cx
+                    .new(|cx| TextInput::new(cx, t(Language::En, "placeholder.observe_media_dir")));
+                let observe_output_input = cx.new(|cx| {
+                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
+                });
+                let capture_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
+                let capture_output_input = cx.new(|cx| {
+                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
+                });
+                let xmp_source_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.source_dir")));
+                let xmp_output_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.output_dir")));
+                let xmp_csv_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.csv_file")));
+                let xmp_dir_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.directory")));
+                let extract_csv_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
+                let extract_value_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.filter_value")));
+                let extract_output_input = cx.new(|cx| {
+                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
+                });
+                let translate_csv_input =
+                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
                 let translate_taglist_input =
                     cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.taglist_csv")));
                 let translate_from_input =
                     cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.translate_from")));
                 let translate_to_input =
                     cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.translate_to")));
-                let translate_output_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir")));
-                let pty_input = cx.new(|cx| TextInput::new_submit(cx, t(Language::En, "placeholder.interactive_input")));
+                let translate_output_input = cx.new(|cx| {
+                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
+                });
+                let pty_input = cx.new(|cx| {
+                    TextInput::new_submit(cx, t(Language::En, "placeholder.interactive_input"))
+                });
 
                 cx.observe(&observe_input, |view: &mut RootView, input, cx| {
                     view.command_state.observe.media_dir = input.read(cx).value().to_string();
@@ -3023,8 +3358,11 @@ fn main() {
 
                 cx.observe(&observe_output_input, |view: &mut RootView, input, cx| {
                     let value = input.read(cx).value().to_string();
-                    view.command_state.observe.output_dir =
-                        if value.trim().is_empty() { None } else { Some(value) };
+                    view.command_state.observe.output_dir = if value.trim().is_empty() {
+                        None
+                    } else {
+                        Some(value)
+                    };
                     cx.notify();
                 })
                 .detach();
@@ -3040,8 +3378,11 @@ fn main() {
 
                 cx.observe(&capture_output_input, |view: &mut RootView, input, cx| {
                     let value = input.read(cx).value().to_string();
-                    view.command_state.capture.output_dir =
-                        if value.trim().is_empty() { None } else { Some(value) };
+                    view.command_state.capture.output_dir = if value.trim().is_empty() {
+                        None
+                    } else {
+                        Some(value)
+                    };
                     cx.notify();
                 })
                 .detach();
@@ -3084,8 +3425,11 @@ fn main() {
 
                 cx.observe(&extract_output_input, |view: &mut RootView, input, cx| {
                     let value = input.read(cx).value().to_string();
-                    view.command_state.extract.output_dir =
-                        if value.trim().is_empty() { None } else { Some(value) };
+                    view.command_state.extract.output_dir = if value.trim().is_empty() {
+                        None
+                    } else {
+                        Some(value)
+                    };
                     cx.notify();
                 })
                 .detach();
@@ -3096,10 +3440,14 @@ fn main() {
                 })
                 .detach();
 
-                cx.observe(&translate_taglist_input, |view: &mut RootView, input, cx| {
-                    view.command_state.translate.taglist_path = input.read(cx).value().to_string();
-                    cx.notify();
-                })
+                cx.observe(
+                    &translate_taglist_input,
+                    |view: &mut RootView, input, cx| {
+                        view.command_state.translate.taglist_path =
+                            input.read(cx).value().to_string();
+                        cx.notify();
+                    },
+                )
                 .detach();
 
                 cx.observe(&translate_from_input, |view: &mut RootView, input, cx| {
@@ -3116,8 +3464,11 @@ fn main() {
 
                 cx.observe(&translate_output_input, |view: &mut RootView, input, cx| {
                     let value = input.read(cx).value().to_string();
-                    view.command_state.translate.output_dir =
-                        if value.trim().is_empty() { None } else { Some(value) };
+                    view.command_state.translate.output_dir = if value.trim().is_empty() {
+                        None
+                    } else {
+                        Some(value)
+                    };
                     cx.notify();
                 })
                 .detach();
@@ -3151,6 +3502,7 @@ fn main() {
                     translate_to_input,
                     translate_output_input,
                     pty_input,
+                    terminal_buffer: TerminalBuffer::default(),
                     output_log: String::new(),
                     running: false,
                     pty_writer: None,
