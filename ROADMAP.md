@@ -63,6 +63,7 @@ Rules:
 - [x] Implement run state management: idle, running, success, failed, cancelled.
 - [x] Preserve carriage-return progress updates in the integrated output pane so PTY-rendered progress bars remain visible
 - [x] Route `serval observe` through PTY so its progress bars can render in the GUI
+- [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
 - [ ] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
 
 ---

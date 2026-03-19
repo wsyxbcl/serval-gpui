@@ -9,10 +9,12 @@ use std::thread;
 use std::time::Duration;
 
 mod commands;
+mod capture_helper;
 mod help_texts;
 mod i18n;
 mod text_input;
 
+use capture_helper::{CaptureHelperModel, CaptureHelperPromptKind};
 use commands::{CommandKind, CommandState, XmpSubcommand};
 use i18n::{t, Language};
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
@@ -311,6 +313,7 @@ struct RootView {
     running_process: Option<RunningProcessHandle>,
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
+    capture_helper: CaptureHelperModel,
     helper_mode: bool,
     command_panel_open: bool,
     input_panel_open: bool,
@@ -508,6 +511,7 @@ impl RootView {
     fn select_command(&mut self, kind: CommandKind, cx: &mut Context<Self>) {
         if self.command_state.kind != kind {
             self.command_state.kind = kind;
+            self.capture_helper.reset();
             self.hover_help_key = None;
             self.option_help_position = None;
             if self.command_help_open {
@@ -544,6 +548,7 @@ impl RootView {
         self.cancel_requested = false;
         self.running_process = None;
         self.pty_writer = None;
+        self.capture_helper.reset();
         cx.notify();
     }
 
@@ -560,6 +565,7 @@ impl RootView {
         self.cancel_requested = false;
         self.running_process = None;
         self.pty_writer = None;
+        self.capture_helper.reset();
 
         if state == RunState::Cancelled {
             self.append_output(t(self.language, "message.process_cancelled"), cx);
@@ -634,6 +640,11 @@ impl RootView {
                 };
                 let _ = guard.write_all(newline);
                 let _ = guard.flush();
+                if self.command_state.kind == CommandKind::Capture
+                    && self.capture_helper.record_submission(value)
+                {
+                    cx.notify();
+                }
                 true
             } else {
                 self.append_output(t(self.language, "message.pty_writer_locked"), cx);
@@ -653,6 +664,13 @@ impl RootView {
         if self.write_pty_value(&input_value, cx) {
             self.pty_input
                 .update(cx, |input, cx| input.set_value("", cx));
+        }
+    }
+
+    fn observe_capture_helper_output(&mut self, chunk: &str, cx: &mut Context<Self>) {
+        let chunk = sanitize_log_output(chunk);
+        if self.capture_helper.observe_output(&chunk) {
+            cx.notify();
         }
     }
 
@@ -821,6 +839,81 @@ impl RootView {
             .unwrap_or_else(|| t(self.language, "message.help_missing").to_string());
         self.help_cache.insert(key, text);
         cx.notify();
+    }
+
+    fn render_capture_helper_panel(&self, entity: Entity<Self>) -> AnyElement {
+        let Some(prompt) = self.capture_helper.prompt().cloned() else {
+            return div().into_any_element();
+        };
+
+        let language = self.language;
+        let last_submission = self.capture_helper.last_submission().map(str::to_string);
+
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(8.0))
+            .pt(px(8.0))
+            .border_t_1()
+            .border_color(rgb(0x374151))
+            .child(
+                div()
+                    .text_color(rgb(0x9CA3AF))
+                    .child(t(language, "panel.capture_helper")),
+            )
+            .child(div().text_color(rgb(0xF9FAFB)).child(prompt.prompt.clone()))
+            .child(if let Some(sample_path) = prompt.sample_path.clone() {
+                div()
+                    .text_color(rgb(0xD1D5DB))
+                    .font_family("monospace")
+                    .text_size(px(12.0))
+                    .child(sample_path)
+            } else {
+                div()
+            })
+            .child(if prompt.options.is_empty() {
+                div().into_any_element()
+            } else {
+                prompt.options.into_iter().fold(
+                    div().flex().flex_row().flex_wrap().gap(px(8.0)),
+                    |container, option| {
+                        let entity_click = entity.clone();
+                        let value = option.value.clone();
+                        let button_text = format!("{}: {}", option.value, option.label);
+                        container.child(
+                            div()
+                                .id(SharedString::from(format!("capture-helper-{}", value)))
+                                .bg(rgb(0x111827))
+                                .text_color(rgb(0xF9FAFB))
+                                .p(px(8.0))
+                                .cursor_pointer()
+                                .on_click(move |_, _, cx| {
+                                    entity_click.update(cx, |view, cx| {
+                                        view.write_pty_value(&value, cx);
+                                    });
+                                })
+                                .child(button_text),
+                        )
+                    },
+                ).into_any_element()
+            })
+            .child(if prompt.kind == CaptureHelperPromptKind::Minutes {
+                div()
+                    .text_color(rgb(0x9CA3AF))
+                    .child(t(language, "message.capture_prompt_enter_hint"))
+            } else {
+                div()
+            })
+            .child(if let Some(last_submission) = last_submission {
+                div().text_color(rgb(0x9CA3AF)).child(format!(
+                    "{}: {}",
+                    t(language, "label.last_sent"),
+                    last_submission
+                ))
+            } else {
+                div()
+            })
+            .into_any_element()
     }
 }
 
@@ -1031,6 +1124,7 @@ impl Render for RootView {
         let command_panel_open = self.command_panel_open;
         let input_panel_open = self.input_panel_open;
         let preview_panel_open = self.preview_panel_open;
+        let running = self.run_state.is_running();
         let hover_help_key = self.hover_help_key.clone();
         let option_help_position = self.option_help_position;
         let command_help_key = self
@@ -1045,6 +1139,11 @@ impl Render for RootView {
             t(language, "message.output_placeholder").to_string()
         } else {
             self.output_log.clone()
+        };
+        let capture_helper_panel = if capture_selected && running {
+            self.render_capture_helper_panel(entity.clone())
+        } else {
+            div().into_any_element()
         };
 
         let observe_input = self.observe_input.clone();
@@ -3066,6 +3165,13 @@ impl Render for RootView {
                                                     OutputEvent::Chunk(chunk) => {
                                                         let _ = cx.update(|_window, app| {
                                                             entity.update(app, |view, cx| {
+                                                                if view.command_state.kind
+                                                                    == CommandKind::Capture
+                                                                {
+                                                                    view.observe_capture_helper_output(
+                                                                        &chunk, cx,
+                                                                    );
+                                                                }
                                                                 view.append_output_chunk(chunk, cx);
                                                             })
                                                         });
@@ -3431,6 +3537,7 @@ impl Render for RootView {
                             }),
                     ),
             )
+            .child(capture_helper_panel)
             .child(if helper_mode && self.command_help_open {
                 {
                     let base = div()
@@ -3739,6 +3846,7 @@ fn main() {
                     running_process: None,
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),
+                    capture_helper: CaptureHelperModel::default(),
                     helper_mode: false,
                     command_panel_open: true,
                     input_panel_open: true,
