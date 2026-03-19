@@ -64,7 +64,9 @@ Rules:
 - [x] Preserve carriage-return progress updates in the integrated output pane so PTY-rendered progress bars remain visible
 - [x] Route `serval observe` through PTY so its progress bars can render in the GUI
 - [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
+- [ ] Use GUI-assit for other serval command that need interaction, e.g. serval extract
 - [ ] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
+- [ ] Addapt to serval v0.6.5 (add serval xmp init --info argument)
 
 ---
 
@@ -81,6 +83,7 @@ Rules:
 - Add more polished forms for all Serval subcommands. e.g. pre-read csv from input to give more advanced opiton in translate
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
+- Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
 - Improve packaging and distribution for Linux, Windows, and macOS.
 - Explore Ghostty-based terminal components if a richer embedded terminal becomes necessary.
