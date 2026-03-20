@@ -2,9 +2,14 @@
 name = "maze-serval-gpui"
 version = "0.1.0"
 edition = "2021"
+default-run = "waxbill"
 description = "Native GPUI desktop wrapper for the Serval CLI."
 license = "Apache-2.0"
 repository = "https://github.com/wsyxbcl/serval-gpui"
+
+[[bin]]
+name = "waxbill"
+path = "src/main.rs"
 
 [dependencies]
 gpui = "0.2.2"

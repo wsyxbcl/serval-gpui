@@ -1,6 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-changed=assets/windows/app-icon.rc");
-    println!("cargo:rerun-if-changed=assets/icons/io.github.wsyxbcl.maze-serval-gpui.ico");
+    println!("cargo:rerun-if-changed=assets/icons/io.github.wsyxbcl.waxbill.ico");
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         embed_resource::compile("assets/windows/app-icon.rc", embed_resource::NONE)

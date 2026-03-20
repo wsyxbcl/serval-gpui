@@ -20,7 +20,7 @@ use interaction_helper::InteractionHelperModel;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
-const APP_ID: &str = "io.github.wsyxbcl.maze-serval-gpui";
+const APP_ID: &str = "io.github.wsyxbcl.waxbill";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {

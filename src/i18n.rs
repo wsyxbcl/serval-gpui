@@ -19,7 +19,7 @@ pub fn t(language: Language, key: &str) -> &'static str {
 
 fn en(key: &str) -> &'static str {
     match key {
-        "app.title" => "serval-gpui",
+        "app.title" => "Waxbill",
         "app.active_binary" => "Active Binary",
         "action.open_input_dir" => "Open Input Dir",
         "action.open_output_dir" => "Open Output Dir",
@@ -153,7 +153,7 @@ fn en(key: &str) -> &'static str {
 
 fn zh_cn(key: &str) -> &'static str {
     match key {
-        "app.title" => "serval-gpui",
+        "app.title" => "Waxbill",
         "app.active_binary" => "当前可执行文件",
         "action.open_input_dir" => "打开输入目录",
         "action.open_output_dir" => "打开输出目录",

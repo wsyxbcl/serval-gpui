@@ -71,6 +71,7 @@ Rules:
 - [x] Quote preview and copied command arguments so spaces and shell-sensitive values stay copy-pastable
 - [x] Add cross-platform app icon assets/resources and attribution notice
 - [x] Derive blank output dirs from the input location and show the auto-output hint in the UI
+- [x] Rename the shipped binary and user-facing app identity to Waxbill
 
 ---
 
