@@ -1,3 +1,10 @@
+use std::path::{Path, PathBuf};
+
+const OBSERVE_OUTPUT_DIR_NAME: &str = "serval_observe";
+const CAPTURE_OUTPUT_DIR_NAME: &str = "serval_capture";
+const EXTRACT_OUTPUT_DIR_NAME: &str = "serval_extract";
+const TRANSLATE_OUTPUT_DIR_NAME: &str = "serval_translate";
+
 fn is_shell_safe_char(ch: char) -> bool {
     matches!(
         ch,
@@ -46,6 +53,73 @@ pub fn format_shell_command(program: &str, args: &[String]) -> String {
         .map(shell_quote_arg)
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn explicit_output_dir(value: Option<&String>) -> Option<String> {
+    value
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn default_output_dir(base_dir: PathBuf, command_dir_name: &str) -> String {
+    base_dir
+        .join("serval_output")
+        .join(command_dir_name)
+        .to_string_lossy()
+        .to_string()
+}
+
+fn base_dir_from_directory_input(path: &str) -> Option<PathBuf> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(trimmed))
+    }
+}
+
+fn base_dir_from_file_input(path: &str) -> Option<PathBuf> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let path = Path::new(trimmed);
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    if parent.as_os_str().is_empty() {
+        Some(PathBuf::from("."))
+    } else {
+        Some(parent.to_path_buf())
+    }
+}
+
+fn effective_observe_output_dir(input: &ObserveInput) -> Option<String> {
+    explicit_output_dir(input.output_dir.as_ref()).or_else(|| {
+        base_dir_from_directory_input(&input.media_dir)
+            .map(|base_dir| default_output_dir(base_dir, OBSERVE_OUTPUT_DIR_NAME))
+    })
+}
+
+fn effective_capture_output_dir(input: &CaptureInput) -> Option<String> {
+    explicit_output_dir(input.output_dir.as_ref()).or_else(|| {
+        base_dir_from_file_input(&input.csv_path)
+            .map(|base_dir| default_output_dir(base_dir, CAPTURE_OUTPUT_DIR_NAME))
+    })
+}
+
+fn effective_extract_output_dir(input: &ExtractInput) -> Option<String> {
+    explicit_output_dir(input.output_dir.as_ref()).or_else(|| {
+        base_dir_from_file_input(&input.csv_path)
+            .map(|base_dir| default_output_dir(base_dir, EXTRACT_OUTPUT_DIR_NAME))
+    })
+}
+
+fn effective_translate_output_dir(input: &TranslateInput) -> Option<String> {
+    explicit_output_dir(input.output_dir.as_ref()).or_else(|| {
+        base_dir_from_file_input(&input.csv_path)
+            .map(|base_dir| default_output_dir(base_dir, TRANSLATE_OUTPUT_DIR_NAME))
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -155,6 +229,53 @@ impl CommandState {
             CommandKind::Translate => build_translate(&self.translate),
         }
     }
+
+    pub fn effective_output_dir(&self) -> Option<String> {
+        match self.kind {
+            CommandKind::Observe => effective_observe_output_dir(&self.observe),
+            CommandKind::Capture => effective_capture_output_dir(&self.capture),
+            CommandKind::Xmp => {
+                if self.xmp.subcommand == XmpSubcommand::Copy {
+                    let trimmed = self.xmp.output_dir.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                } else {
+                    None
+                }
+            }
+            CommandKind::Extract => effective_extract_output_dir(&self.extract),
+            CommandKind::Translate => effective_translate_output_dir(&self.translate),
+        }
+    }
+
+    pub fn auto_output_dir_hint(&self) -> Option<String> {
+        match self.kind {
+            CommandKind::Observe
+                if explicit_output_dir(self.observe.output_dir.as_ref()).is_none() =>
+            {
+                effective_observe_output_dir(&self.observe)
+            }
+            CommandKind::Capture
+                if explicit_output_dir(self.capture.output_dir.as_ref()).is_none() =>
+            {
+                effective_capture_output_dir(&self.capture)
+            }
+            CommandKind::Extract
+                if explicit_output_dir(self.extract.output_dir.as_ref()).is_none() =>
+            {
+                effective_extract_output_dir(&self.extract)
+            }
+            CommandKind::Translate
+                if explicit_output_dir(self.translate.output_dir.as_ref()).is_none() =>
+            {
+                effective_translate_output_dir(&self.translate)
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -242,9 +363,9 @@ impl Default for XmpInput {
 fn preview_observe_args(input: &ObserveInput) -> Vec<String> {
     let mut parts = vec!["observe".to_string()];
 
-    if let Some(output) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output) = effective_observe_output_dir(input) {
         parts.push("-o".to_string());
-        parts.push(output.clone());
+        parts.push(output);
     }
     if input.xmp {
         parts.push("--xmp".to_string());
@@ -289,9 +410,9 @@ fn preview_capture_args(input: &CaptureInput) -> Vec<String> {
     if input.camtrap_dp {
         parts.push("--camtrap-dp".to_string());
     }
-    if let Some(output) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output) = effective_capture_output_dir(input) {
         parts.push("-o".to_string());
-        parts.push(output.clone());
+        parts.push(output);
     }
 
     let csv_path = if input.csv_path.is_empty() {
@@ -388,9 +509,9 @@ fn preview_extract_args(input: &ExtractInput) -> Vec<String> {
         parts.push("--subdir-type".to_string());
         parts.push(subdir_type.clone());
     }
-    if let Some(output_dir) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output_dir) = effective_extract_output_dir(input) {
         parts.push("-o".to_string());
-        parts.push(output_dir.clone());
+        parts.push(output_dir);
     }
     parts.push(if input.csv_path.is_empty() {
         "<CSV_PATH>".to_string()
@@ -420,9 +541,9 @@ fn preview_translate_args(input: &TranslateInput) -> Vec<String> {
     } else {
         input.to.clone()
     });
-    if let Some(output_dir) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output_dir) = effective_translate_output_dir(input) {
         parts.push("-o".to_string());
-        parts.push(output_dir.clone());
+        parts.push(output_dir);
     }
     parts.push(if input.csv_path.is_empty() {
         "<CSV_PATH>".to_string()
@@ -439,9 +560,9 @@ fn build_observe(input: &ObserveInput) -> Result<(String, Vec<String>), String> 
 
     let mut args = vec!["observe".to_string()];
 
-    if let Some(output) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output) = effective_observe_output_dir(input) {
         args.push("-o".to_string());
-        args.push(output.clone());
+        args.push(output);
     }
     if input.xmp {
         args.push("--xmp".to_string());
@@ -486,9 +607,9 @@ fn build_capture(input: &CaptureInput) -> Result<(String, Vec<String>), String> 
     if input.camtrap_dp {
         args.push("--camtrap-dp".to_string());
     }
-    if let Some(output) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output) = effective_capture_output_dir(input) {
         args.push("-o".to_string());
-        args.push(output.clone());
+        args.push(output);
     }
 
     args.push(input.csv_path.clone());
@@ -588,9 +709,9 @@ fn build_extract(input: &ExtractInput) -> Result<(String, Vec<String>), String> 
         args.push("--subdir-type".to_string());
         args.push(subdir_type.clone());
     }
-    if let Some(output_dir) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output_dir) = effective_extract_output_dir(input) {
         args.push("-o".to_string());
-        args.push(output_dir.clone());
+        args.push(output_dir);
     }
     args.push(input.csv_path.clone());
 
@@ -621,9 +742,9 @@ fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), Stri
         input.to.clone(),
     ];
 
-    if let Some(output_dir) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
+    if let Some(output_dir) = effective_translate_output_dir(input) {
         args.push("-o".to_string());
-        args.push(output_dir.clone());
+        args.push(output_dir);
     }
 
     args.push(input.csv_path.clone());
@@ -633,7 +754,9 @@ fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), Stri
 
 #[cfg(test)]
 mod tests {
-    use super::{format_shell_command, CommandKind, CommandState, ExtractInput};
+    use super::{
+        format_shell_command, CommandKind, CommandState, ExtractInput, ObserveInput, TranslateInput,
+    };
 
     #[test]
     fn shell_command_quotes_spaced_arguments() {
@@ -674,8 +797,63 @@ mod tests {
 
         assert_eq!(
             state.preview(),
-            r#"serval extract --filter-type species --value "Snow leopard" "<CSV_PATH>""#
-                .replace("\"<CSV_PATH>\"", "/tmp/records.csv")
+            r#"serval extract --filter-type species --value "Snow leopard" -o /tmp/serval_output/serval_extract /tmp/records.csv"#
+        );
+    }
+
+    #[test]
+    fn observe_build_uses_input_directory_for_default_output() {
+        let input = ObserveInput {
+            media_dir: "/tmp/media".to_string(),
+            ..ObserveInput::default()
+        };
+
+        let (_, args) = super::build_observe(&input).expect("observe command should build");
+
+        assert_eq!(
+            args,
+            vec![
+                "observe",
+                "-o",
+                "/tmp/media/serval_output/serval_observe",
+                "/tmp/media",
+            ]
+        );
+    }
+
+    #[test]
+    fn translate_hint_uses_csv_parent_when_output_dir_is_blank() {
+        let mut state = CommandState::default();
+        state.kind = CommandKind::Translate;
+        state.translate = TranslateInput {
+            csv_path: "/tmp/jobs/tags.csv".to_string(),
+            taglist_path: "/tmp/jobs/taglist.csv".to_string(),
+            from: "species".to_string(),
+            to: "species_cn".to_string(),
+            ..TranslateInput::default()
+        };
+
+        assert_eq!(
+            state.auto_output_dir_hint().as_deref(),
+            Some("/tmp/jobs/serval_output/serval_translate")
+        );
+    }
+
+    #[test]
+    fn explicit_output_dir_disables_auto_hint() {
+        let mut state = CommandState::default();
+        state.kind = CommandKind::Extract;
+        state.extract = ExtractInput {
+            csv_path: "/tmp/records.csv".to_string(),
+            value: "Snow leopard".to_string(),
+            output_dir: Some("/tmp/custom-output".to_string()),
+            ..ExtractInput::default()
+        };
+
+        assert_eq!(state.auto_output_dir_hint(), None);
+        assert_eq!(
+            state.effective_output_dir().as_deref(),
+            Some("/tmp/custom-output")
         );
     }
 }

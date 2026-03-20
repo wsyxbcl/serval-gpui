@@ -763,51 +763,22 @@ impl RootView {
     }
 
     fn resolve_output_dir(&self) -> Option<PathBuf> {
-        match self.command_state.kind {
-            CommandKind::Observe => self
-                .command_state
-                .observe
-                .output_dir
-                .as_ref()
-                .filter(|s| !s.trim().is_empty())
-                .map(PathBuf::from)
-                .or_else(|| Some(PathBuf::from("./serval_output/serval_observe"))),
-            CommandKind::Capture => self
-                .command_state
-                .capture
-                .output_dir
-                .as_ref()
-                .filter(|s| !s.trim().is_empty())
-                .map(PathBuf::from)
-                .or_else(|| Some(PathBuf::from("./serval_output/serval_capture"))),
-            CommandKind::Xmp => {
-                if self.command_state.xmp.subcommand == XmpSubcommand::Copy {
-                    if self.command_state.xmp.output_dir.trim().is_empty() {
-                        None
-                    } else {
-                        Some(PathBuf::from(self.command_state.xmp.output_dir.trim()))
-                    }
-                } else {
-                    None
-                }
-            }
-            CommandKind::Extract => self
-                .command_state
-                .extract
-                .output_dir
-                .as_ref()
-                .filter(|s| !s.trim().is_empty())
-                .map(PathBuf::from)
-                .or_else(|| Some(PathBuf::from("./serval_output/serval_extract"))),
-            CommandKind::Translate => self
-                .command_state
-                .translate
-                .output_dir
-                .as_ref()
-                .filter(|s| !s.trim().is_empty())
-                .map(PathBuf::from)
-                .or_else(|| Some(PathBuf::from("./serval_output/serval_translate"))),
-        }
+        self.command_state.effective_output_dir().map(PathBuf::from)
+    }
+
+    fn render_auto_output_dir_hint(&self) -> AnyElement {
+        let Some(path) = self.command_state.auto_output_dir_hint() else {
+            return div().into_any_element();
+        };
+
+        div()
+            .text_color(rgb(0x6B7280))
+            .text_size(px(12.0))
+            .child(format!(
+                "{} {path}",
+                t(self.language, "hint.output_dir_auto")
+            ))
+            .into_any_element()
     }
 
     fn current_help_key(&self) -> String {
@@ -1277,6 +1248,7 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
+                .child(self.render_auto_output_dir_hint())
                 .child(
                     div()
                         .text_color(rgb(0x6B7280))
@@ -1585,6 +1557,7 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
+                .child(self.render_auto_output_dir_hint())
                 .child(
                     div()
                         .text_color(rgb(0x6B7280))
@@ -2431,6 +2404,7 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
+                .child(self.render_auto_output_dir_hint())
                 .child(
                     div()
                         .text_color(rgb(0x6B7280))
@@ -2768,6 +2742,7 @@ impl Render for RootView {
                                 .child(t(language, "action.browse"))
                         }),
                 )
+                .child(self.render_auto_output_dir_hint())
         };
 
         div()
