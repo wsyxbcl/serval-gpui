@@ -35,12 +35,12 @@ Rules:
 - [x] Add initial UI support for `capture`.
 - [x] Add copy-command and copy-log actions.
 - [x] Add open input dir / open output dir actions.
-- [x] A setup interface: user can config location of serval binary, if set, gui should be using that to start serval
+- [x] Add a setup interface so the user can configure the Serval binary path, and use it for launches when set.
 - [x] Add initial UI support for `xmp` and its subfunctions
 - [x] Add initial UI support for `extract`
 - [x] Add initial UI support for `translate`
-- [x] Add a collaspe design to some panel, as config panel take different space, which may push the output panel to invisible
-- [x] Add corresponding help message to each functions
+- [x] Add collapsible panels so configuration sections do not push the output panel offscreen.
+- [x] Add corresponding help messages for each function.
 - [x] Improve help UX: load full `serval ... --help` content and show it on Help hover
 - [x] Extend hover help to option toggles/chips (observe/capture/xmp update/extract)
 - [x] Render help as overlay instead of in-panel block to avoid hover layout shifts
@@ -51,7 +51,7 @@ Rules:
 - [x] Add language selector in Setup and wire core header/panel/action labels to i18n keys
 - [x] Make help text source language-aware (`help_texts::text_for_key(language, key)`)
 - [x] Localize additional labels/prompts/messages and command buttons using i18n keys
-- [x] Add a i18n support for languages and let user config in setup
+- [x] Add i18n language support and let the user configure it in Setup.
 - [x] Add language support for simplified Chinese
 - [x] Add a GitHub Actions workflow to build a Windows release binary and upload it as an artifact
 - [x] Fix Windows PTY interactive prompt/input forwarding for `serval capture`
@@ -64,10 +64,10 @@ Rules:
 - [x] Preserve carriage-return progress updates in the integrated output pane so PTY-rendered progress bars remain visible
 - [x] Route `serval observe` through PTY so its progress bars can render in the GUI
 - [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
-- [x] Use GUI-assit for other serval command that need interaction, e.g. serval extract
+- [x] Use the GUI assist layer for other Serval commands that need interaction, such as `serval extract`.
 - [ ] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
-- [ ] Addapt to serval v0.6.5 (add serval xmp init --info argument)
-- [ ] Suppport clipboard and other inline shortcuts
+- [ ] Adapt to `serval` v0.6.5 (add `serval xmp init --info`)
+- [ ] Support clipboard and other inline shortcuts
 - [ ] Add an icon for the binary (should be working cross-platform)
 
 ---
@@ -77,14 +77,13 @@ Rules:
 - Decide whether to support bundling the Serval binary or require an external executable.
 - Decide which subcommands beyond the initial set deserve first-class GUI forms.
 - Decide how much terminal fidelity is actually needed in the integrated output pane.
-- Refine i18n translation for Chinese
-
+- Refine i18n translations for Chinese.
 
 ---
 
 ## Future Work
 
-- Add more polished forms for all Serval subcommands. e.g. pre-read csv from input to give more advanced opiton in translate or pre-read species values in csv for extract
+- Add more polished forms for all Serval subcommands, e.g. pre-read CSV input to offer more advanced options in `translate` or pre-read species values in CSV for `extract`.
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
