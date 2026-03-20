@@ -1,3 +1,53 @@
+fn is_shell_safe_char(ch: char) -> bool {
+    matches!(
+        ch,
+        'a'..='z'
+            | 'A'..='Z'
+            | '0'..='9'
+            | '_'
+            | '-'
+            | '.'
+            | '/'
+            | '\\'
+            | ':'
+            | '@'
+            | '%'
+            | '+'
+            | '='
+            | ','
+    )
+}
+
+fn shell_quote_arg(arg: &str) -> String {
+    if !arg.is_empty() && arg.chars().all(is_shell_safe_char) {
+        return arg.to_string();
+    }
+
+    let mut quoted = String::with_capacity(arg.len() + 2);
+    quoted.push('"');
+    for ch in arg.chars() {
+        match ch {
+            '"' | '$' | '`' => {
+                quoted.push('\\');
+                quoted.push(ch);
+            }
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            _ => quoted.push(ch),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+pub fn format_shell_command(program: &str, args: &[String]) -> String {
+    std::iter::once(program)
+        .chain(args.iter().map(String::as_str))
+        .map(shell_quote_arg)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommandKind {
     Observe,
@@ -82,13 +132,18 @@ impl Default for CommandState {
 
 impl CommandState {
     pub fn preview(&self) -> String {
-        match self.kind {
-            CommandKind::Observe => preview_observe(&self.observe),
-            CommandKind::Capture => preview_capture(&self.capture),
-            CommandKind::Xmp => preview_xmp(&self.xmp),
-            CommandKind::Extract => preview_extract(&self.extract),
-            CommandKind::Translate => preview_translate(&self.translate),
-        }
+        self.preview_with_program("serval")
+    }
+
+    pub fn preview_with_program(&self, program: &str) -> String {
+        let args = match self.kind {
+            CommandKind::Observe => preview_observe_args(&self.observe),
+            CommandKind::Capture => preview_capture_args(&self.capture),
+            CommandKind::Xmp => preview_xmp_args(&self.xmp),
+            CommandKind::Extract => preview_extract_args(&self.extract),
+            CommandKind::Translate => preview_translate_args(&self.translate),
+        };
+        format_shell_command(program, &args)
     }
 
     pub fn build_command(&self) -> Result<(String, Vec<String>), String> {
@@ -184,8 +239,8 @@ impl Default for XmpInput {
     }
 }
 
-fn preview_observe(input: &ObserveInput) -> String {
-    let mut parts = vec!["serval".to_string(), "observe".to_string()];
+fn preview_observe_args(input: &ObserveInput) -> Vec<String> {
+    let mut parts = vec!["observe".to_string()];
 
     if let Some(output) = input.output_dir.as_ref().filter(|s| !s.is_empty()) {
         parts.push("-o".to_string());
@@ -219,12 +274,11 @@ fn preview_observe(input: &ObserveInput) -> String {
         input.media_dir.as_str()
     };
     parts.push(media_dir.to_string());
-
-    parts.join(" ")
+    parts
 }
 
-fn preview_capture(input: &CaptureInput) -> String {
-    let mut parts = vec!["serval".to_string(), "capture".to_string()];
+fn preview_capture_args(input: &CaptureInput) -> Vec<String> {
+    let mut parts = vec!["capture".to_string()];
 
     if input.event {
         parts.push("--event".to_string());
@@ -246,12 +300,11 @@ fn preview_capture(input: &CaptureInput) -> String {
         input.csv_path.as_str()
     };
     parts.push(csv_path.to_string());
-
-    parts.join(" ")
+    parts
 }
 
-fn preview_xmp(input: &XmpInput) -> String {
-    let mut parts = vec!["serval".to_string(), "xmp".to_string()];
+fn preview_xmp_args(input: &XmpInput) -> Vec<String> {
+    let mut parts = vec!["xmp".to_string()];
 
     match input.subcommand {
         XmpSubcommand::Copy => {
@@ -309,11 +362,11 @@ fn preview_xmp(input: &XmpInput) -> String {
         }
     }
 
-    parts.join(" ")
+    parts
 }
 
-fn preview_extract(input: &ExtractInput) -> String {
-    let mut parts = vec!["serval".to_string(), "extract".to_string()];
+fn preview_extract_args(input: &ExtractInput) -> Vec<String> {
+    let mut parts = vec!["extract".to_string()];
     parts.push("--filter-type".to_string());
     parts.push(input.filter_type.clone());
     parts.push("--value".to_string());
@@ -344,11 +397,11 @@ fn preview_extract(input: &ExtractInput) -> String {
     } else {
         input.csv_path.clone()
     });
-    parts.join(" ")
+    parts
 }
 
-fn preview_translate(input: &TranslateInput) -> String {
-    let mut parts = vec!["serval".to_string(), "translate".to_string()];
+fn preview_translate_args(input: &TranslateInput) -> Vec<String> {
+    let mut parts = vec!["translate".to_string()];
     parts.push("--taglist-path".to_string());
     parts.push(if input.taglist_path.is_empty() {
         "<TAGLIST>".to_string()
@@ -376,7 +429,7 @@ fn preview_translate(input: &TranslateInput) -> String {
     } else {
         input.csv_path.clone()
     });
-    parts.join(" ")
+    parts
 }
 
 fn build_observe(input: &ObserveInput) -> Result<(String, Vec<String>), String> {
@@ -576,4 +629,53 @@ fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), Stri
     args.push(input.csv_path.clone());
 
     Ok(("serval".to_string(), args))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{format_shell_command, CommandKind, CommandState, ExtractInput};
+
+    #[test]
+    fn shell_command_quotes_spaced_arguments() {
+        assert_eq!(
+            format_shell_command(
+                "serval",
+                &[
+                    "extract".to_string(),
+                    "--value".to_string(),
+                    "Snow leopard".to_string(),
+                ]
+            ),
+            r#"serval extract --value "Snow leopard""#
+        );
+    }
+
+    #[test]
+    fn shell_command_quotes_program_paths_and_placeholder_tokens() {
+        assert_eq!(
+            format_shell_command(
+                "/tmp/serval bin",
+                &["capture".to_string(), "<CSV_PATH>".to_string()]
+            ),
+            r#""/tmp/serval bin" capture "<CSV_PATH>""#
+        );
+    }
+
+    #[test]
+    fn extract_preview_quotes_spaced_filter_values() {
+        let mut state = CommandState::default();
+        state.kind = CommandKind::Extract;
+        state.extract = ExtractInput {
+            csv_path: "/tmp/records.csv".to_string(),
+            value: "Snow leopard".to_string(),
+            subdir_type: None,
+            ..ExtractInput::default()
+        };
+
+        assert_eq!(
+            state.preview(),
+            r#"serval extract --filter-type species --value "Snow leopard" "<CSV_PATH>""#
+                .replace("\"<CSV_PATH>\"", "/tmp/records.csv")
+        );
+    }
 }

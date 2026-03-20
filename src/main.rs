@@ -14,7 +14,7 @@ mod i18n;
 mod interaction_helper;
 mod text_input;
 
-use commands::{CommandKind, CommandState, XmpSubcommand};
+use commands::{format_shell_command, CommandKind, CommandState, XmpSubcommand};
 use i18n::{t, Language};
 use interaction_helper::InteractionHelperModel;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
@@ -496,13 +496,8 @@ impl RootView {
     }
 
     fn command_preview(&self) -> String {
-        let base = self.command_state.preview();
-        let program = self.executable_program();
-        if program == "serval" {
-            base
-        } else {
-            base.replacen("serval", &program, 1)
-        }
+        self.command_state
+            .preview_with_program(&self.executable_program())
     }
 
     fn set_serval_binary_path(&mut self, path: Option<String>, cx: &mut Context<Self>) {
@@ -2959,9 +2954,8 @@ impl Render for RootView {
                                             let executable = view.executable_program();
                                             let kind = view.command_state.kind;
                                             let display = format!(
-                                                "$ {} {}",
-                                                executable,
-                                                command.1.join(" ")
+                                                "$ {}",
+                                                format_shell_command(&executable, &command.1)
                                             );
                                             view.begin_run(kind, display, cx);
                                             let use_pty = RootView::command_uses_pty(kind);
