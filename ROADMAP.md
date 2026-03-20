@@ -65,7 +65,7 @@ Rules:
 - [x] Route `serval observe` through PTY so its progress bars can render in the GUI
 - [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
 - [x] Use the GUI assist layer for other Serval commands that need interaction, such as `serval extract`.
-- [ ] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
+- [x] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
 - [ ] Adapt to `serval` v0.6.5 (add `serval xmp init --info`)
 - [ ] Support clipboard and other inline shortcuts
 - [ ] Add an icon for the binary (should be working cross-platform)

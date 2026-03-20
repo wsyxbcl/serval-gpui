@@ -258,7 +258,7 @@ impl TerminalBuffer {
 
 #[cfg(test)]
 mod tests {
-    use super::TerminalBuffer;
+    use super::{commands::CommandKind, RootView, TerminalBuffer};
 
     #[test]
     fn carriage_return_overwrites_current_line() {
@@ -282,6 +282,12 @@ mod tests {
         buffer.push_chunk("Working...");
         buffer.append_log_line("Done");
         assert_eq!(buffer.render_text(), "Working...\nDone\n");
+    }
+
+    #[test]
+    fn xmp_commands_use_pty_for_progress_rendering() {
+        assert!(RootView::command_uses_pty(CommandKind::Xmp));
+        assert!(!RootView::command_uses_pty(CommandKind::Translate));
     }
 }
 
@@ -403,7 +409,7 @@ impl RootView {
     fn command_uses_pty(kind: CommandKind) -> bool {
         matches!(
             kind,
-            CommandKind::Observe | CommandKind::Capture | CommandKind::Extract
+            CommandKind::Observe | CommandKind::Capture | CommandKind::Xmp | CommandKind::Extract
         )
     }
 
