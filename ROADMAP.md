@@ -69,7 +69,7 @@ Rules:
 - [x] Support clipboard and other inline shortcuts
 - [x] Fix IME composition handling in custom text inputs so Chinese input works on Windows
 - [x] Quote preview and copied command arguments so spaces and shell-sensitive values stay copy-pastable
-- [ ] Add an icon for the binary (should be working cross-platform)
+- [x] Add cross-platform app icon assets/resources and attribution notice
 
 ---
 

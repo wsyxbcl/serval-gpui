@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Serval GPUI
+Comment=Native GPUI desktop wrapper for the Serval CLI
+Exec=maze-serval-gpui
+Icon=io.github.wsyxbcl.maze-serval-gpui
+Terminal=false
+Categories=Utility;
+StartupWMClass=io.github.wsyxbcl.maze-serval-gpui

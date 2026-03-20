@@ -20,6 +20,8 @@ use interaction_helper::InteractionHelperModel;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
+const APP_ID: &str = "io.github.wsyxbcl.maze-serval-gpui";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {
     Idle,
@@ -2875,7 +2877,7 @@ impl Render for RootView {
                                         let language = setup_state.language;
                                         let root_for_window = entity_setup.clone();
                                         let _ = cx.open_window(
-                                            WindowOptions::default(),
+                                            app_window_options(),
                                             move |_, app| {
                                                 let root = root_for_window.clone();
                                                 let initial = current.clone();
@@ -3674,7 +3676,7 @@ impl Render for RootView {
 fn main() {
     Application::new().run(|app| {
         bind_text_input_keys(app);
-        app.open_window(WindowOptions::default(), |_window, app| {
+        app.open_window(app_window_options(), |_window, app| {
             app.new(|cx| {
                 let observe_input = cx
                     .new(|cx| TextInput::new(cx, t(Language::En, "placeholder.observe_media_dir")));
@@ -3892,4 +3894,10 @@ fn main() {
         })
         .unwrap();
     });
+}
+
+fn app_window_options() -> WindowOptions {
+    let mut options = WindowOptions::default();
+    options.app_id = Some(APP_ID.to_string());
+    options
 }

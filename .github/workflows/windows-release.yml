@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BIN_NAME: serval-gpui
+  BIN_NAME: maze-serval-gpui
   TARGET: x86_64-pc-windows-msvc
 
 jobs:
@@ -42,6 +42,9 @@ jobs:
           }
           if (Test-Path "LICENSE") {
             Copy-Item "LICENSE" $stagingDir
+          }
+          if (Test-Path "NOTICE") {
+            Copy-Item "NOTICE" $stagingDir
           }
           Compress-Archive -Path "$stagingDir/*" -DestinationPath "$artifactName.zip"
           "ASSET_NAME=$artifactName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

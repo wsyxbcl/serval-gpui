@@ -10,3 +10,6 @@ repository = "https://github.com/wsyxbcl/serval-gpui"
 gpui = "0.2.2"
 unicode-segmentation = "1.11"
 portable-pty = "0.9"
+
+[build-dependencies]
+embed-resource = "3.0.2"
