@@ -66,7 +66,6 @@ Rules:
 - [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
 - [x] Use the GUI assist layer for other Serval commands that need interaction, such as `serval extract`.
 - [x] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
-- [ ] Adapt to `serval` v0.6.5 (add `serval xmp init --info`)
 - [ ] Support clipboard and other inline shortcuts
 - [ ] Add an icon for the binary (should be working cross-platform)
 
@@ -86,6 +85,7 @@ Rules:
 - Add more polished forms for all Serval subcommands, e.g. pre-read CSV input to offer more advanced options in `translate` or pre-read species values in CSV for `extract`.
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
+- Adapt to future `serval` v0.6.6/v0.7.0 (add `serval xmp init --info` and serval viz utils)
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
 - Improve packaging and distribution for Linux, Windows, and macOS.
