@@ -25,7 +25,9 @@ fn en_text_for_key(key: &str) -> Option<&'static str> {
         "observe|--video" => Some("Only process video files."),
         "observe|--image" => Some("Only process image files."),
         "observe|--debug" => Some("Enable debug output."),
-        "observe|--independent" => Some("Run temporal independence analysis after metadata extraction."),
+        "observe|--independent" => {
+            Some("Run temporal independence analysis after metadata extraction.")
+        }
         "capture|--event" => Some("Create event IDs during temporal independence analysis."),
         "capture|--no-exclude" => Some(
             "Do not exclude default tags: Blank, Useless data, Unidentified, Human, Unknown, Blur.",
@@ -38,9 +40,9 @@ fn en_text_for_key(key: &str) -> Option<&'static str> {
         "xmp-update|sex" => Some("Set --tag-type to sex."),
         "xmp-update|bodypart" => Some("Set --tag-type to bodypart."),
         "extract|--rename" => Some("Enable rename mode, including tags in filenames."),
-        "extract|--skip-existing" => Some(
-            "Skip copy if destination already exists (no auto-renaming).",
-        ),
+        "extract|--skip-existing" => {
+            Some("Skip copy if destination already exists (no auto-renaming).")
+        }
         "extract|--use-subdir" => Some("Use subdirectories to organize copied resources."),
         _ => None,
     }
@@ -56,9 +58,9 @@ fn zh_text_for_key(key: &str) -> Option<&'static str> {
         "observe|--debug" => Some("启用调试输出。"),
         "observe|--independent" => Some("提取完成后执行时间独立性分析。"),
         "capture|--event" => Some("在时间独立性分析过程中生成事件 ID。"),
-        "capture|--no-exclude" => Some(
-            "不排除默认标签：Blank、Useless data、Unidentified、Human、Unknown、Blur。",
-        ),
+        "capture|--no-exclude" => {
+            Some("不排除默认标签：Blank、Useless data、Unidentified、Human、Unknown、Blur。")
+        }
         "capture|--camtrap-dp" => Some("使用 camtrap-dp 数据包中的 observation 表。"),
         "xmp-update|--datetime" => Some("更新日期时间，而不是更新标签字段。"),
         "xmp-update|species" => Some("将 --tag-type 设置为 species。"),

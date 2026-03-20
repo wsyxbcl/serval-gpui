@@ -64,9 +64,11 @@ Rules:
 - [x] Preserve carriage-return progress updates in the integrated output pane so PTY-rendered progress bars remain visible
 - [x] Route `serval observe` through PTY so its progress bars can render in the GUI
 - [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
-- [ ] Use GUI-assit for other serval command that need interaction, e.g. serval extract
+- [x] Use GUI-assit for other serval command that need interaction, e.g. serval extract
 - [ ] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
 - [ ] Addapt to serval v0.6.5 (add serval xmp init --info argument)
+- [ ] Suppport clipboard and other inline shortcuts
+- [ ] Add an icon for the binary (should be working cross-platform)
 
 ---
 
@@ -75,12 +77,14 @@ Rules:
 - Decide whether to support bundling the Serval binary or require an external executable.
 - Decide which subcommands beyond the initial set deserve first-class GUI forms.
 - Decide how much terminal fidelity is actually needed in the integrated output pane.
+- Refine i18n translation for Chinese
+
 
 ---
 
 ## Future Work
 
-- Add more polished forms for all Serval subcommands. e.g. pre-read csv from input to give more advanced opiton in translate
+- Add more polished forms for all Serval subcommands. e.g. pre-read csv from input to give more advanced opiton in translate or pre-read species values in csv for extract
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv

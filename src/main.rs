@@ -9,14 +9,14 @@ use std::thread;
 use std::time::Duration;
 
 mod commands;
-mod capture_helper;
 mod help_texts;
 mod i18n;
+mod interaction_helper;
 mod text_input;
 
-use capture_helper::{CaptureHelperModel, CaptureHelperPromptKind};
 use commands::{CommandKind, CommandState, XmpSubcommand};
 use i18n::{t, Language};
+use interaction_helper::InteractionHelperModel;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
@@ -310,10 +310,11 @@ struct RootView {
     output_log: String,
     run_state: RunState,
     cancel_requested: bool,
+    running_command_kind: Option<CommandKind>,
     running_process: Option<RunningProcessHandle>,
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
-    capture_helper: CaptureHelperModel,
+    interaction_helper: InteractionHelperModel,
     helper_mode: bool,
     command_panel_open: bool,
     input_panel_open: bool,
@@ -399,6 +400,17 @@ fn browse_into_text_input(
     }
 }
 impl RootView {
+    fn command_uses_pty(kind: CommandKind) -> bool {
+        matches!(
+            kind,
+            CommandKind::Observe | CommandKind::Capture | CommandKind::Extract
+        )
+    }
+
+    fn command_uses_interaction_helper(kind: CommandKind) -> bool {
+        matches!(kind, CommandKind::Capture | CommandKind::Extract)
+    }
+
     fn set_language(&mut self, language: Language, cx: &mut Context<Self>) {
         if self.language != language {
             self.language = language;
@@ -511,7 +523,9 @@ impl RootView {
     fn select_command(&mut self, kind: CommandKind, cx: &mut Context<Self>) {
         if self.command_state.kind != kind {
             self.command_state.kind = kind;
-            self.capture_helper.reset();
+            if !self.run_state.is_running() {
+                self.interaction_helper.reset();
+            }
             self.hover_help_key = None;
             self.option_help_position = None;
             if self.command_help_open {
@@ -542,13 +556,14 @@ impl RootView {
         cx.notify();
     }
 
-    fn begin_run(&mut self, display: String, cx: &mut Context<Self>) {
+    fn begin_run(&mut self, kind: CommandKind, display: String, cx: &mut Context<Self>) {
         self.append_output(display, cx);
         self.run_state = RunState::Running;
         self.cancel_requested = false;
+        self.running_command_kind = Some(kind);
         self.running_process = None;
         self.pty_writer = None;
-        self.capture_helper.reset();
+        self.interaction_helper.reset();
         cx.notify();
     }
 
@@ -563,9 +578,10 @@ impl RootView {
 
         self.run_state = state;
         self.cancel_requested = false;
+        self.running_command_kind = None;
         self.running_process = None;
         self.pty_writer = None;
-        self.capture_helper.reset();
+        self.interaction_helper.reset();
 
         if state == RunState::Cancelled {
             self.append_output(t(self.language, "message.process_cancelled"), cx);
@@ -640,8 +656,10 @@ impl RootView {
                 };
                 let _ = guard.write_all(newline);
                 let _ = guard.flush();
-                if self.command_state.kind == CommandKind::Capture
-                    && self.capture_helper.record_submission(value)
+                if self
+                    .running_command_kind
+                    .is_some_and(Self::command_uses_interaction_helper)
+                    && self.interaction_helper.record_submission(value)
                 {
                     cx.notify();
                 }
@@ -667,9 +685,9 @@ impl RootView {
         }
     }
 
-    fn observe_capture_helper_output(&mut self, chunk: &str, cx: &mut Context<Self>) {
+    fn observe_interaction_helper_output(&mut self, chunk: &str, cx: &mut Context<Self>) {
         let chunk = sanitize_log_output(chunk);
-        if self.capture_helper.observe_output(&chunk) {
+        if self.interaction_helper.observe_output(&chunk) {
             cx.notify();
         }
     }
@@ -841,13 +859,17 @@ impl RootView {
         cx.notify();
     }
 
-    fn render_capture_helper_panel(&self, entity: Entity<Self>) -> AnyElement {
-        let Some(prompt) = self.capture_helper.prompt().cloned() else {
+    fn render_interaction_helper_panel(&self, entity: Entity<Self>) -> AnyElement {
+        let Some(prompt) = self.interaction_helper.prompt().cloned() else {
             return div().into_any_element();
         };
 
         let language = self.language;
-        let last_submission = self.capture_helper.last_submission().map(str::to_string);
+        let has_options = !prompt.options.is_empty();
+        let last_submission = self
+            .interaction_helper
+            .last_submission()
+            .map(str::to_string);
 
         div()
             .flex()
@@ -859,7 +881,7 @@ impl RootView {
             .child(
                 div()
                     .text_color(rgb(0x9CA3AF))
-                    .child(t(language, "panel.capture_helper")),
+                    .child(t(language, "panel.interaction_helper")),
             )
             .child(div().text_color(rgb(0xF9FAFB)).child(prompt.prompt.clone()))
             .child(if let Some(sample_path) = prompt.sample_path.clone() {
@@ -871,36 +893,40 @@ impl RootView {
             } else {
                 div()
             })
-            .child(if prompt.options.is_empty() {
+            .child(if !has_options {
                 div().into_any_element()
             } else {
-                prompt.options.into_iter().fold(
-                    div().flex().flex_row().flex_wrap().gap(px(8.0)),
-                    |container, option| {
-                        let entity_click = entity.clone();
-                        let value = option.value.clone();
-                        let button_text = format!("{}: {}", option.value, option.label);
-                        container.child(
-                            div()
-                                .id(SharedString::from(format!("capture-helper-{}", value)))
-                                .bg(rgb(0x111827))
-                                .text_color(rgb(0xF9FAFB))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.write_pty_value(&value, cx);
-                                    });
-                                })
-                                .child(button_text),
-                        )
-                    },
-                ).into_any_element()
+                prompt
+                    .options
+                    .into_iter()
+                    .fold(
+                        div().flex().flex_row().flex_wrap().gap(px(8.0)),
+                        |container, option| {
+                            let entity_click = entity.clone();
+                            let value = option.value.clone();
+                            let button_text = format!("{}: {}", option.value, option.label);
+                            container.child(
+                                div()
+                                    .id(SharedString::from(format!("interaction-helper-{}", value)))
+                                    .bg(rgb(0x111827))
+                                    .text_color(rgb(0xF9FAFB))
+                                    .p(px(8.0))
+                                    .cursor_pointer()
+                                    .on_click(move |_, _, cx| {
+                                        entity_click.update(cx, |view, cx| {
+                                            view.write_pty_value(&value, cx);
+                                        });
+                                    })
+                                    .child(button_text),
+                            )
+                        },
+                    )
+                    .into_any_element()
             })
-            .child(if prompt.kind == CaptureHelperPromptKind::Minutes {
+            .child(if !has_options {
                 div()
                     .text_color(rgb(0x9CA3AF))
-                    .child(t(language, "message.capture_prompt_enter_hint"))
+                    .child(t(language, "message.interactive_prompt_enter_hint"))
             } else {
                 div()
             })
@@ -1140,8 +1166,8 @@ impl Render for RootView {
         } else {
             self.output_log.clone()
         };
-        let capture_helper_panel = if capture_selected && running {
-            self.render_capture_helper_panel(entity.clone())
+        let interaction_helper_panel = if running {
+            self.render_interaction_helper_panel(entity.clone())
         } else {
             div().into_any_element()
         };
@@ -2916,7 +2942,7 @@ impl Render for RootView {
                                     .cursor_pointer()
                                     .on_click(move |_, window, cx| {
                                 let entity = entity_run.clone();
-                                let (program, args, use_pty) = match entity_run.update(cx, |view, cx| {
+                                let (program, args, use_pty, use_interaction_helper) = match entity_run.update(cx, |view, cx| {
                                     if view.run_state.is_running() {
                                         view.request_cancel(cx);
                                         return None;
@@ -2925,17 +2951,22 @@ impl Render for RootView {
                                     match view.command_state.build_command() {
                                         Ok(command) => {
                                             let executable = view.executable_program();
+                                            let kind = view.command_state.kind;
                                             let display = format!(
                                                 "$ {} {}",
                                                 executable,
                                                 command.1.join(" ")
                                             );
-                                            view.begin_run(display, cx);
-                                            let use_pty = matches!(
-                                                view.command_state.kind,
-                                                CommandKind::Capture | CommandKind::Observe
-                                            );
-                                            Some((executable, command.1, use_pty))
+                                            view.begin_run(kind, display, cx);
+                                            let use_pty = RootView::command_uses_pty(kind);
+                                            let use_interaction_helper =
+                                                RootView::command_uses_interaction_helper(kind);
+                                            Some((
+                                                executable,
+                                                command.1,
+                                                use_pty,
+                                                use_interaction_helper,
+                                            ))
                                         }
                                         Err(message) => {
                                             view.append_output(message, cx);
@@ -3165,10 +3196,8 @@ impl Render for RootView {
                                                     OutputEvent::Chunk(chunk) => {
                                                         let _ = cx.update(|_window, app| {
                                                             entity.update(app, |view, cx| {
-                                                                if view.command_state.kind
-                                                                    == CommandKind::Capture
-                                                                {
-                                                                    view.observe_capture_helper_output(
+                                                                if use_interaction_helper {
+                                                                    view.observe_interaction_helper_output(
                                                                         &chunk, cx,
                                                                     );
                                                                 }
@@ -3537,7 +3566,7 @@ impl Render for RootView {
                             }),
                     ),
             )
-            .child(capture_helper_panel)
+            .child(interaction_helper_panel)
             .child(if helper_mode && self.command_help_open {
                 {
                     let base = div()
@@ -3843,10 +3872,11 @@ fn main() {
                     output_log: String::new(),
                     run_state: RunState::Idle,
                     cancel_requested: false,
+                    running_command_kind: None,
                     running_process: None,
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),
-                    capture_helper: CaptureHelperModel::default(),
+                    interaction_helper: InteractionHelperModel::default(),
                     helper_mode: false,
                     command_panel_open: true,
                     input_panel_open: true,

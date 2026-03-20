@@ -41,7 +41,7 @@ fn en(key: &str) -> &'static str {
         "panel.output" => "Output",
         "panel.help" => "Help",
         "panel.option_help" => "Option Help",
-        "panel.capture_helper" => "Capture Helper",
+        "panel.interaction_helper" => "Interactive Helper",
         "label.options" => "Options",
         "label.status" => "Status",
         "label.last_sent" => "Last sent",
@@ -80,7 +80,9 @@ fn en(key: &str) -> &'static str {
         "message.process_wait_error" => "Process wait error",
         "message.stdout_error" => "stdout error",
         "message.stderr_error" => "stderr error",
-        "message.capture_prompt_enter_hint" => "Enter the answer below and press Send or Enter.",
+        "message.interactive_prompt_enter_hint" => {
+            "Enter the answer below and press Send or Enter."
+        }
         "prompt.select_media_directory" => "Select media directory",
         "prompt.select_output_directory" => "Select output directory",
         "prompt.select_tags_csv" => "Select tags.csv",
@@ -171,7 +173,7 @@ fn zh_cn(key: &str) -> &'static str {
         "panel.output" => "输出",
         "panel.help" => "帮助",
         "panel.option_help" => "选项帮助",
-        "panel.capture_helper" => "Capture Helper",
+        "panel.interaction_helper" => "交互辅助",
         "label.options" => "选项",
         "label.media_dir" => "媒体目录",
         "label.csv_path" => "CSV路径",
@@ -204,7 +206,7 @@ fn zh_cn(key: &str) -> &'static str {
         "message.failed_start_process" => "无法启动进程",
         "message.stdout_error" => "标准输出错误",
         "message.stderr_error" => "标准错误输出错误",
-        "message.capture_prompt_enter_hint" => "在下方输入答案，然后点击发送或按回车。",
+        "message.interactive_prompt_enter_hint" => "在下方输入答案，然后点击发送或按回车。",
         "prompt.select_media_directory" => "选择媒体目录",
         "prompt.select_output_directory" => "选择输出目录",
         "prompt.select_tags_csv" => "选择 tags.csv",
