@@ -66,7 +66,8 @@ Rules:
 - [x] Prototype a decoupled GUI-assist layer for `capture` that keeps raw PTY input authoritative
 - [x] Use the GUI assist layer for other Serval commands that need interaction, such as `serval extract`.
 - [x] Evaluate routing progress-heavy non-interactive Serval commands through PTY when needed so their progress bars can render in the GUI
-- [ ] Support clipboard and other inline shortcuts
+- [x] Support clipboard and other inline shortcuts
+- [x] Fix IME composition handling in custom text inputs so Chinese input works on Windows
 - [ ] Add an icon for the binary (should be working cross-platform)
 
 ---
@@ -88,6 +89,7 @@ Rules:
 - Adapt to future `serval` v0.6.6/v0.7.0 (add `serval xmp init --info` and serval viz utils)
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
+- Investigate and fix Linux IME composition in custom text inputs so Chinese input works there too.
 - Improve packaging and distribution for Linux, Windows, and macOS.
 - Explore Ghostty-based terminal components if a richer embedded terminal becomes necessary.
 - Consider extracting reusable Serval command metadata from the CLI project if it materially improves maintainability.

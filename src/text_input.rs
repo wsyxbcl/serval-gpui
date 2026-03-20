@@ -29,23 +29,74 @@ actions!(
     ]
 );
 
+fn utf16_offset_to_utf8(text: &str, offset: usize) -> usize {
+    let mut utf8_offset = 0;
+    let mut utf16_count = 0;
+
+    for ch in text.chars() {
+        if utf16_count >= offset {
+            break;
+        }
+        utf16_count += ch.len_utf16();
+        utf8_offset += ch.len_utf8();
+    }
+
+    utf8_offset
+}
+
+fn utf8_offset_to_utf16(text: &str, offset: usize) -> usize {
+    let mut utf16_offset = 0;
+    let mut utf8_count = 0;
+
+    for ch in text.chars() {
+        if utf8_count >= offset {
+            break;
+        }
+        utf8_count += ch.len_utf8();
+        utf16_offset += ch.len_utf16();
+    }
+
+    utf16_offset
+}
+
+fn marked_text_selected_range(
+    replaced_range: &Range<usize>,
+    new_text: &str,
+    new_selected_range_utf16: Option<&Range<usize>>,
+) -> Range<usize> {
+    new_selected_range_utf16
+        .map(|range_utf16| {
+            let start = utf16_offset_to_utf8(new_text, range_utf16.start);
+            let end = utf16_offset_to_utf8(new_text, range_utf16.end);
+            replaced_range.start + start..replaced_range.start + end
+        })
+        .unwrap_or_else(|| {
+            let cursor = replaced_range.start + new_text.len();
+            cursor..cursor
+        })
+}
+
 pub fn bind_text_input_keys(app: &mut App) {
-    app.bind_keys([
+    app.bind_keys(text_input_key_bindings());
+}
+
+fn text_input_key_bindings() -> Vec<KeyBinding> {
+    vec![
         KeyBinding::new("backspace", Backspace, None),
         KeyBinding::new("delete", Delete, None),
         KeyBinding::new("left", Left, None),
         KeyBinding::new("right", Right, None),
         KeyBinding::new("shift-left", SelectLeft, None),
         KeyBinding::new("shift-right", SelectRight, None),
-        KeyBinding::new("cmd-a", SelectAll, None),
-        KeyBinding::new("cmd-v", Paste, None),
-        KeyBinding::new("cmd-c", Copy, None),
-        KeyBinding::new("cmd-x", Cut, None),
+        KeyBinding::new("secondary-a", SelectAll, None),
+        KeyBinding::new("secondary-v", Paste, None),
+        KeyBinding::new("secondary-c", Copy, None),
+        KeyBinding::new("secondary-x", Cut, None),
         KeyBinding::new("home", Home, None),
         KeyBinding::new("end", End, None),
         KeyBinding::new("ctrl-cmd-space", ShowCharacterPalette, None),
         KeyBinding::new("enter", Enter, None),
-    ]);
+    ]
 }
 
 pub struct TextInputSubmitted;
@@ -261,33 +312,11 @@ impl TextInput {
     }
 
     fn offset_from_utf16(&self, offset: usize) -> usize {
-        let mut utf8_offset = 0;
-        let mut utf16_count = 0;
-
-        for ch in self.content.chars() {
-            if utf16_count >= offset {
-                break;
-            }
-            utf16_count += ch.len_utf16();
-            utf8_offset += ch.len_utf8();
-        }
-
-        utf8_offset
+        utf16_offset_to_utf8(self.content.as_ref(), offset)
     }
 
     fn offset_to_utf16(&self, offset: usize) -> usize {
-        let mut utf16_offset = 0;
-        let mut utf8_count = 0;
-
-        for ch in self.content.chars() {
-            if utf8_count >= offset {
-                break;
-            }
-            utf8_count += ch.len_utf8();
-            utf16_offset += ch.len_utf16();
-        }
-
-        utf16_offset
+        utf8_offset_to_utf16(self.content.as_ref(), offset)
     }
 
     fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
@@ -374,8 +403,9 @@ impl EntityInputHandler for TextInput {
             .map(|range| self.range_to_utf16(range))
     }
 
-    fn unmark_text(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
+    fn unmark_text(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         self.marked_range = None;
+        cx.notify();
     }
 
     fn replace_text_in_range(
@@ -395,6 +425,7 @@ impl EntityInputHandler for TextInput {
             (self.content[0..range.start].to_owned() + new_text + &self.content[range.end..])
                 .into();
         self.selected_range = range.start + new_text.len()..range.start + new_text.len();
+        self.selection_reversed = false;
         self.marked_range.take();
         cx.notify();
     }
@@ -421,11 +452,9 @@ impl EntityInputHandler for TextInput {
         } else {
             self.marked_range = None;
         }
-        self.selected_range = new_selected_range_utf16
-            .as_ref()
-            .map(|range_utf16| self.range_from_utf16(range_utf16))
-            .map(|new_range| new_range.start + range.start..new_range.end + range.end)
-            .unwrap_or_else(|| range.start + new_text.len()..range.start + new_text.len());
+        self.selected_range =
+            marked_text_selected_range(&range, new_text, new_selected_range_utf16.as_ref());
+        self.selection_reversed = false;
 
         cx.notify();
     }
@@ -686,5 +715,72 @@ impl Render for TextInput {
 impl Focusable for TextInput {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus_handle.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        marked_text_selected_range, text_input_key_bindings, utf16_offset_to_utf8,
+        utf8_offset_to_utf16,
+    };
+
+    #[test]
+    fn clipboard_shortcuts_use_secondary_modifier() {
+        let bindings = text_input_key_bindings()
+            .into_iter()
+            .flat_map(|binding| {
+                binding
+                    .keystrokes()
+                    .iter()
+                    .map(|keystroke| {
+                        (
+                            keystroke.key().to_string(),
+                            keystroke.modifiers().secondary(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        assert!(bindings
+            .iter()
+            .any(|(key, secondary)| key == "a" && *secondary));
+        assert!(bindings
+            .iter()
+            .any(|(key, secondary)| key == "c" && *secondary));
+        assert!(bindings
+            .iter()
+            .any(|(key, secondary)| key == "v" && *secondary));
+        assert!(bindings
+            .iter()
+            .any(|(key, secondary)| key == "x" && *secondary));
+    }
+
+    #[test]
+    fn utf16_utf8_conversion_handles_cjk_text() {
+        assert_eq!(utf16_offset_to_utf8("你a", 0), 0);
+        assert_eq!(utf16_offset_to_utf8("你a", 1), 3);
+        assert_eq!(utf16_offset_to_utf8("你a", 2), 4);
+
+        assert_eq!(utf8_offset_to_utf16("你a", 0), 0);
+        assert_eq!(utf8_offset_to_utf16("你a", 3), 1);
+        assert_eq!(utf8_offset_to_utf16("你a", 4), 2);
+    }
+
+    #[test]
+    fn ime_selected_range_is_relative_to_new_marked_text() {
+        assert_eq!(
+            marked_text_selected_range(&(5..7), "ni", Some(&(2..2))),
+            7..7
+        );
+    }
+
+    #[test]
+    fn ime_selected_range_uses_new_text_utf16_offsets() {
+        assert_eq!(
+            marked_text_selected_range(&(0..0), "你", Some(&(1..1))),
+            3..3
+        );
     }
 }
