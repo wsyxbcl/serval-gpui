@@ -886,6 +886,298 @@ impl RootView {
         }
     }
 
+    fn handle_run_click(
+        entity: Entity<Self>,
+        language: Language,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let entity_for_events = entity.clone();
+        let (program, args, use_pty, use_interaction_helper) =
+            match entity.update(cx, |view, cx| {
+                if view.run_state.is_running() {
+                    view.request_cancel(cx);
+                    return None;
+                }
+
+                match view.command_state.build_command() {
+                    Ok(command) => {
+                        let executable = view.executable_program();
+                        let kind = view.command_state.kind;
+                        let display =
+                            format!("$ {}", format_shell_command(&executable, &command.1));
+                        let use_interaction_helper = view.command_uses_interaction_helper();
+                        view.begin_run(kind, use_interaction_helper, display, cx);
+                        let use_pty = RootView::command_uses_pty(kind);
+                        Some((executable, command.1, use_pty, use_interaction_helper))
+                    }
+                    Err(message) => {
+                        view.append_output(message, cx);
+                        None
+                    }
+                }
+            }) {
+                Some(command) => command,
+                None => return,
+            };
+
+        let (tx, rx) = mpsc::channel::<OutputEvent>();
+
+        if use_pty {
+            thread::spawn(move || {
+                let pty_system = native_pty_system();
+                let pair = match pty_system.openpty(PtySize {
+                    rows: 24,
+                    cols: 120,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                }) {
+                    Ok(pair) => pair,
+                    Err(err) => {
+                        let _ = tx.send(OutputEvent::Error(format!(
+                            "{}: {err}",
+                            t(language, "message.failed_open_pty")
+                        )));
+                        let _ = tx.send(OutputEvent::Exit(1));
+                        return;
+                    }
+                };
+
+                let mut cmd = CommandBuilder::new(&program);
+                cmd.args(&args);
+
+                let mut child = match pair.slave.spawn_command(cmd) {
+                    Ok(child) => child,
+                    Err(err) => {
+                        let _ = tx.send(OutputEvent::Error(format!(
+                            "{}: {err}",
+                            t(language, "message.failed_start_pty")
+                        )));
+                        let _ = tx.send(OutputEvent::Exit(1));
+                        return;
+                    }
+                };
+                drop(pair.slave);
+
+                let _ = tx.send(OutputEvent::ProcessHandle(RunningProcessHandle::Pty {
+                    pid: child.process_id(),
+                    killer: Arc::new(Mutex::new(child.clone_killer())),
+                }));
+
+                if let Ok(writer) = pair.master.take_writer() {
+                    let _ = tx.send(OutputEvent::PtyWriter(Arc::new(Mutex::new(writer))));
+                }
+
+                let mut reader = match pair.master.try_clone_reader() {
+                    Ok(reader) => reader,
+                    Err(err) => {
+                        let _ = tx.send(OutputEvent::Error(format!(
+                            "{}: {err}",
+                            t(language, "message.failed_read_pty_output")
+                        )));
+                        let _ = tx.send(OutputEvent::Exit(1));
+                        return;
+                    }
+                };
+
+                let tx_reader = tx.clone();
+                thread::spawn(move || {
+                    let mut buf = [0u8; 8192];
+                    loop {
+                        match reader.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(n) => {
+                                let text = String::from_utf8_lossy(&buf[..n]).to_string();
+                                let _ = tx_reader.send(OutputEvent::Chunk(text));
+                            }
+                            Err(err) => {
+                                let _ = tx_reader.send(OutputEvent::Error(format!(
+                                    "{}: {err}",
+                                    t(language, "message.pty_read_error")
+                                )));
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                let status = match child.wait() {
+                    Ok(status) => status.exit_code() as i32,
+                    Err(_) => 1,
+                };
+                let _ = tx.send(OutputEvent::Exit(status));
+            });
+        } else {
+            thread::spawn(move || {
+                let child = match Command::new(&program)
+                    .args(&args)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                {
+                    Ok(child) => child,
+                    Err(err) => {
+                        let _ = tx.send(OutputEvent::Error(format!(
+                            "{}: {err}",
+                            t(language, "message.failed_start_process")
+                        )));
+                        let _ = tx.send(OutputEvent::Exit(1));
+                        return;
+                    }
+                };
+
+                let child = Arc::new(Mutex::new(child));
+                let pid = child.lock().ok().map(|child| child.id()).unwrap_or(0);
+                let _ = tx.send(OutputEvent::ProcessHandle(RunningProcessHandle::Process {
+                    pid,
+                    child: child.clone(),
+                }));
+
+                let (stdout, stderr) = match child.lock() {
+                    Ok(mut child) => (child.stdout.take(), child.stderr.take()),
+                    Err(_) => {
+                        let _ = tx.send(OutputEvent::Error(
+                            t(language, "message.process_wait_error").to_string(),
+                        ));
+                        let _ = tx.send(OutputEvent::Exit(1));
+                        return;
+                    }
+                };
+
+                if let Some(stdout) = stdout {
+                    let tx_out = tx.clone();
+                    thread::spawn(move || {
+                        let reader = BufReader::new(stdout);
+                        for line in reader.lines() {
+                            match line {
+                                Ok(line) => {
+                                    let _ = tx_out.send(OutputEvent::Line(line));
+                                }
+                                Err(err) => {
+                                    let _ = tx_out.send(OutputEvent::Error(format!(
+                                        "{}: {err}",
+                                        t(language, "message.stdout_error")
+                                    )));
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if let Some(stderr) = stderr {
+                    let tx_err = tx.clone();
+                    thread::spawn(move || {
+                        let reader = BufReader::new(stderr);
+                        for line in reader.lines() {
+                            match line {
+                                Ok(line) => {
+                                    let _ = tx_err.send(OutputEvent::Line(line));
+                                }
+                                Err(err) => {
+                                    let _ = tx_err.send(OutputEvent::Error(format!(
+                                        "{}: {err}",
+                                        t(language, "message.stderr_error")
+                                    )));
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                }
+
+                loop {
+                    let status = match child.lock() {
+                        Ok(mut child) => match child.try_wait() {
+                            Ok(Some(status)) => Some(status.code().unwrap_or(1)),
+                            Ok(None) => None,
+                            Err(err) => {
+                                let _ = tx.send(OutputEvent::Error(format!(
+                                    "{}: {err}",
+                                    t(language, "message.process_wait_error")
+                                )));
+                                Some(1)
+                            }
+                        },
+                        Err(_) => {
+                            let _ = tx.send(OutputEvent::Error(
+                                t(language, "message.process_wait_error").to_string(),
+                            ));
+                            Some(1)
+                        }
+                    };
+
+                    if let Some(status) = status {
+                        let _ = tx.send(OutputEvent::Exit(status));
+                        break;
+                    }
+
+                    thread::sleep(Duration::from_millis(50));
+                }
+            });
+        }
+
+        window
+            .spawn(cx, async move |cx| {
+                let mut finished = false;
+                while !finished {
+                    while let Ok(event) = rx.try_recv() {
+                        let entity = entity_for_events.clone();
+                        match event {
+                            OutputEvent::Chunk(chunk) => {
+                                let _ = cx.update(|_window, app| {
+                                    entity.update(app, |view, cx| {
+                                        if use_interaction_helper {
+                                            view.observe_interaction_helper_output(&chunk, cx);
+                                        }
+                                        view.append_output_chunk(chunk, cx);
+                                    })
+                                });
+                            }
+                            OutputEvent::Line(line) => {
+                                let _ = cx.update(|_window, app| {
+                                    entity.update(app, |view, cx| {
+                                        view.append_output(line, cx);
+                                    })
+                                });
+                            }
+                            OutputEvent::Error(message) => {
+                                let _ = cx.update(|_window, app| {
+                                    entity.update(app, |view, cx| {
+                                        view.append_output(message, cx);
+                                    })
+                                });
+                            }
+                            OutputEvent::ProcessHandle(handle) => {
+                                let _ = cx.update(|_window, app| {
+                                    entity.update(app, |view, cx| {
+                                        view.set_running_process(Some(handle), cx);
+                                    })
+                                });
+                            }
+                            OutputEvent::PtyWriter(writer) => {
+                                let _ = cx.update(|_window, app| {
+                                    entity.update(app, |view, cx| {
+                                        view.set_pty_writer(Some(writer), cx);
+                                    })
+                                });
+                            }
+                            OutputEvent::Exit(code) => {
+                                let _ = cx.update(|_window, app| {
+                                    entity.update(app, |view, cx| {
+                                        view.finish_run(code, cx);
+                                    })
+                                });
+                                finished = true;
+                            }
+                        }
+                    }
+                    Timer::after(Duration::from_millis(50)).await;
+                }
+            })
+            .detach();
+    }
+
     fn resolve_output_dir(&self) -> Option<PathBuf> {
         self.command_state.effective_output_dir().map(PathBuf::from)
     }
@@ -2861,792 +3153,638 @@ impl Render for RootView {
                                     .items_center()
                                     .justify_between()
                                     .gap(px(12.0))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(4.0))
-                            .child(div().child(t(language, "app.title")))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(rgb(active_binary_color))
-                                    .child(format!(
-                                        "{}: {active_binary_text}",
-                                        t(language, "app.active_binary")
-                                    )),
-                            )
-                            .child(if let Some((prompt_text, prompt_color)) = &header_prompt {
-                                div()
-                                    .text_sm()
-                                    .text_color(rgb(*prompt_color))
-                                    .child(prompt_text.clone())
-                                    .into_any_element()
-                            } else {
-                                div().into_any_element()
-                            }),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .flex_wrap()
-                            .justify_end()
-                            .gap(px(8.0))
-                            .child({
-                                let entity_open_input = entity.clone();
-                                div()
-                                    .id("open-input-dir")
-                                    .bg(rgb(0xF3F4F6))
-                                    .text_color(rgb(0x111827))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_open_input.update(cx, |view, cx| {
-                                            if let Some(path) = view.resolve_input_dir() {
-                                                cx.reveal_path(&path);
-                                            } else {
-                                                view.append_output(
-                                                    t(language, "message.no_input_dir"),
-                                                    cx,
-                                                );
-                                            }
-                                        });
-                                    })
-                                    .child(t(language, "action.open_input_dir"))
-                            })
-                            .child({
-                                let entity_open_output = entity.clone();
-                                div()
-                                    .id("open-output-dir")
-                                    .bg(rgb(0xF3F4F6))
-                                    .text_color(rgb(0x111827))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_open_output.update(cx, |view, cx| {
-                                            if let Some(path) = view.resolve_output_dir() {
-                                                cx.reveal_path(&path);
-                                            } else {
-                                                view.append_output(
-                                                    t(language, "message.no_output_dir"),
-                                                    cx,
-                                                );
-                                            }
-                                        });
-                                    })
-                                    .child(t(language, "action.open_output_dir"))
-                            })
-                            .child({
-                                let entity_setup = entity.clone();
-                                div()
-                                    .id("open-setup")
-                                    .bg(rgb(0xF3F4F6))
-                                    .text_color(rgb(0x111827))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _window, cx| {
-                                        let setup_state = entity_setup.read(cx);
-                                        let current =
-                                            setup_state.serval_binary_path.clone().unwrap_or_default();
-                                        let language = setup_state.language;
-                                        let root_for_window = entity_setup.clone();
-                                        let _ = cx.open_window(
-                                            app_window_options(),
-                                            move |_, app| {
-                                                let root = root_for_window.clone();
-                                                let initial = current.clone();
-                                                let placeholder = t(
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .gap(px(4.0))
+                                            .child(div().child(t(language, "app.title")))
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(rgb(active_binary_color))
+                                                    .child(format!(
+                                                        "{}: {active_binary_text}",
+                                                        t(language, "app.active_binary")
+                                                    )),
+                                            )
+                                            .child(
+                                                if let Some((prompt_text, prompt_color)) =
+                                                    &header_prompt
+                                                {
+                                                    div()
+                                                        .text_sm()
+                                                        .text_color(rgb(*prompt_color))
+                                                        .child(prompt_text.clone())
+                                                        .into_any_element()
+                                                } else {
+                                                    div().into_any_element()
+                                                },
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .flex_wrap()
+                                            .justify_end()
+                                            .gap(px(8.0))
+                                            .child({
+                                                let entity_open_input = entity.clone();
+                                                div()
+                                                    .id("open-input-dir")
+                                                    .bg(rgb(0xF3F4F6))
+                                                    .text_color(rgb(0x111827))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_open_input.update(cx, |view, cx| {
+                                                            if let Some(path) =
+                                                                view.resolve_input_dir()
+                                                            {
+                                                                cx.reveal_path(&path);
+                                                            } else {
+                                                                view.append_output(
+                                                                    t(
+                                                                        language,
+                                                                        "message.no_input_dir",
+                                                                    ),
+                                                                    cx,
+                                                                );
+                                                            }
+                                                        });
+                                                    })
+                                                    .child(t(language, "action.open_input_dir"))
+                                            })
+                                            .child({
+                                                let entity_open_output = entity.clone();
+                                                div()
+                                                    .id("open-output-dir")
+                                                    .bg(rgb(0xF3F4F6))
+                                                    .text_color(rgb(0x111827))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_open_output.update(
+                                                            cx,
+                                                            |view, cx| {
+                                                                if let Some(path) =
+                                                                    view.resolve_output_dir()
+                                                                {
+                                                                    cx.reveal_path(&path);
+                                                                } else {
+                                                                    view.append_output(
+                                                                        t(
+                                                                            language,
+                                                                            "message.no_output_dir",
+                                                                        ),
+                                                                        cx,
+                                                                    );
+                                                                }
+                                                            },
+                                                        );
+                                                    })
+                                                    .child(t(language, "action.open_output_dir"))
+                                            })
+                                            .child({
+                                                let entity_setup = entity.clone();
+                                                div()
+                                                    .id("open-setup")
+                                                    .bg(rgb(0xF3F4F6))
+                                                    .text_color(rgb(0x111827))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _window, cx| {
+                                                        let setup_state = entity_setup.read(cx);
+                                                        let current = setup_state
+                                                            .serval_binary_path
+                                                            .clone()
+                                                            .unwrap_or_default();
+                                                        let language = setup_state.language;
+                                                        let root_for_window = entity_setup.clone();
+                                                        let _ = cx.open_window(
+                                                            app_window_options(),
+                                                            move |_, app| {
+                                                                let root = root_for_window.clone();
+                                                                let initial = current.clone();
+                                                                let placeholder = t(
                                                     language,
                                                     "setup.serval_binary_placeholder",
                                                 )
                                                 .to_string();
-                                                app.new(move |cx| {
-                                                    let input = cx.new(|cx| {
-                                                        TextInput::new_with_value(
+                                                                app.new(move |cx| {
+                                                                    let input = cx.new(|cx| {
+                                                                        TextInput::new_with_value(
+                                                                            cx,
+                                                                            placeholder.clone(),
+                                                                            initial.clone(),
+                                                                        )
+                                                                    });
+                                                                    SetupView {
+                                                                        root: root.clone(),
+                                                                        serval_binary_input: input,
+                                                                    }
+                                                                })
+                                                            },
+                                                        );
+                                                    })
+                                                    .child(t(language, "action.setup"))
+                                            })
+                                            .child({
+                                                let entity_helper = entity.clone();
+                                                div()
+                                                    .id("toggle-helper-mode")
+                                                    .bg(rgb(if helper_mode {
+                                                        0x111827
+                                                    } else {
+                                                        0xF3F4F6
+                                                    }))
+                                                    .text_color(rgb(if helper_mode {
+                                                        0xF9FAFB
+                                                    } else {
+                                                        0x111827
+                                                    }))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_helper.update(cx, |view, cx| {
+                                                            view.helper_mode = !view.helper_mode;
+                                                            if view.helper_mode {
+                                                                let key = view.current_help_key();
+                                                                view.command_help_open = true;
+                                                                view.command_help_key =
+                                                                    Some(key.clone());
+                                                                view.ensure_help_loaded_for_key(
+                                                                    key, cx,
+                                                                );
+                                                            } else {
+                                                                view.command_help_open = false;
+                                                                view.command_help_key = None;
+                                                                view.hover_help_key = None;
+                                                                view.option_help_position = None;
+                                                                cx.notify();
+                                                            }
+                                                        });
+                                                    })
+                                                    .child(if helper_mode {
+                                                        t(language, "action.helper_mode_on")
+                                                    } else {
+                                                        t(language, "action.helper_mode_off")
+                                                    })
+                                            })
+                                            .child({
+                                                let entity_run = entity.clone();
+                                                div()
+                                                    .id("run-button")
+                                                    .bg(rgb(0x111827))
+                                                    .text_color(rgb(0xF9FAFB))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, window, cx| {
+                                                        RootView::handle_run_click(
+                                                            entity_run.clone(),
+                                                            language,
+                                                            window,
                                                             cx,
-                                                            placeholder.clone(),
-                                                            initial.clone(),
-                                                        )
-                                                    });
-                                                    SetupView {
-                                                        root: root.clone(),
-                                                        serval_binary_input: input,
-                                                    }
-                                                })
-                                            },
-                                        );
-                                    })
-                                    .child(t(language, "action.setup"))
-                            })
-                            .child({
-                                let entity_helper = entity.clone();
-                                div()
-                                    .id("toggle-helper-mode")
-                                    .bg(rgb(if helper_mode { 0x111827 } else { 0xF3F4F6 }))
-                                    .text_color(rgb(if helper_mode { 0xF9FAFB } else { 0x111827 }))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_helper.update(cx, |view, cx| {
-                                            view.helper_mode = !view.helper_mode;
-                                            if view.helper_mode {
-                                                let key = view.current_help_key();
-                                                view.command_help_open = true;
-                                                view.command_help_key = Some(key.clone());
-                                                view.ensure_help_loaded_for_key(key, cx);
-                                            } else {
-                                                view.command_help_open = false;
-                                                view.command_help_key = None;
-                                                view.hover_help_key = None;
-                                                view.option_help_position = None;
-                                                cx.notify();
-                                            }
-                                        });
-                                    })
-                                    .child(if helper_mode {
-                                        t(language, "action.helper_mode_on")
-                                    } else {
-                                        t(language, "action.helper_mode_off")
-                                    })
-                            })
-                            .child({
-                                let entity_run = entity.clone();
-                                div()
-                                    .id("run-button")
-                                    .bg(rgb(0x111827))
-                                    .text_color(rgb(0xF9FAFB))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, window, cx| {
-                                let entity = entity_run.clone();
-                                let (program, args, use_pty, use_interaction_helper) = match entity_run.update(cx, |view, cx| {
-                                    if view.run_state.is_running() {
-                                        view.request_cancel(cx);
-                                        return None;
-                                    }
-
-                                    match view.command_state.build_command() {
-                                        Ok(command) => {
-                                            let executable = view.executable_program();
-                                            let kind = view.command_state.kind;
-                                            let display = format!(
-                                                "$ {}",
-                                                format_shell_command(&executable, &command.1)
-                                            );
-                                            let use_interaction_helper =
-                                                view.command_uses_interaction_helper();
-                                            view.begin_run(
-                                                kind,
-                                                use_interaction_helper,
-                                                display,
-                                                cx,
-                                            );
-                                            let use_pty = RootView::command_uses_pty(kind);
-                                            Some((
-                                                executable,
-                                                command.1,
-                                                use_pty,
-                                                use_interaction_helper,
-                                            ))
-                                        }
-                                        Err(message) => {
-                                            view.append_output(message, cx);
-                                            None
-                                        }
-                                    }
-                                }) {
-                                    Some(command) => command,
-                                    None => return,
-                                };
-
-                                let (tx, rx) = mpsc::channel::<OutputEvent>();
-
-                                if use_pty {
-                                    thread::spawn(move || {
-                                        let pty_system = native_pty_system();
-                                        let pair = match pty_system.openpty(PtySize {
-                                            rows: 24,
-                                            cols: 120,
-                                            pixel_width: 0,
-                                            pixel_height: 0,
-                                        }) {
-                                            Ok(pair) => pair,
-                                            Err(err) => {
-                                                let _ = tx.send(OutputEvent::Error(format!(
-                                                    "{}: {err}",
-                                                    t(language, "message.failed_open_pty")
-                                                )));
-                                                let _ = tx.send(OutputEvent::Exit(1));
-                                                return;
-                                            }
-                                        };
-
-                                        let mut cmd = CommandBuilder::new(&program);
-                                        cmd.args(&args);
-
-                                        let mut child = match pair.slave.spawn_command(cmd) {
-                                            Ok(child) => child,
-                                            Err(err) => {
-                                                let _ = tx.send(OutputEvent::Error(format!(
-                                                    "{}: {err}",
-                                                    t(language, "message.failed_start_pty")
-                                                )));
-                                                let _ = tx.send(OutputEvent::Exit(1));
-                                                return;
-                                            }
-                                        };
-                                        drop(pair.slave);
-
-                                        let _ = tx.send(OutputEvent::ProcessHandle(
-                                            RunningProcessHandle::Pty {
-                                                pid: child.process_id(),
-                                                killer: Arc::new(Mutex::new(child.clone_killer())),
-                                            },
-                                        ));
-
-                                        if let Ok(writer) = pair.master.take_writer() {
-                                            let _ = tx.send(OutputEvent::PtyWriter(Arc::new(
-                                                Mutex::new(writer),
-                                            )));
-                                        }
-
-                                        let mut reader = match pair.master.try_clone_reader() {
-                                            Ok(reader) => reader,
-                                            Err(err) => {
-                                                let _ = tx.send(OutputEvent::Error(format!(
-                                                    "{}: {err}",
-                                                    t(language, "message.failed_read_pty_output")
-                                                )));
-                                                let _ = tx.send(OutputEvent::Exit(1));
-                                                return;
-                                            }
-                                        };
-
-                                        let tx_reader = tx.clone();
-                                        thread::spawn(move || {
-                                            let mut buf = [0u8; 8192];
-                                            loop {
-                                                match reader.read(&mut buf) {
-                                                    Ok(0) => break,
-                                                    Ok(n) => {
-                                                        let text = String::from_utf8_lossy(&buf[..n])
-                                                            .to_string();
-                                                        let _ = tx_reader.send(OutputEvent::Chunk(text));
-                                                    }
-                                                    Err(err) => {
-                                                        let _ = tx_reader.send(OutputEvent::Error(format!(
-                                                            "{}: {err}",
-                                                            t(language, "message.pty_read_error")
-                                                        )));
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        });
-
-                                        let status = match child.wait() {
-                                            Ok(status) => status.exit_code() as i32,
-                                            Err(_) => 1,
-                                        };
-                                        let _ = tx.send(OutputEvent::Exit(status));
-                                    });
-                                } else {
-                                    thread::spawn(move || {
-                                        let child = match Command::new(&program)
-                                            .args(&args)
-                                            .stdout(Stdio::piped())
-                                            .stderr(Stdio::piped())
-                                            .spawn()
-                                        {
-                                            Ok(child) => child,
-                                            Err(err) => {
-                                                let _ = tx.send(OutputEvent::Error(format!(
-                                                    "{}: {err}",
-                                                    t(language, "message.failed_start_process")
-                                                )));
-                                                let _ = tx.send(OutputEvent::Exit(1));
-                                                return;
-                                            }
-                                        };
-
-                                        let child = Arc::new(Mutex::new(child));
-                                        let pid = child.lock().ok().map(|child| child.id()).unwrap_or(0);
-                                        let _ = tx.send(OutputEvent::ProcessHandle(
-                                            RunningProcessHandle::Process { pid, child: child.clone() },
-                                        ));
-
-                                        let (stdout, stderr) = match child.lock() {
-                                            Ok(mut child) => (child.stdout.take(), child.stderr.take()),
-                                            Err(_) => {
-                                                let _ = tx.send(OutputEvent::Error(
-                                                    t(language, "message.process_wait_error")
-                                                        .to_string(),
-                                                ));
-                                                let _ = tx.send(OutputEvent::Exit(1));
-                                                return;
-                                            }
-                                        };
-
-                                        if let Some(stdout) = stdout {
-                                            let tx_out = tx.clone();
-                                            thread::spawn(move || {
-                                                let reader = BufReader::new(stdout);
-                                                for line in reader.lines() {
-                                                    match line {
-                                                        Ok(line) => {
-                                                            let _ = tx_out
-                                                                .send(OutputEvent::Line(line));
-                                                        }
-                                                        Err(err) => {
-                                                            let _ = tx_out.send(
-                                                                OutputEvent::Error(format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.stdout_error")
-                                                                )),
-                                                            );
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                            });
-                                        }
-
-                                        if let Some(stderr) = stderr {
-                                            let tx_err = tx.clone();
-                                            thread::spawn(move || {
-                                                let reader = BufReader::new(stderr);
-                                                for line in reader.lines() {
-                                                    match line {
-                                                        Ok(line) => {
-                                                            let _ = tx_err
-                                                                .send(OutputEvent::Line(line));
-                                                        }
-                                                        Err(err) => {
-                                                            let _ = tx_err.send(
-                                                                OutputEvent::Error(format!(
-                                                                    "{}: {err}",
-                                                                    t(language, "message.stderr_error")
-                                                                )),
-                                                            );
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                            });
-                                        }
-
-                                        loop {
-                                            let status = match child.lock() {
-                                                Ok(mut child) => match child.try_wait() {
-                                                    Ok(Some(status)) => Some(status.code().unwrap_or(1)),
-                                                    Ok(None) => None,
-                                                    Err(err) => {
-                                                        let _ = tx.send(OutputEvent::Error(format!(
-                                                            "{}: {err}",
-                                                            t(language, "message.process_wait_error")
-                                                        )));
-                                                        Some(1)
-                                                    }
-                                                },
-                                                Err(_) => {
-                                                    let _ = tx.send(OutputEvent::Error(
-                                                        t(language, "message.process_wait_error")
-                                                            .to_string(),
-                                                    ));
-                                                    Some(1)
-                                                }
-                                            };
-
-                                            if let Some(status) = status {
-                                                let _ = tx.send(OutputEvent::Exit(status));
-                                                break;
-                                            }
-
-                                            thread::sleep(Duration::from_millis(50));
-                                        }
-                                    });
-                                }
-
-                                window
-                                    .spawn(cx, async move |cx| {
-                                        let mut finished = false;
-                                        while !finished {
-                                            while let Ok(event) = rx.try_recv() {
-                                                let entity = entity.clone();
-                                                match event {
-                                                    OutputEvent::Chunk(chunk) => {
-                                                        let _ = cx.update(|_window, app| {
-                                                            entity.update(app, |view, cx| {
-                                                                if use_interaction_helper {
-                                                                    view.observe_interaction_helper_output(
-                                                                        &chunk, cx,
-                                                                    );
-                                                                }
-                                                                view.append_output_chunk(chunk, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                    OutputEvent::Line(line) => {
-                                                        let _ = cx.update(|_window, app| {
-                                                            entity.update(app, |view, cx| {
-                                                                view.append_output(line, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                    OutputEvent::Error(message) => {
-                                                        let _ = cx.update(|_window, app| {
-                                                            entity.update(app, |view, cx| {
-                                                                view.append_output(message, cx);
-                                                            })
-                                                        });
-                                                    }
-                                                    OutputEvent::ProcessHandle(handle) => {
-                                                        let _ = cx.update(|_window, app| {
-                                                            entity.update(app, |view, cx| {
-                                                                view.set_running_process(Some(handle), cx);
-                                                            })
-                                                        });
-                                                    }
-                                                    OutputEvent::PtyWriter(writer) => {
-                                                        let _ = cx.update(|_window, app| {
-                                                            entity.update(app, |view, cx| {
-                                                                view.set_pty_writer(Some(writer), cx);
-                                                            })
-                                                        });
-                                                    }
-                                                    OutputEvent::Exit(code) => {
-                                                        let _ = cx.update(|_window, app| {
-                                                            entity.update(app, |view, cx| {
-                                                                view.finish_run(code, cx);
-                                                            })
-                                                        });
-                                                        finished = true;
-                                                    }
-                                                }
-                                            }
-                                            Timer::after(Duration::from_millis(50)).await;
-                                        }
-                                    })
-                                    .detach();
-                            })
-                                    .child(t(language, self.run_state.action_key()))
-                            }),
-                    ),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(8.0))
-                    .bg(rgb(0xFFFFFF))
-                    .p(px(16.0))
-                    .child({
-                        let entity = entity.clone();
-                        div()
-                            .id("toggle-command-panel")
-                            .flex()
-                            .flex_row()
-                            .justify_between()
-                            .items_center()
-                            .cursor_pointer()
-                            .on_click(move |_, _, cx| {
-                                entity.update(cx, |view, cx| {
-                                    view.command_panel_open = !view.command_panel_open;
-                                    cx.notify();
-                                });
-                            })
-                            .child(div().text_color(rgb(0x6B7280)).child(t(language, "panel.command")))
-                            .child(div().text_color(rgb(0x6B7280)).child(if command_panel_open {
-                                t(language, "action.collapse")
-                            } else {
-                                t(language, "action.expand")
-                            }))
-                    })
-                    .child(if command_panel_open {
-                        div()
-                            .flex()
-                            .flex_row()
-                            .flex_wrap()
-                            .gap(px(8.0))
-                            .child({
-                                let entity_click = entity_observe.clone();
-                                div()
-                                    .id("command-observe")
-                                    .bg(rgb(if observe_selected { 0x111827 } else { 0xF3F4F6 }))
-                                    .text_color(rgb(if observe_selected { 0xF9FAFB } else { 0x111827 }))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.select_command(CommandKind::Observe, cx);
-                                        });
-                                    })
-                                    .child(t(language, "cmd.observe"))
-                            })
-                            .child({
-                                let entity_click = entity_capture.clone();
-                                div()
-                                    .id("command-capture")
-                                    .bg(rgb(if capture_selected { 0x111827 } else { 0xF3F4F6 }))
-                                    .text_color(rgb(if capture_selected { 0xF9FAFB } else { 0x111827 }))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.select_command(CommandKind::Capture, cx);
-                                        });
-                                    })
-                                    .child(t(language, "cmd.capture"))
-                            })
-                            .child({
-                                let entity_click = entity_xmp.clone();
-                                div()
-                                    .id("command-xmp")
-                                    .bg(rgb(if xmp_selected { 0x111827 } else { 0xF3F4F6 }))
-                                    .text_color(rgb(if xmp_selected { 0xF9FAFB } else { 0x111827 }))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.select_command(CommandKind::Xmp, cx);
-                                        });
-                                    })
-                                    .child(t(language, "cmd.xmp"))
-                            })
-                            .child({
-                                let entity_click = entity_extract.clone();
-                                div()
-                                    .id("command-extract")
-                                    .bg(rgb(if extract_selected { 0x111827 } else { 0xF3F4F6 }))
-                                    .text_color(rgb(if extract_selected { 0xF9FAFB } else { 0x111827 }))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.select_command(CommandKind::Extract, cx);
-                                        });
-                                    })
-                                    .child(t(language, "cmd.extract"))
-                            })
-                            .child({
-                                let entity_click = entity_translate.clone();
-                                div()
-                                    .id("command-translate")
-                                    .bg(rgb(if translate_selected { 0x111827 } else { 0xF3F4F6 }))
-                                    .text_color(rgb(if translate_selected { 0xF9FAFB } else { 0x111827 }))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.select_command(CommandKind::Translate, cx);
-                                        });
-                                    })
-                                    .child(t(language, "cmd.translate"))
-                            })
-                    } else {
-                        div()
-                    }),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(8.0))
-                    .bg(rgb(0xFFFFFF))
-                    .p(px(16.0))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .justify_between()
-                            .items_center()
-                            .child(div().text_color(rgb(0x6B7280)).child(t(language, "panel.inputs")))
+                                                        );
+                                                    })
+                                                    .child(t(language, self.run_state.action_key()))
+                                            }),
+                                    ),
+                            )
                             .child(
                                 div()
                                     .flex()
-                                    .flex_row()
-                                    .items_center()
+                                    .flex_col()
                                     .gap(px(8.0))
+                                    .bg(rgb(0xFFFFFF))
+                                    .p(px(16.0))
                                     .child({
                                         let entity = entity.clone();
                                         div()
-                                            .id("toggle-input-panel")
-                                            .text_color(rgb(0x6B7280))
+                                            .id("toggle-command-panel")
+                                            .flex()
+                                            .flex_row()
+                                            .justify_between()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_color(rgb(0x6B7280))
+                                                    .child(t(language, "panel.command")),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_row()
+                                                    .items_center()
+                                                    .gap(px(8.0))
+                                                    .child(
+                                                        div()
+                                                            .id("toggle-command-panel-action")
+                                                            .text_color(rgb(0x6B7280))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, _, cx| {
+                                                                entity.update(cx, |view, cx| {
+                                                                    view.command_panel_open =
+                                                                        !view.command_panel_open;
+                                                                    cx.notify();
+                                                                });
+                                                            })
+                                                            .child(if command_panel_open {
+                                                                t(language, "action.collapse")
+                                                            } else {
+                                                                t(language, "action.expand")
+                                                            }),
+                                                    ),
+                                            )
+                                    })
+                                    .child(if command_panel_open {
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .flex_wrap()
+                                            .gap(px(8.0))
+                                            .child({
+                                                let entity_click = entity_observe.clone();
+                                                div()
+                                                    .id("command-observe")
+                                                    .bg(rgb(if observe_selected {
+                                                        0x111827
+                                                    } else {
+                                                        0xF3F4F6
+                                                    }))
+                                                    .text_color(rgb(if observe_selected {
+                                                        0xF9FAFB
+                                                    } else {
+                                                        0x111827
+                                                    }))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_click.update(cx, |view, cx| {
+                                                            view.select_command(
+                                                                CommandKind::Observe,
+                                                                cx,
+                                                            );
+                                                        });
+                                                    })
+                                                    .child(t(language, "cmd.observe"))
+                                            })
+                                            .child({
+                                                let entity_click = entity_capture.clone();
+                                                div()
+                                                    .id("command-capture")
+                                                    .bg(rgb(if capture_selected {
+                                                        0x111827
+                                                    } else {
+                                                        0xF3F4F6
+                                                    }))
+                                                    .text_color(rgb(if capture_selected {
+                                                        0xF9FAFB
+                                                    } else {
+                                                        0x111827
+                                                    }))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_click.update(cx, |view, cx| {
+                                                            view.select_command(
+                                                                CommandKind::Capture,
+                                                                cx,
+                                                            );
+                                                        });
+                                                    })
+                                                    .child(t(language, "cmd.capture"))
+                                            })
+                                            .child({
+                                                let entity_click = entity_xmp.clone();
+                                                div()
+                                                    .id("command-xmp")
+                                                    .bg(rgb(if xmp_selected {
+                                                        0x111827
+                                                    } else {
+                                                        0xF3F4F6
+                                                    }))
+                                                    .text_color(rgb(if xmp_selected {
+                                                        0xF9FAFB
+                                                    } else {
+                                                        0x111827
+                                                    }))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_click.update(cx, |view, cx| {
+                                                            view.select_command(
+                                                                CommandKind::Xmp,
+                                                                cx,
+                                                            );
+                                                        });
+                                                    })
+                                                    .child(t(language, "cmd.xmp"))
+                                            })
+                                            .child({
+                                                let entity_click = entity_extract.clone();
+                                                div()
+                                                    .id("command-extract")
+                                                    .bg(rgb(if extract_selected {
+                                                        0x111827
+                                                    } else {
+                                                        0xF3F4F6
+                                                    }))
+                                                    .text_color(rgb(if extract_selected {
+                                                        0xF9FAFB
+                                                    } else {
+                                                        0x111827
+                                                    }))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_click.update(cx, |view, cx| {
+                                                            view.select_command(
+                                                                CommandKind::Extract,
+                                                                cx,
+                                                            );
+                                                        });
+                                                    })
+                                                    .child(t(language, "cmd.extract"))
+                                            })
+                                            .child({
+                                                let entity_click = entity_translate.clone();
+                                                div()
+                                                    .id("command-translate")
+                                                    .bg(rgb(if translate_selected {
+                                                        0x111827
+                                                    } else {
+                                                        0xF3F4F6
+                                                    }))
+                                                    .text_color(rgb(if translate_selected {
+                                                        0xF9FAFB
+                                                    } else {
+                                                        0x111827
+                                                    }))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_click.update(cx, |view, cx| {
+                                                            view.select_command(
+                                                                CommandKind::Translate,
+                                                                cx,
+                                                            );
+                                                        });
+                                                    })
+                                                    .child(t(language, "cmd.translate"))
+                                            })
+                                    } else {
+                                        div()
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(8.0))
+                                    .bg(rgb(0xFFFFFF))
+                                    .p(px(16.0))
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .justify_between()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_color(rgb(0x6B7280))
+                                                    .child(t(language, "panel.inputs")),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_row()
+                                                    .items_center()
+                                                    .gap(px(8.0))
+                                                    .child({
+                                                        let entity = entity.clone();
+                                                        div()
+                                                            .id("toggle-input-panel")
+                                                            .text_color(rgb(0x6B7280))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, _, cx| {
+                                                                entity.update(cx, |view, cx| {
+                                                                    view.input_panel_open =
+                                                                        !view.input_panel_open;
+                                                                    cx.notify();
+                                                                });
+                                                            })
+                                                            .child(if input_panel_open {
+                                                                t(language, "action.collapse")
+                                                            } else {
+                                                                t(language, "action.expand")
+                                                            })
+                                                    }),
+                                            ),
+                                    )
+                                    .child(if input_panel_open {
+                                        input_section
+                                    } else {
+                                        div()
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(8.0))
+                                    .bg(rgb(0xFFFFFF))
+                                    .p(px(16.0))
+                                    .child({
+                                        let entity = entity.clone();
+                                        div()
+                                            .id("toggle-preview-panel")
+                                            .flex()
+                                            .flex_row()
+                                            .justify_between()
+                                            .items_center()
                                             .cursor_pointer()
                                             .on_click(move |_, _, cx| {
                                                 entity.update(cx, |view, cx| {
-                                                    view.input_panel_open = !view.input_panel_open;
+                                                    view.preview_panel_open =
+                                                        !view.preview_panel_open;
                                                     cx.notify();
                                                 });
                                             })
-                                            .child(if input_panel_open {
-                                                t(language, "action.collapse")
-                                            } else {
-                                                t(language, "action.expand")
-                                            })
-                                    }),
-                            ),
-                    )
-                    .child(if input_panel_open { input_section } else { div() }),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(8.0))
-                    .bg(rgb(0xFFFFFF))
-                    .p(px(16.0))
-                    .child({
-                        let entity = entity.clone();
-                        div()
-                            .id("toggle-preview-panel")
-                            .flex()
-                            .flex_row()
-                            .justify_between()
-                            .items_center()
-                            .cursor_pointer()
-                            .on_click(move |_, _, cx| {
-                                entity.update(cx, |view, cx| {
-                                    view.preview_panel_open = !view.preview_panel_open;
-                                    cx.notify();
-                                });
-                            })
-                            .child(div().text_color(rgb(0x6B7280)).child(t(language, "panel.command_preview")))
-                            .child(div().text_color(rgb(0x6B7280)).child(if preview_panel_open {
-                                t(language, "action.collapse")
-                            } else {
-                                t(language, "action.expand")
-                            }))
-                    })
-                    .child(if preview_panel_open {
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(8.0))
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .justify_end()
-                                    .child({
-                                        let entity = entity.clone();
+                                            .child(
+                                                div()
+                                                    .text_color(rgb(0x6B7280))
+                                                    .child(t(language, "panel.command_preview")),
+                                            )
+                                            .child(div().text_color(rgb(0x6B7280)).child(
+                                                if preview_panel_open {
+                                                    t(language, "action.collapse")
+                                                } else {
+                                                    t(language, "action.expand")
+                                                },
+                                            ))
+                                    })
+                                    .child(if preview_panel_open {
+                                        div().flex().flex_col().gap(px(8.0)).child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .flex_wrap()
+                                                .items_start()
+                                                .gap(px(8.0))
+                                                .bg(rgb(0xF3F4F6))
+                                                .text_color(rgb(0x111827))
+                                                .p(px(8.0))
+                                                .child(
+                                                    div()
+                                                        .flex_grow()
+                                                        .min_w(px(320.0))
+                                                        .child(preview),
+                                                )
+                                                .child({
+                                                    let entity = entity.clone();
+                                                    div()
+                                                        .id("copy-command")
+                                                        .bg(rgb(0xE5E7EB))
+                                                        .text_color(rgb(0x111827))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity.update(cx, |view, cx| {
+                                                                cx.write_to_clipboard(
+                                                                    ClipboardItem::new_string(
+                                                                        view.command_preview(),
+                                                                    ),
+                                                                );
+                                                            });
+                                                        })
+                                                        .child(t(language, "action.copy_command"))
+                                                })
+                                                .child({
+                                                    let entity_run = entity.clone();
+                                                    div()
+                                                        .id("run-button-preview-panel")
+                                                        .bg(rgb(0x111827))
+                                                        .text_color(rgb(0xF9FAFB))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, window, cx| {
+                                                            RootView::handle_run_click(
+                                                                entity_run.clone(),
+                                                                language,
+                                                                window,
+                                                                cx,
+                                                            );
+                                                        })
+                                                        .child(t(
+                                                            language,
+                                                            self.run_state.action_key(),
+                                                        ))
+                                                }),
+                                        )
+                                    } else {
                                         div()
-                                            .id("copy-command")
-                                            .bg(rgb(0xF3F4F6))
-                                            .text_color(rgb(0x111827))
-                                            .p(px(8.0))
-                                            .cursor_pointer()
-                                            .on_click(move |_, _, cx| {
-                                                entity.update(cx, |view, cx| {
-                                                    cx.write_to_clipboard(ClipboardItem::new_string(
-                                                        view.command_preview(),
-                                                    ));
-                                                });
-                                            })
-                                            .child(t(language, "action.copy_command"))
                                     }),
                             )
                             .child(
                                 div()
-                                    .bg(rgb(0xF3F4F6))
-                                    .text_color(rgb(0x111827))
-                                    .p(px(8.0))
-                                    .child(preview),
-                            )
-                    } else {
-                        div()
-                    }),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(8.0))
-                    .bg(rgb(0x0B0F1A))
-                    .text_color(rgb(0xE5E7EB))
-                    .p(px(16.0))
-                    .min_h(px(220.0))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .justify_between()
-                            .items_center()
-                            .child(
-                                div()
                                     .flex()
-                                    .flex_row()
+                                    .flex_col()
                                     .gap(px(8.0))
-                                    .items_center()
-                                    .child(div().text_color(rgb(0x9CA3AF)).child(t(language, "panel.output")))
+                                    .bg(rgb(0x0B0F1A))
+                                    .text_color(rgb(0xE5E7EB))
+                                    .p(px(16.0))
+                                    .min_h(px(220.0))
                                     .child(
                                         div()
-                                            .text_color(rgb(self.run_state.color()))
-                                            .child(format!(
-                                                "{}: {}",
-                                                t(language, "label.status"),
-                                                t(language, self.run_state.label_key())
-                                            )),
+                                            .flex()
+                                            .flex_row()
+                                            .justify_between()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_row()
+                                                    .gap(px(8.0))
+                                                    .items_center()
+                                                    .child(
+                                                        div()
+                                                            .text_color(rgb(0x9CA3AF))
+                                                            .child(t(language, "panel.output")),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_color(rgb(self.run_state.color()))
+                                                            .child(format!(
+                                                                "{}: {}",
+                                                                t(language, "label.status"),
+                                                                t(
+                                                                    language,
+                                                                    self.run_state.label_key()
+                                                                )
+                                                            )),
+                                                    ),
+                                            )
+                                            .child({
+                                                let entity = entity.clone();
+                                                div()
+                                                    .id("copy-log")
+                                                    .bg(rgb(0x111827))
+                                                    .text_color(rgb(0xF9FAFB))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity.update(cx, |view, cx| {
+                                                            cx.write_to_clipboard(
+                                                                ClipboardItem::new_string(
+                                                                    view.output_log.clone(),
+                                                                ),
+                                                            );
+                                                        });
+                                                    })
+                                                    .child(t(language, "action.copy_log"))
+                                            }),
+                                    )
+                                    .child(
+                                        div()
+                                            .font_family("monospace")
+                                            .text_size(px(12.0))
+                                            .line_height(px(16.0))
+                                            .whitespace_nowrap()
+                                            .id("output-scroll")
+                                            .track_scroll(&self.output_scroll_handle)
+                                            .min_h(px(220.0))
+                                            .w_full()
+                                            .overflow_y_scroll()
+                                            .overflow_x_scroll()
+                                            .scrollbar_width(px(8.0))
+                                            .child(output_text),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .gap(px(8.0))
+                                            .pt(px(8.0))
+                                            .child(div().flex_grow().child(pty_input.clone()))
+                                            .child({
+                                                let entity = entity.clone();
+                                                div()
+                                                    .id("send-pty")
+                                                    .bg(rgb(0x111827))
+                                                    .text_color(rgb(0xF9FAFB))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity.update(cx, |view, cx| {
+                                                            view.send_pty_input(cx);
+                                                        });
+                                                    })
+                                                    .child(t(language, "action.send"))
+                                            }),
                                     ),
                             )
-                            .child({
-                                let entity = entity.clone();
-                                div()
-                                    .id("copy-log")
-                                    .bg(rgb(0x111827))
-                                    .text_color(rgb(0xF9FAFB))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity.update(cx, |view, cx| {
-                                            cx.write_to_clipboard(ClipboardItem::new_string(
-                                                view.output_log.clone(),
-                                            ));
-                                        });
-                                    })
-                                    .child(t(language, "action.copy_log"))
-                            }),
-                    )
-                    .child(
-                        div()
-                            .font_family("monospace")
-                            .text_size(px(12.0))
-                            .line_height(px(16.0))
-                            .whitespace_nowrap()
-                            .id("output-scroll")
-                            .track_scroll(&self.output_scroll_handle)
-                            .min_h(px(220.0))
-                            .w_full()
-                            .overflow_y_scroll()
-                            .overflow_x_scroll()
-                            .scrollbar_width(px(8.0))
-                            .child(output_text),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .gap(px(8.0))
-                            .pt(px(8.0))
-                            .child(div().flex_grow().child(pty_input.clone()))
-                            .child({
-                                let entity = entity.clone();
-                                div()
-                                    .id("send-pty")
-                                    .bg(rgb(0x111827))
-                                    .text_color(rgb(0xF9FAFB))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity.update(cx, |view, cx| {
-                                            view.send_pty_input(cx);
-                                        });
-                                    })
-                                    .child(t(language, "action.send"))
-                            }),
-                    ),
-            )
                             .child(interaction_helper_panel),
                     ),
             )
@@ -3675,7 +3813,11 @@ impl Render for RootView {
                                 .flex_row()
                                 .justify_between()
                                 .items_center()
-                                .child(div().text_color(rgb(0x9CA3AF)).child(t(language, "panel.help")))
+                                .child(
+                                    div()
+                                        .text_color(rgb(0x9CA3AF))
+                                        .child(t(language, "panel.help")),
+                                )
                                 .child({
                                     let entity = entity.clone();
                                     div()
@@ -3711,40 +3853,40 @@ impl Render for RootView {
             })
             .child(if helper_mode {
                 if let (Some(help_text), Some(pos)) = (option_help_text, option_help_position) {
-                div()
-                    .absolute()
-                    .left(pos.x + px(14.0))
-                    .top(pos.y + px(14.0))
-                    .w(px(360.0))
-                    .h(px(170.0))
-                    .flex()
-                    .flex_col()
-                    .bg(rgb(0x111827))
-                    .opacity(0.94)
-                    .text_color(rgb(0xF9FAFB))
-                    .border_1()
-                    .border_color(rgb(0x374151))
-                    .rounded_md()
-                    .shadow_lg()
-                    .p(px(8.0))
-                    .text_size(px(12.0))
-                    .line_height(px(18.0))
-                    .font_family("monospace")
-                    .child(
-                        div()
-                            .text_color(rgb(0x9CA3AF))
-                            .child(t(language, "panel.option_help")),
-                    )
-                    .child(
-                        div()
-                            .pt(px(4.0))
-                            .flex_grow()
-                            .id("option-help-overlay-scroll")
-                            .overflow_y_scroll()
-                            .overflow_x_scroll()
-                            .scrollbar_width(px(8.0))
-                            .child(help_text),
-                    )
+                    div()
+                        .absolute()
+                        .left(pos.x + px(14.0))
+                        .top(pos.y + px(14.0))
+                        .w(px(360.0))
+                        .h(px(170.0))
+                        .flex()
+                        .flex_col()
+                        .bg(rgb(0x111827))
+                        .opacity(0.94)
+                        .text_color(rgb(0xF9FAFB))
+                        .border_1()
+                        .border_color(rgb(0x374151))
+                        .rounded_md()
+                        .shadow_lg()
+                        .p(px(8.0))
+                        .text_size(px(12.0))
+                        .line_height(px(18.0))
+                        .font_family("monospace")
+                        .child(
+                            div()
+                                .text_color(rgb(0x9CA3AF))
+                                .child(t(language, "panel.option_help")),
+                        )
+                        .child(
+                            div()
+                                .pt(px(4.0))
+                                .flex_grow()
+                                .id("option-help-overlay-scroll")
+                                .overflow_y_scroll()
+                                .overflow_x_scroll()
+                                .scrollbar_width(px(8.0))
+                                .child(help_text),
+                        )
                 } else {
                     div()
                 }
