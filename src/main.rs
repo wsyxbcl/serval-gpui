@@ -330,6 +330,7 @@ struct RootView {
     run_state: RunState,
     cancel_requested: bool,
     running_command_kind: Option<CommandKind>,
+    running_interaction_helper: bool,
     running_process: Option<RunningProcessHandle>,
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
@@ -524,8 +525,15 @@ impl RootView {
         )
     }
 
-    fn command_uses_interaction_helper(kind: CommandKind) -> bool {
-        matches!(kind, CommandKind::Capture | CommandKind::Extract)
+    fn command_uses_interaction_helper(&self) -> bool {
+        match self.command_state.kind {
+            CommandKind::Capture | CommandKind::Extract => true,
+            CommandKind::Xmp => {
+                self.command_state.xmp.subcommand == XmpSubcommand::Init
+                    && self.command_state.xmp.info
+            }
+            _ => false,
+        }
     }
 
     fn set_language(&mut self, language: Language, cx: &mut Context<Self>) {
@@ -669,11 +677,18 @@ impl RootView {
         cx.notify();
     }
 
-    fn begin_run(&mut self, kind: CommandKind, display: String, cx: &mut Context<Self>) {
+    fn begin_run(
+        &mut self,
+        kind: CommandKind,
+        use_interaction_helper: bool,
+        display: String,
+        cx: &mut Context<Self>,
+    ) {
         self.append_output(display, cx);
         self.run_state = RunState::Running;
         self.cancel_requested = false;
         self.running_command_kind = Some(kind);
+        self.running_interaction_helper = use_interaction_helper;
         self.running_process = None;
         self.pty_writer = None;
         self.interaction_helper.reset();
@@ -692,6 +707,7 @@ impl RootView {
         self.run_state = state;
         self.cancel_requested = false;
         self.running_command_kind = None;
+        self.running_interaction_helper = false;
         self.running_process = None;
         self.pty_writer = None;
         self.interaction_helper.reset();
@@ -769,9 +785,7 @@ impl RootView {
                 };
                 let _ = guard.write_all(newline);
                 let _ = guard.flush();
-                if self
-                    .running_command_kind
-                    .is_some_and(Self::command_uses_interaction_helper)
+                if self.running_interaction_helper
                     && self.interaction_helper.record_submission(value)
                 {
                     cx.notify();
@@ -1403,67 +1417,6 @@ impl Render for RootView {
                             let entity = entity.clone();
                             let entity_click = entity.clone();
                             let entity_hover = entity.clone();
-                            let active = self.command_state.observe.subject;
-                            div()
-                                .id("toggle-observe-subject")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.subject =
-                                            !view.command_state.observe.subject;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--subject", cx);
-                                        } else {
-                                            view.clear_hover_help_key("observe|--subject", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.subject"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.observe.modified_time;
-                            div()
-                                .id("toggle-observe-modified-time")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.modified_time =
-                                            !view.command_state.observe.modified_time;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--modified-time", cx);
-                                        } else {
-                                            view.clear_hover_help_key(
-                                                "observe|--modified-time",
-                                                cx,
-                                            );
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.modified_time"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
                             let active = self.command_state.observe.video_only;
                             div()
                                 .id("toggle-observe-video")
@@ -1552,35 +1505,6 @@ impl Render for RootView {
                                     });
                                 })
                                 .child(t(language, "opt.debug"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.observe.independent;
-                            div()
-                                .id("toggle-observe-independent")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.independent =
-                                            !view.command_state.observe.independent;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--independent", cx);
-                                        } else {
-                                            view.clear_hover_help_key("observe|--independent", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.independent"))
                         }),
                 )
         } else if capture_selected {
@@ -1986,6 +1910,48 @@ impl Render for RootView {
                                                     );
                                                 })
                                                 .child(t(language, "action.browse"))
+                                        }),
+                                )
+                        } else if self.command_state.xmp.subcommand == XmpSubcommand::Init {
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.0))
+                                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.options")))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .flex_wrap()
+                                        .gap(px(8.0))
+                                        .child({
+                                            let entity = entity.clone();
+                                            let entity_click = entity.clone();
+                                            let entity_hover = entity.clone();
+                                            let active = self.command_state.xmp.info;
+                                            div()
+                                                .id("toggle-xmp-init-info")
+                                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
+                                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity_click.update(cx, |view, cx| {
+                                                        view.command_state.xmp.info =
+                                                            !view.command_state.xmp.info;
+                                                        cx.notify();
+                                                    });
+                                                })
+                                                .on_hover(move |hovered, _, cx| {
+                                                    entity_hover.update(cx, |view, cx| {
+                                                        if *hovered {
+                                                            view.set_hover_help_key("xmp-init|--info", cx);
+                                                        } else {
+                                                            view.clear_hover_help_key("xmp-init|--info", cx);
+                                                        }
+                                                    });
+                                                })
+                                                .child(t(language, "opt.info"))
                                         }),
                                 )
                         } else {
@@ -3068,10 +3034,15 @@ impl Render for RootView {
                                                 "$ {}",
                                                 format_shell_command(&executable, &command.1)
                                             );
-                                            view.begin_run(kind, display, cx);
-                                            let use_pty = RootView::command_uses_pty(kind);
                                             let use_interaction_helper =
-                                                RootView::command_uses_interaction_helper(kind);
+                                                view.command_uses_interaction_helper();
+                                            view.begin_run(
+                                                kind,
+                                                use_interaction_helper,
+                                                display,
+                                                cx,
+                                            );
+                                            let use_pty = RootView::command_uses_pty(kind);
                                             Some((
                                                 executable,
                                                 command.1,
@@ -3986,6 +3957,7 @@ fn main() {
                     run_state: RunState::Idle,
                     cancel_requested: false,
                     running_command_kind: None,
+                    running_interaction_helper: false,
                     running_process: None,
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),

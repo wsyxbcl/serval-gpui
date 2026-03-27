@@ -67,6 +67,7 @@ fn detect_prompt(buffer: &str) -> Option<InteractionHelperPrompt> {
         .or_else(|| {
             detect_numbered_choice_prompt(buffer, "Select the top level directory to keep:")
         })
+        .or_else(|| detect_xmp_init_info_prompt(buffer))
         .or_else(|| detect_analysis_prompt(buffer))
         .or_else(|| detect_compare_mode_prompt(buffer))
         .or_else(|| detect_minutes_prompt(buffer))
@@ -82,6 +83,24 @@ fn detect_numbered_choice_prompt(buffer: &str, prompt: &str) -> Option<Interacti
     Some(InteractionHelperPrompt {
         prompt: prompt_line,
         sample_path: sample_path(buffer),
+        options,
+    })
+}
+
+fn detect_xmp_init_info_prompt(buffer: &str) -> Option<InteractionHelperPrompt> {
+    if !buffer.contains("Expect numeric input") {
+        return None;
+    }
+
+    let sample_path = sample_path(buffer)?;
+    let options = numbered_options(buffer);
+    if options.is_empty() {
+        return None;
+    }
+
+    Some(InteractionHelperPrompt {
+        prompt: "Select the directory level to keep:".to_string(),
+        sample_path: Some(sample_path),
         options,
     })
 }
@@ -247,5 +266,25 @@ mod tests {
              Select the top level directory to keep: 0"
         )
         .is_none());
+    }
+
+    #[test]
+    fn detects_xmp_init_info_numeric_prompt() {
+        let prompt = prompt(
+            "Here is a sample of the file path (/tmp/charton/assets/industry_echarts.png)\n\
+             1): tmp\n\
+             2): charton\n\
+             3): assets\n\
+              --< Expect numeric input",
+        );
+
+        assert_eq!(prompt.prompt, "Select the directory level to keep:");
+        assert_eq!(
+            prompt.sample_path.as_deref(),
+            Some("/tmp/charton/assets/industry_echarts.png")
+        );
+        assert_eq!(prompt.options.len(), 3);
+        assert_eq!(prompt.options[0].label, "tmp");
+        assert_eq!(prompt.options[2].value, "3");
     }
 }

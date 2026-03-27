@@ -20,19 +20,15 @@ fn en_text_for_key(key: &str) -> Option<&'static str> {
         "extract" => Some(EXTRACT_HELP),
         "translate" => Some(TRANSLATE_HELP),
         "observe|--xmp" => Some("Read tags from XMP sidecar files instead of embedded metadata."),
-        "observe|--subject" => Some("Include Subject metadata in output."),
-        "observe|--modified-time" => Some("Include filesystem modified time in output."),
         "observe|--video" => Some("Only process video files."),
         "observe|--image" => Some("Only process image files."),
         "observe|--debug" => Some("Enable debug output."),
-        "observe|--independent" => {
-            Some("Run temporal independence analysis after metadata extraction.")
-        }
         "capture|--event" => Some("Create event IDs during temporal independence analysis."),
         "capture|--no-exclude" => Some(
             "Do not exclude default tags: Blank, Useless data, Unidentified, Human, Unknown, Blur.",
         ),
         "capture|--camtrap-dp" => Some("Use observation table from camtrap-dp data package."),
+        "xmp-init|--info" => Some("Enable info mode and write an XMP init datetime CSV."),
         "xmp-update|--datetime" => Some("Update datetime instead of tag fields."),
         "xmp-update|species" => Some("Set --tag-type to species."),
         "xmp-update|individual" => Some("Set --tag-type to individual."),
@@ -51,17 +47,15 @@ fn en_text_for_key(key: &str) -> Option<&'static str> {
 fn zh_text_for_key(key: &str) -> Option<&'static str> {
     match key {
         "observe|--xmp" => Some("从 XMP 侧车文件读取标签，而不是从媒体嵌入元数据读取。"),
-        "observe|--subject" => Some("在输出中包含 Subject 元数据。"),
-        "observe|--modified-time" => Some("在输出中包含文件修改时间。"),
         "observe|--video" => Some("仅处理视频文件。"),
         "observe|--image" => Some("仅处理图像文件。"),
         "observe|--debug" => Some("启用调试输出。"),
-        "observe|--independent" => Some("提取完成后执行时间独立性分析。"),
         "capture|--event" => Some("在时间独立性分析过程中生成事件 ID。"),
         "capture|--no-exclude" => {
             Some("不排除默认标签：Blank、Useless data、Unidentified、Human、Unknown、Blur。")
         }
         "capture|--camtrap-dp" => Some("使用 camtrap-dp 数据包中的 observation 表。"),
+        "xmp-init|--info" => Some("启用 info 模式，并写出一个 XMP 初始化时间 CSV。"),
         "xmp-update|--datetime" => Some("更新日期时间，而不是更新标签字段。"),
         "xmp-update|species" => Some("将 --tag-type 设置为 species。"),
         "xmp-update|individual" => Some("将 --tag-type 设置为 individual。"),
@@ -84,12 +78,9 @@ Arguments:
 Options:
   -o, --output <OUTPUT_DIR>  Output directory [default: ./serval_output/serval_observe]
   -x, --xmp                  Read from XMP files
-  -s, --subject              Include Subject metadata
-  -m, --modified-time        Include file modified time
-      --video                Video only
-      --image                Image only
+  --video                Video only
+  --image                Image only
   -d, --debug                Debug mode
-  -i, --independent          Temporal independence analysis after retrieving
   -h, --help                 Print help"#;
 
 const CAPTURE_HELP: &str = r#"Temporal independence analysis on a CSV file
@@ -119,7 +110,10 @@ const XMP_COPY_HELP: &str = r#"Copy XMP files to output directory
 Usage: serval xmp copy <SOURCE_DIR> <OUTPUT_DIR>"#;
 
 const XMP_INIT_HELP: &str = r#"Initialize XMP files for media files
-Usage: serval xmp init <SOURCE_DIR>"#;
+Usage: serval xmp init [OPTIONS] <SOURCE_DIR>
+
+Options:
+  -i, --info  Enable info mode and write an XMP init datetime CSV"#;
 
 const XMP_UPDATE_HELP: &str = r#"Update XMP files from CSV
 Usage: serval xmp update [OPTIONS] <CSV_PATH>

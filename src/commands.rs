@@ -136,12 +136,9 @@ pub struct ObserveInput {
     pub media_dir: String,
     pub output_dir: Option<String>,
     pub xmp: bool,
-    pub subject: bool,
-    pub modified_time: bool,
     pub video_only: bool,
     pub image_only: bool,
     pub debug: bool,
-    pub independent: bool,
 }
 
 impl Default for ObserveInput {
@@ -150,12 +147,9 @@ impl Default for ObserveInput {
             media_dir: String::new(),
             output_dir: None,
             xmp: false,
-            subject: false,
-            modified_time: false,
             video_only: false,
             image_only: false,
             debug: false,
-            independent: false,
         }
     }
 }
@@ -344,6 +338,7 @@ pub struct XmpInput {
     pub dir: String,
     pub tag_type: Option<String>,
     pub datetime: bool,
+    pub info: bool,
 }
 
 impl Default for XmpInput {
@@ -356,6 +351,7 @@ impl Default for XmpInput {
             dir: String::new(),
             tag_type: None,
             datetime: false,
+            info: false,
         }
     }
 }
@@ -370,12 +366,6 @@ fn preview_observe_args(input: &ObserveInput) -> Vec<String> {
     if input.xmp {
         parts.push("--xmp".to_string());
     }
-    if input.subject {
-        parts.push("--subject".to_string());
-    }
-    if input.modified_time {
-        parts.push("--modified-time".to_string());
-    }
     if input.video_only {
         parts.push("--video".to_string());
     }
@@ -384,9 +374,6 @@ fn preview_observe_args(input: &ObserveInput) -> Vec<String> {
     }
     if input.debug {
         parts.push("--debug".to_string());
-    }
-    if input.independent {
-        parts.push("--independent".to_string());
     }
 
     let media_dir = if input.media_dir.is_empty() {
@@ -443,6 +430,9 @@ fn preview_xmp_args(input: &XmpInput) -> Vec<String> {
         }
         XmpSubcommand::Init => {
             parts.push("init".to_string());
+            if input.info {
+                parts.push("--info".to_string());
+            }
             parts.push(if input.source_dir.is_empty() {
                 "<SOURCE_DIR>".to_string()
             } else {
@@ -567,12 +557,6 @@ fn build_observe(input: &ObserveInput) -> Result<(String, Vec<String>), String> 
     if input.xmp {
         args.push("--xmp".to_string());
     }
-    if input.subject {
-        args.push("--subject".to_string());
-    }
-    if input.modified_time {
-        args.push("--modified-time".to_string());
-    }
     if input.video_only {
         args.push("--video".to_string());
     }
@@ -581,9 +565,6 @@ fn build_observe(input: &ObserveInput) -> Result<(String, Vec<String>), String> 
     }
     if input.debug {
         args.push("--debug".to_string());
-    }
-    if input.independent {
-        args.push("--independent".to_string());
     }
 
     args.push(input.media_dir.clone());
@@ -637,6 +618,9 @@ fn build_xmp(input: &XmpInput) -> Result<(String, Vec<String>), String> {
                 return Err("XMP init requires SOURCE_DIR.".to_string());
             }
             args.push("init".to_string());
+            if input.info {
+                args.push("--info".to_string());
+            }
             args.push(input.source_dir.clone());
         }
         XmpSubcommand::Remove => {
@@ -755,7 +739,8 @@ fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), Stri
 #[cfg(test)]
 mod tests {
     use super::{
-        format_shell_command, CommandKind, CommandState, ExtractInput, ObserveInput, TranslateInput,
+        format_shell_command, CommandKind, CommandState, ExtractInput, ObserveInput,
+        TranslateInput, XmpInput, XmpSubcommand,
     };
 
     #[test]
@@ -819,6 +804,46 @@ mod tests {
                 "/tmp/media",
             ]
         );
+    }
+
+    #[test]
+    fn observe_build_matches_serval_0_6_7_options() {
+        let input = ObserveInput {
+            media_dir: "/tmp/media".to_string(),
+            xmp: true,
+            video_only: true,
+            debug: true,
+            ..ObserveInput::default()
+        };
+
+        let (_, args) = super::build_observe(&input).expect("observe command should build");
+
+        assert_eq!(
+            args,
+            vec![
+                "observe",
+                "-o",
+                "/tmp/media/serval_output/serval_observe",
+                "--xmp",
+                "--video",
+                "--debug",
+                "/tmp/media",
+            ]
+        );
+    }
+
+    #[test]
+    fn xmp_init_info_build_adds_info_flag() {
+        let input = XmpInput {
+            subcommand: XmpSubcommand::Init,
+            source_dir: "/tmp/media".to_string(),
+            info: true,
+            ..XmpInput::default()
+        };
+
+        let (_, args) = super::build_xmp(&input).expect("xmp init command should build");
+
+        assert_eq!(args, vec!["xmp", "init", "--info", "/tmp/media"]);
     }
 
     #[test]
