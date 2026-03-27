@@ -21,6 +21,13 @@ fn en(key: &str) -> &'static str {
     match key {
         "app.title" => "Waxbill",
         "app.active_binary" => "Active Binary",
+        "app.binary_not_configured" => "Not configured",
+        "app.serval_version" => "Serval Version",
+        "app.serval_version_via_path" => "via PATH; use Setup to pin the executable",
+        "app.serval_version_not_configured" => {
+            "Not configured. Use Setup to choose the executable."
+        }
+        "app.serval_version_unavailable" => "Version unavailable for the configured executable.",
         "action.open_input_dir" => "Open Input Dir",
         "action.open_output_dir" => "Open Output Dir",
         "action.setup" => "Setup",
@@ -155,6 +162,11 @@ fn zh_cn(key: &str) -> &'static str {
     match key {
         "app.title" => "Waxbill",
         "app.active_binary" => "当前可执行文件",
+        "app.binary_not_configured" => "未配置",
+        "app.serval_version" => "Serval 版本",
+        "app.serval_version_via_path" => "来自 PATH；可在“设置”中固定可执行文件",
+        "app.serval_version_not_configured" => "尚未配置。请先在“设置”中选择可执行文件。",
+        "app.serval_version_unavailable" => "无法读取已配置可执行文件的版本。",
         "action.open_input_dir" => "打开输入目录",
         "action.open_output_dir" => "打开输出目录",
         "action.setup" => "设置",

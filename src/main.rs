@@ -4,7 +4,7 @@ use gpui::*;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -77,6 +77,14 @@ enum RunningProcessHandle {
         pid: u32,
         child: Arc<Mutex<std::process::Child>>,
     },
+}
+
+#[derive(Clone, Debug)]
+enum ServalVersionStatus {
+    Configured(String),
+    PathFallback(String),
+    Missing,
+    Error,
 }
 
 impl RunningProcessHandle {
@@ -299,6 +307,7 @@ struct RootView {
     command_state: CommandState,
     language: Language,
     serval_binary_path: Option<String>,
+    serval_version_status: ServalVersionStatus,
     observe_input: Entity<TextInput>,
     observe_output_input: Entity<TextInput>,
     capture_input: Entity<TextInput>,
@@ -324,6 +333,7 @@ struct RootView {
     running_process: Option<RunningProcessHandle>,
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
+    page_scroll_handle: ScrollHandle,
     interaction_helper: InteractionHelperModel,
     helper_mode: bool,
     command_panel_open: bool,
@@ -410,6 +420,103 @@ fn browse_into_text_input(
     }
 }
 impl RootView {
+    fn first_non_empty_output_line(output: &Output) -> Option<String> {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        stdout
+            .lines()
+            .chain(String::from_utf8_lossy(&output.stderr).lines())
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(str::to_string)
+    }
+
+    fn detect_serval_version_status(configured_path: Option<&str>) -> ServalVersionStatus {
+        let configured_path = configured_path.and_then(|path| {
+            let trimmed = path.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        });
+
+        let program = configured_path.unwrap_or("serval");
+        let output = match Command::new(program).arg("--version").output() {
+            Ok(output) => output,
+            Err(_) => {
+                return if configured_path.is_some() {
+                    ServalVersionStatus::Error
+                } else {
+                    ServalVersionStatus::Missing
+                };
+            }
+        };
+
+        if !output.status.success() {
+            return if configured_path.is_some() {
+                ServalVersionStatus::Error
+            } else {
+                ServalVersionStatus::Missing
+            };
+        }
+
+        match Self::first_non_empty_output_line(&output) {
+            Some(version) => {
+                if configured_path.is_some() {
+                    ServalVersionStatus::Configured(version)
+                } else {
+                    ServalVersionStatus::PathFallback(version)
+                }
+            }
+            None => {
+                if configured_path.is_some() {
+                    ServalVersionStatus::Error
+                } else {
+                    ServalVersionStatus::Missing
+                }
+            }
+        }
+    }
+
+    fn refresh_serval_version_status(&mut self) {
+        self.serval_version_status =
+            Self::detect_serval_version_status(self.serval_binary_path.as_deref());
+    }
+
+    fn active_binary_display(&self) -> (String, u32, Option<(String, u32)>) {
+        let active_binary = self.executable_program();
+
+        match &self.serval_version_status {
+            ServalVersionStatus::Configured(version) => {
+                (format!("{version} ({active_binary})"), 0x6B7280, None)
+            }
+            ServalVersionStatus::PathFallback(version) => (
+                format!("{version} ({active_binary})"),
+                0x6B7280,
+                Some((
+                    t(self.language, "app.serval_version_via_path").to_string(),
+                    0xB45309,
+                )),
+            ),
+            ServalVersionStatus::Missing => (
+                t(self.language, "app.binary_not_configured").to_string(),
+                0xB45309,
+                Some((
+                    t(self.language, "app.serval_version_not_configured").to_string(),
+                    0xB45309,
+                )),
+            ),
+            ServalVersionStatus::Error => (
+                active_binary,
+                0x6B7280,
+                Some((
+                    t(self.language, "app.serval_version_unavailable").to_string(),
+                    0xDC2626,
+                )),
+            ),
+        }
+    }
+
     fn command_uses_pty(kind: CommandKind) -> bool {
         matches!(
             kind,
@@ -513,6 +620,7 @@ impl RootView {
                 Some(trimmed)
             }
         });
+        self.refresh_serval_version_status();
         self.help_cache.clear();
         self.hover_help_key = None;
         self.option_help_position = None;
@@ -1115,7 +1223,7 @@ impl Render for RootView {
         let entity_extract = entity.clone();
         let entity_translate = entity.clone();
         let preview = self.command_preview();
-        let active_binary = self.executable_program();
+        let (active_binary_text, active_binary_color, header_prompt) = self.active_binary_display();
         let observe_selected = self.command_state.kind == CommandKind::Observe;
         let capture_selected = self.command_state.kind == CommandKind::Capture;
         let xmp_selected = self.command_state.kind == CommandKind::Xmp;
@@ -2750,10 +2858,6 @@ impl Render for RootView {
         div()
             .size_full()
             .relative()
-            .flex()
-            .flex_col()
-            .gap(px(8.0))
-            .p(px(24.0))
             .bg(rgb(0xF7F4EF))
             .text_color(rgb(0x1E1E1E))
             .on_mouse_move({
@@ -2770,10 +2874,27 @@ impl Render for RootView {
             })
             .child(
                 div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
+                    .id("page-scroll")
+                    .size_full()
+                    .track_scroll(&self.page_scroll_handle)
+                    .overflow_y_scroll()
+                    .overflow_x_hidden()
+                    .scrollbar_width(px(8.0))
+                    .child(
+                        div()
+                            .w_full()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .p(px(24.0))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .flex_wrap()
+                                    .items_center()
+                                    .justify_between()
+                                    .gap(px(12.0))
                     .child(
                         div()
                             .flex()
@@ -2783,17 +2904,28 @@ impl Render for RootView {
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(rgb(0x6B7280))
+                                    .text_color(rgb(active_binary_color))
                                     .child(format!(
-                                        "{}: {active_binary}",
+                                        "{}: {active_binary_text}",
                                         t(language, "app.active_binary")
                                     )),
-                            ),
+                            )
+                            .child(if let Some((prompt_text, prompt_color)) = &header_prompt {
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(*prompt_color))
+                                    .child(prompt_text.clone())
+                                    .into_any_element()
+                            } else {
+                                div().into_any_element()
+                            }),
                     )
                     .child(
                         div()
                             .flex()
                             .flex_row()
+                            .flex_wrap()
+                            .justify_end()
                             .gap(px(8.0))
                             .child({
                                 let entity_open_input = entity.clone();
@@ -3264,6 +3396,7 @@ impl Render for RootView {
                         div()
                             .flex()
                             .flex_row()
+                            .flex_wrap()
                             .gap(px(8.0))
                             .child({
                                 let entity_click = entity_observe.clone();
@@ -3462,7 +3595,6 @@ impl Render for RootView {
                     .bg(rgb(0x0B0F1A))
                     .text_color(rgb(0xE5E7EB))
                     .p(px(16.0))
-                    .flex_grow()
                     .min_h(px(220.0))
                     .child(
                         div()
@@ -3513,9 +3645,8 @@ impl Render for RootView {
                             .whitespace_nowrap()
                             .id("output-scroll")
                             .track_scroll(&self.output_scroll_handle)
-                            .flex_grow()
+                            .min_h(px(220.0))
                             .w_full()
-                            .h_full()
                             .overflow_y_scroll()
                             .overflow_x_scroll()
                             .scrollbar_width(px(8.0))
@@ -3545,7 +3676,9 @@ impl Render for RootView {
                             }),
                     ),
             )
-            .child(interaction_helper_panel)
+                            .child(interaction_helper_panel),
+                    ),
+            )
             .child(if helper_mode && self.command_help_open {
                 {
                     let base = div()
@@ -3830,6 +3963,7 @@ fn main() {
                     command_state: CommandState::default(),
                     language: Language::default(),
                     serval_binary_path: None,
+                    serval_version_status: RootView::detect_serval_version_status(None),
                     observe_input,
                     observe_output_input,
                     capture_input,
@@ -3855,6 +3989,7 @@ fn main() {
                     running_process: None,
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),
+                    page_scroll_handle: ScrollHandle::new(),
                     interaction_helper: InteractionHelperModel::default(),
                     helper_mode: false,
                     command_panel_open: true,

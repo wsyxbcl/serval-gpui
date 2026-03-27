@@ -73,6 +73,14 @@ Rules:
 - [x] Derive blank output dirs from the input location and show the auto-output hint in the UI
 - [x] Rename the shipped binary and user-facing app identity to Waxbill
 - [x] Build the Windows app as a GUI subsystem executable so it does not open an empty console window
+- [x] Keep the UI usable on smaller devices with a page-level scrollbar and wrapped top-level control rows.
+- [ ] Evaluate whether additional adaptive sizing/scaling is still needed for very small windows.
+- [x] Show serval version at the top, and guide the user to Setup when the executable is only coming from PATH or not configured.
+- [ ] Adapt to latest serval v0.6.7: some options in observe are removed, xmp now have a xmp init --info option
+- [ ] Add gui assit layer for xmp init --info
+- [ ] The font color in input box of the interactive step is too light, make it black
+- [ ] remove the collapse ability of the command panel
+- [ ] Provide some default options for from and to in serval translate, default options are: tag, tagCN, mazeNameCN and mazeScientificName
 
 ---
 
@@ -90,7 +98,6 @@ Rules:
 - Add more polished forms for all Serval subcommands, e.g. pre-read CSV input to offer more advanced options in `translate` or pre-read species values in CSV for `extract`.
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
-- Adapt to future `serval` v0.6.6/v0.7.0 (add `serval xmp init --info` and serval viz utils)
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
 - Investigate and fix Linux IME composition in custom text inputs so Chinese input works there too.
