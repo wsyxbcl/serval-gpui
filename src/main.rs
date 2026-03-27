@@ -978,13 +978,13 @@ impl RootView {
             .border_color(rgb(0x374151))
             .child(
                 div()
-                    .text_color(rgb(0x9CA3AF))
+                    .text_color(rgb(0x6B7280))
                     .child(t(language, "panel.interaction_helper")),
             )
-            .child(div().text_color(rgb(0xF9FAFB)).child(prompt.prompt.clone()))
+            .child(div().text_color(rgb(0x111827)).child(prompt.prompt.clone()))
             .child(if let Some(sample_path) = prompt.sample_path.clone() {
                 div()
-                    .text_color(rgb(0xD1D5DB))
+                    .text_color(rgb(0x4B5563))
                     .font_family("monospace")
                     .text_size(px(12.0))
                     .child(sample_path)
@@ -1023,13 +1023,13 @@ impl RootView {
             })
             .child(if !has_options {
                 div()
-                    .text_color(rgb(0x9CA3AF))
+                    .text_color(rgb(0x4B5563))
                     .child(t(language, "message.interactive_prompt_enter_hint"))
             } else {
                 div()
             })
             .child(if let Some(last_submission) = last_submission {
-                div().text_color(rgb(0x9CA3AF)).child(format!(
+                div().text_color(rgb(0x4B5563)).child(format!(
                     "{}: {}",
                     t(language, "label.last_sent"),
                     last_submission

@@ -78,7 +78,7 @@ Rules:
 - [x] Show serval version at the top, and guide the user to Setup when the executable is only coming from PATH or not configured.
 - [x] Adapt to latest serval v0.6.7: remove stale observe options and add `serval xmp init --info`
 - [x] Add gui assit layer for xmp init --info
-- [ ] The font color in input box of the interactive step is too light, make it black
+- [x] The font color in input box of the interactive step is too light, make it black
 - [ ] remove the collapse ability of the command panel
 - [ ] Provide some default options for from and to in serval translate, default options are: tag, tagCN, mazeNameCN and mazeScientificName
 

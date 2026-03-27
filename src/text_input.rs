@@ -553,7 +553,7 @@ impl Element for TextElement {
         let style = window.text_style();
 
         let (display_text, text_color) = if content.is_empty() {
-            (input.placeholder.clone(), hsla(0., 0., 0., 0.35))
+            (input.placeholder.clone(), hsla(0., 0., 0., 0.5))
         } else {
             (content, style.color)
         };
@@ -701,12 +701,14 @@ impl Render for TextInput {
             .border_color(black().blend(hsla(0., 0., 0., 0.07)))
             .line_height(px(20.))
             .text_size(px(14.))
+            .text_color(rgb(0x111827))
             .child(
                 div()
                     .h(px(20. + 4. * 2.))
                     .w_full()
                     .p(px(4.))
                     .bg(white())
+                    .text_color(rgb(0x111827))
                     .child(TextElement { input: cx.entity() }),
             )
     }
