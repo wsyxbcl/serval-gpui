@@ -74,7 +74,6 @@ Rules:
 - [x] Rename the shipped binary and user-facing app identity to Waxbill
 - [x] Build the Windows app as a GUI subsystem executable so it does not open an empty console window
 - [x] Keep the UI usable on smaller devices with a page-level scrollbar and wrapped top-level control rows.
-- [ ] Evaluate whether additional adaptive sizing/scaling is still needed for very small windows.
 - [x] Show serval version at the top, and guide the user to Setup when the executable is only coming from PATH or not configured.
 - [x] Adapt to latest serval v0.6.7: remove stale observe options and add `serval xmp init --info`
 - [x] Add gui assit layer for xmp init --info
@@ -96,6 +95,7 @@ Rules:
 ## Future Work
 
 - Add more polished forms for all Serval subcommands, e.g. pre-read CSV input to offer more advanced options in `translate` or pre-read species values in CSV for `extract`.
+- Revisit adaptive sizing/scaling for very small windows after the core workflows settle.
 - Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
