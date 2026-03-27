@@ -337,7 +337,6 @@ struct RootView {
     page_scroll_handle: ScrollHandle,
     interaction_helper: InteractionHelperModel,
     helper_mode: bool,
-    command_panel_open: bool,
     input_panel_open: bool,
     preview_panel_open: bool,
     help_cache: HashMap<String, String>,
@@ -1537,7 +1536,6 @@ impl Render for RootView {
         let translate_selected = self.command_state.kind == CommandKind::Translate;
         let language = self.language;
         let helper_mode = self.helper_mode;
-        let command_panel_open = self.command_panel_open;
         let input_panel_open = self.input_panel_open;
         let preview_panel_open = self.preview_panel_open;
         let running = self.run_state.is_running();
@@ -3359,46 +3357,12 @@ impl Render for RootView {
                                     .gap(px(8.0))
                                     .bg(rgb(0xFFFFFF))
                                     .p(px(16.0))
-                                    .child({
-                                        let entity = entity.clone();
+                                    .child(
                                         div()
-                                            .id("toggle-command-panel")
-                                            .flex()
-                                            .flex_row()
-                                            .justify_between()
-                                            .items_center()
-                                            .child(
-                                                div()
-                                                    .text_color(rgb(0x6B7280))
-                                                    .child(t(language, "panel.command")),
-                                            )
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_row()
-                                                    .items_center()
-                                                    .gap(px(8.0))
-                                                    .child(
-                                                        div()
-                                                            .id("toggle-command-panel-action")
-                                                            .text_color(rgb(0x6B7280))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, _, cx| {
-                                                                entity.update(cx, |view, cx| {
-                                                                    view.command_panel_open =
-                                                                        !view.command_panel_open;
-                                                                    cx.notify();
-                                                                });
-                                                            })
-                                                            .child(if command_panel_open {
-                                                                t(language, "action.collapse")
-                                                            } else {
-                                                                t(language, "action.expand")
-                                                            }),
-                                                    ),
-                                            )
-                                    })
-                                    .child(if command_panel_open {
+                                            .text_color(rgb(0x6B7280))
+                                            .child(t(language, "panel.command")),
+                                    )
+                                    .child(
                                         div()
                                             .flex()
                                             .flex_row()
@@ -3533,10 +3497,8 @@ impl Render for RootView {
                                                         });
                                                     })
                                                     .child(t(language, "cmd.translate"))
-                                            })
-                                    } else {
-                                        div()
-                                    }),
+                                            }),
+                                    ),
                             )
                             .child(
                                 div()
@@ -4106,7 +4068,6 @@ fn main() {
                     page_scroll_handle: ScrollHandle::new(),
                     interaction_helper: InteractionHelperModel::default(),
                     helper_mode: false,
-                    command_panel_open: true,
                     input_panel_open: true,
                     preview_panel_open: true,
                     help_cache: HashMap::new(),
