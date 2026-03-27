@@ -16,7 +16,10 @@ mod i18n;
 mod interaction_helper;
 mod text_input;
 
-use commands::{format_shell_command, CommandKind, CommandState, XmpSubcommand};
+use commands::{
+    format_shell_command, CommandKind, CommandState, XmpSubcommand, DEFAULT_TRANSLATE_FROM,
+    DEFAULT_TRANSLATE_TO, TRANSLATE_COLUMN_OPTIONS,
+};
 use i18n::{t, Language};
 use interaction_helper::InteractionHelperModel;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
@@ -1181,6 +1184,36 @@ impl RootView {
         self.command_state.effective_output_dir().map(PathBuf::from)
     }
 
+    fn set_translate_from_value(&mut self, value: String, cx: &mut Context<Self>) {
+        self.command_state.translate.from = value.clone();
+        self.translate_from_input
+            .update(cx, |input, cx| input.set_value(value, cx));
+        cx.notify();
+    }
+
+    fn set_translate_to_value(&mut self, value: String, cx: &mut Context<Self>) {
+        self.command_state.translate.to = value.clone();
+        self.translate_to_input
+            .update(cx, |input, cx| input.set_value(value, cx));
+        cx.notify();
+    }
+
+    fn activate_translate_from_custom(&mut self, cx: &mut Context<Self>) {
+        if is_translate_column_preset(&self.command_state.translate.from) {
+            self.set_translate_from_value(String::new(), cx);
+        } else {
+            cx.notify();
+        }
+    }
+
+    fn activate_translate_to_custom(&mut self, cx: &mut Context<Self>) {
+        if is_translate_column_preset(&self.command_state.translate.to) {
+            self.set_translate_to_value(String::new(), cx);
+        } else {
+            cx.notify();
+        }
+    }
+
     fn render_auto_output_dir_hint(&self) -> AnyElement {
         let Some(path) = self.command_state.auto_output_dir_hint() else {
             return div().into_any_element();
@@ -1519,6 +1552,10 @@ fn sanitize_log_output(input: &str) -> String {
     }
     line
 }
+
+fn is_translate_column_preset(value: &str) -> bool {
+    TRANSLATE_COLUMN_OPTIONS.contains(&value.trim())
+}
 impl Render for RootView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
@@ -1534,6 +1571,10 @@ impl Render for RootView {
         let xmp_selected = self.command_state.kind == CommandKind::Xmp;
         let extract_selected = self.command_state.kind == CommandKind::Extract;
         let translate_selected = self.command_state.kind == CommandKind::Translate;
+        let translate_from_value = self.command_state.translate.from.clone();
+        let translate_to_value = self.command_state.translate.to.clone();
+        let translate_from_custom = !is_translate_column_preset(&translate_from_value);
+        let translate_to_custom = !is_translate_column_preset(&translate_to_value);
         let language = self.language;
         let helper_mode = self.helper_mode;
         let input_panel_open = self.input_panel_open;
@@ -3052,9 +3093,153 @@ impl Render for RootView {
                 .child(
                     div()
                         .flex()
-                        .flex_row()
+                        .flex_col()
                         .gap(px(8.0))
-                        .child(div().flex_grow().child(translate_from_input.clone())),
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .flex_wrap()
+                                .gap(px(8.0))
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-from-tag")
+                                        .bg(rgb(if translate_from_value == "tag" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_from_value == "tag" {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_from_value(
+                                                    "tag".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("tag")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-from-tagcn")
+                                        .bg(rgb(if translate_from_value == "tagCN" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_from_value == "tagCN" {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_from_value(
+                                                    "tagCN".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("tagCN")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-from-mazenamecn")
+                                        .bg(rgb(if translate_from_value == "mazeNameCN" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_from_value == "mazeNameCN" {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_from_value(
+                                                    "mazeNameCN".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("mazeNameCN")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-from-mazescientificname")
+                                        .bg(rgb(if translate_from_value == "mazeScientificName" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(
+                                            if translate_from_value == "mazeScientificName" {
+                                                0xF9FAFB
+                                            } else {
+                                                0x111827
+                                            },
+                                        ))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_from_value(
+                                                    "mazeScientificName".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("mazeScientificName")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-from-custom")
+                                        .bg(rgb(if translate_from_custom {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_from_custom {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.activate_translate_from_custom(cx);
+                                            });
+                                        })
+                                        .child(t(language, "action.custom"))
+                                }),
+                        )
+                        .child(if translate_from_custom {
+                            div()
+                                .flex()
+                                .flex_row()
+                                .gap(px(8.0))
+                                .child(div().flex_grow().child(translate_from_input.clone()))
+                        } else {
+                            div()
+                        }),
                 )
                 .child(
                     div()
@@ -3064,9 +3249,150 @@ impl Render for RootView {
                 .child(
                     div()
                         .flex()
-                        .flex_row()
+                        .flex_col()
                         .gap(px(8.0))
-                        .child(div().flex_grow().child(translate_to_input.clone())),
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .flex_wrap()
+                                .gap(px(8.0))
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-to-tag")
+                                        .bg(rgb(if translate_to_value == "tag" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_to_value == "tag" {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_to_value("tag".to_string(), cx);
+                                            });
+                                        })
+                                        .child("tag")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-to-tagcn")
+                                        .bg(rgb(if translate_to_value == "tagCN" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_to_value == "tagCN" {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_to_value(
+                                                    "tagCN".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("tagCN")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-to-mazenamecn")
+                                        .bg(rgb(if translate_to_value == "mazeNameCN" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_to_value == "mazeNameCN" {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_to_value(
+                                                    "mazeNameCN".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("mazeNameCN")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-to-mazescientificname")
+                                        .bg(rgb(if translate_to_value == "mazeScientificName" {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(
+                                            if translate_to_value == "mazeScientificName" {
+                                                0xF9FAFB
+                                            } else {
+                                                0x111827
+                                            },
+                                        ))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.set_translate_to_value(
+                                                    "mazeScientificName".to_string(),
+                                                    cx,
+                                                );
+                                            });
+                                        })
+                                        .child("mazeScientificName")
+                                })
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("translate-to-custom")
+                                        .bg(rgb(if translate_to_custom {
+                                            0x111827
+                                        } else {
+                                            0xF3F4F6
+                                        }))
+                                        .text_color(rgb(if translate_to_custom {
+                                            0xF9FAFB
+                                        } else {
+                                            0x111827
+                                        }))
+                                        .p(px(8.0))
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.activate_translate_to_custom(cx);
+                                            });
+                                        })
+                                        .child(t(language, "action.custom"))
+                                }),
+                        )
+                        .child(if translate_to_custom {
+                            div()
+                                .flex()
+                                .flex_row()
+                                .gap(px(8.0))
+                                .child(div().flex_grow().child(translate_to_input.clone()))
+                        } else {
+                            div()
+                        }),
                 )
                 .child(
                     div()
@@ -3892,10 +4218,20 @@ fn main() {
                     cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
                 let translate_taglist_input =
                     cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.taglist_csv")));
-                let translate_from_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.translate_from")));
-                let translate_to_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.translate_to")));
+                let translate_from_input = cx.new(|cx| {
+                    TextInput::new_with_value(
+                        cx,
+                        t(Language::En, "placeholder.translate_from"),
+                        DEFAULT_TRANSLATE_FROM,
+                    )
+                });
+                let translate_to_input = cx.new(|cx| {
+                    TextInput::new_with_value(
+                        cx,
+                        t(Language::En, "placeholder.translate_to"),
+                        DEFAULT_TRANSLATE_TO,
+                    )
+                });
                 let translate_output_input = cx.new(|cx| {
                     TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
                 });

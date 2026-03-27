@@ -4,6 +4,10 @@ const OBSERVE_OUTPUT_DIR_NAME: &str = "serval_observe";
 const CAPTURE_OUTPUT_DIR_NAME: &str = "serval_capture";
 const EXTRACT_OUTPUT_DIR_NAME: &str = "serval_extract";
 const TRANSLATE_OUTPUT_DIR_NAME: &str = "serval_translate";
+pub const TRANSLATE_COLUMN_OPTIONS: [&str; 4] =
+    ["tag", "tagCN", "mazeNameCN", "mazeScientificName"];
+pub const DEFAULT_TRANSLATE_FROM: &str = "tag";
+pub const DEFAULT_TRANSLATE_TO: &str = "tagCN";
 
 fn is_shell_safe_char(ch: char) -> bool {
     matches!(
@@ -313,8 +317,8 @@ impl Default for TranslateInput {
         Self {
             csv_path: String::new(),
             taglist_path: String::new(),
-            from: String::new(),
-            to: String::new(),
+            from: DEFAULT_TRANSLATE_FROM.to_string(),
+            to: DEFAULT_TRANSLATE_TO.to_string(),
             output_dir: None,
         }
     }
@@ -740,7 +744,8 @@ fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), Stri
 mod tests {
     use super::{
         format_shell_command, CommandKind, CommandState, ExtractInput, ObserveInput,
-        TranslateInput, XmpInput, XmpSubcommand,
+        TranslateInput, XmpInput, XmpSubcommand, DEFAULT_TRANSLATE_FROM, DEFAULT_TRANSLATE_TO,
+        TRANSLATE_COLUMN_OPTIONS,
     };
 
     #[test]
@@ -879,6 +884,18 @@ mod tests {
         assert_eq!(
             state.effective_output_dir().as_deref(),
             Some("/tmp/custom-output")
+        );
+    }
+
+    #[test]
+    fn translate_defaults_match_expected_columns() {
+        let input = TranslateInput::default();
+
+        assert_eq!(input.from, DEFAULT_TRANSLATE_FROM);
+        assert_eq!(input.to, DEFAULT_TRANSLATE_TO);
+        assert_eq!(
+            TRANSLATE_COLUMN_OPTIONS,
+            ["tag", "tagCN", "mazeNameCN", "mazeScientificName"]
         );
     }
 }
