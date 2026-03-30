@@ -1,10 +1,10 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 use gpui::*;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::mpsc;
@@ -471,7 +471,12 @@ fn brand_lockup_image() -> Arc<Image> {
     static IMAGE: OnceLock<Arc<Image>> = OnceLock::new();
 
     IMAGE
-        .get_or_init(|| Arc::new(Image::from_bytes(ImageFormat::Png, BRAND_LOCKUP_PNG.to_vec())))
+        .get_or_init(|| {
+            Arc::new(Image::from_bytes(
+                ImageFormat::Png,
+                BRAND_LOCKUP_PNG.to_vec(),
+            ))
+        })
         .clone()
 }
 
@@ -537,11 +542,7 @@ impl RootView {
         }
     }
 
-    fn queue_serval_version_status_refresh_in(
-        &mut self,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn queue_serval_version_status_refresh_in(&mut self, window: &Window, cx: &mut Context<Self>) {
         if self.serval_version_refresh_in_flight {
             return;
         }
@@ -551,18 +552,18 @@ impl RootView {
         let view = cx.weak_entity();
         window
             .spawn(cx, async move |cx| {
-            let status = cx
-                .background_executor()
-                .spawn(async move {
-                    RootView::detect_serval_version_status(configured_path.as_deref())
-                })
-                .await;
+                let status = cx
+                    .background_executor()
+                    .spawn(async move {
+                        RootView::detect_serval_version_status(configured_path.as_deref())
+                    })
+                    .await;
 
-            let _ = view.update(cx, |view, cx| {
-                view.serval_version_status = status;
-                view.serval_version_refresh_in_flight = false;
-                cx.notify();
-            });
+                let _ = view.update(cx, |view, cx| {
+                    view.serval_version_status = status;
+                    view.serval_version_refresh_in_flight = false;
+                    cx.notify();
+                });
             })
             .detach();
     }
@@ -732,7 +733,10 @@ impl RootView {
         let view = cx.weak_entity();
         window
             .spawn(cx, async move |cx| {
-                let result = cx.background_executor().spawn(async move { config.save() }).await;
+                let result = cx
+                    .background_executor()
+                    .spawn(async move { config.save() })
+                    .await;
                 if let Err(err) = result {
                     let message = format!("{}: {err}", t(language, "message.failed_save_setup"));
                     let _ = view.update(cx, |view, cx| {
@@ -1487,122 +1491,120 @@ impl Render for SetupView {
                 .bg(rgb(0xFFFFFF)),
             language,
         )
-            .child(
-                div()
-                    .text_color(rgb(0x6B7280))
-                    .child(t(language, "setup.language")),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .gap(px(8.0))
-                    .child({
-                        let root = root.clone();
-                        div()
-                            .id("setup-lang-en")
-                            .bg(rgb(if language == Language::En {
-                                0x111827
-                            } else {
-                                0xF3F4F6
-                            }))
-                            .text_color(rgb(if language == Language::En {
-                                0xF9FAFB
-                            } else {
-                                0x111827
-                            }))
-                            .p(px(8.0))
-                            .cursor_pointer()
-                            .on_click(move |_, window, cx| {
-                                root.update(cx, |view, cx| {
-                                    view.set_language(Language::En, window, cx)
-                                });
-                            })
-                            .child(t(language, "setup.language_en"))
-                    })
-                    .child({
-                        let root = root.clone();
-                        div()
-                            .id("setup-lang-zh-cn")
-                            .bg(rgb(if language == Language::ZhCn {
-                                0x111827
-                            } else {
-                                0xF3F4F6
-                            }))
-                            .text_color(rgb(if language == Language::ZhCn {
-                                0xF9FAFB
-                            } else {
-                                0x111827
-                            }))
-                            .p(px(8.0))
-                            .cursor_pointer()
-                            .on_click(move |_, window, cx| {
-                                root.update(cx, |view, cx| {
-                                    view.set_language(Language::ZhCn, window, cx)
-                                });
-                            })
-                            .child(t(language, "setup.language_zh_cn"))
-                    }),
-            )
-            .child(
-                div()
-                    .text_color(rgb(0x6B7280))
-                    .child(t(language, "setup.serval_binary")),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .gap(px(8.0))
-                    .child(div().flex_grow().child(serval_binary_input.clone()))
-                    .child({
-                        let root = root.clone();
-                        let serval_binary_input = serval_binary_input.clone();
-                        div()
-                            .id("browse-serval-binary")
-                            .bg(rgb(0xF3F4F6))
-                            .text_color(rgb(0x111827))
-                            .p(px(8.0))
-                            .cursor_pointer()
-                            .on_click(move |_, window, cx| {
-                                browse_into_text_input(
-                                    window,
-                                    cx,
-                                    PathPromptOptions {
-                                        files: true,
-                                        directories: false,
-                                        multiple: false,
-                                        prompt: Some(
-                                            t(language, "setup.select_serval_executable").into(),
-                                        ),
-                                    },
-                                    serval_binary_input.clone(),
-                                    root.clone(),
-                                    language,
-                                );
-                            })
-                            .child(t(language, "action.browse"))
-                    }),
-            )
-            .child({
-                let root = root.clone();
-                let serval_binary_input = serval_binary_input.clone();
-                div()
-                    .id("save-serval-binary")
-                    .bg(rgb(0x111827))
-                    .text_color(rgb(0xF9FAFB))
-                    .p(px(8.0))
-                    .cursor_pointer()
-                    .on_click(move |_, window, cx| {
-                        let value = serval_binary_input.read(cx).value().to_string();
-                        root.update(cx, |view, cx| {
-                            view.set_serval_binary_path(Some(value), window, cx);
-                            view.append_output(t(language, "message.binary_updated"), cx);
-                        });
-                        window.remove_window();
-                    })
-                    .child(t(language, "action.save"))
-            })
+        .child(
+            div()
+                .text_color(rgb(0x6B7280))
+                .child(t(language, "setup.language")),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap(px(8.0))
+                .child({
+                    let root = root.clone();
+                    div()
+                        .id("setup-lang-en")
+                        .bg(rgb(if language == Language::En {
+                            0x111827
+                        } else {
+                            0xF3F4F6
+                        }))
+                        .text_color(rgb(if language == Language::En {
+                            0xF9FAFB
+                        } else {
+                            0x111827
+                        }))
+                        .p(px(8.0))
+                        .cursor_pointer()
+                        .on_click(move |_, window, cx| {
+                            root.update(cx, |view, cx| view.set_language(Language::En, window, cx));
+                        })
+                        .child(t(language, "setup.language_en"))
+                })
+                .child({
+                    let root = root.clone();
+                    div()
+                        .id("setup-lang-zh-cn")
+                        .bg(rgb(if language == Language::ZhCn {
+                            0x111827
+                        } else {
+                            0xF3F4F6
+                        }))
+                        .text_color(rgb(if language == Language::ZhCn {
+                            0xF9FAFB
+                        } else {
+                            0x111827
+                        }))
+                        .p(px(8.0))
+                        .cursor_pointer()
+                        .on_click(move |_, window, cx| {
+                            root.update(cx, |view, cx| {
+                                view.set_language(Language::ZhCn, window, cx)
+                            });
+                        })
+                        .child(t(language, "setup.language_zh_cn"))
+                }),
+        )
+        .child(
+            div()
+                .text_color(rgb(0x6B7280))
+                .child(t(language, "setup.serval_binary")),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap(px(8.0))
+                .child(div().flex_grow().child(serval_binary_input.clone()))
+                .child({
+                    let root = root.clone();
+                    let serval_binary_input = serval_binary_input.clone();
+                    div()
+                        .id("browse-serval-binary")
+                        .bg(rgb(0xF3F4F6))
+                        .text_color(rgb(0x111827))
+                        .p(px(8.0))
+                        .cursor_pointer()
+                        .on_click(move |_, window, cx| {
+                            browse_into_text_input(
+                                window,
+                                cx,
+                                PathPromptOptions {
+                                    files: true,
+                                    directories: false,
+                                    multiple: false,
+                                    prompt: Some(
+                                        t(language, "setup.select_serval_executable").into(),
+                                    ),
+                                },
+                                serval_binary_input.clone(),
+                                root.clone(),
+                                language,
+                            );
+                        })
+                        .child(t(language, "action.browse"))
+                }),
+        )
+        .child({
+            let root = root.clone();
+            let serval_binary_input = serval_binary_input.clone();
+            div()
+                .id("save-serval-binary")
+                .bg(rgb(0x111827))
+                .text_color(rgb(0xF9FAFB))
+                .p(px(8.0))
+                .cursor_pointer()
+                .on_click(move |_, window, cx| {
+                    let value = serval_binary_input.read(cx).value().to_string();
+                    root.update(cx, |view, cx| {
+                        view.set_serval_binary_path(Some(value), window, cx);
+                        view.append_output(t(language, "message.binary_updated"), cx);
+                    });
+                    window.remove_window();
+                })
+                .child(t(language, "action.save"))
+        })
     }
 }
 
@@ -1624,74 +1626,74 @@ impl Render for AboutView {
                 .bg(rgb(0xFFFFFF)),
             language,
         )
-            .child(div().child(img(brand_lockup).h(px(72.0))))
-            .child(
-                div()
-                    .text_center()
-                    .text_color(rgb(0x6B7280))
-                    .child(version_text),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap(px(12.0))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .items_center()
-                            .gap(px(4.0))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_center()
-                                    .text_color(rgb(0x6B7280))
-                                    .child(t(language, "about.project_url")),
-                            )
-                            .child(
-                                div()
-                                    .font_family("monospace")
-                                    .text_center()
-                                    .text_color(rgb(0x111827))
-                                    .child(PROJECT_URL),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .items_center()
-                            .gap(px(4.0))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_center()
-                                    .text_color(rgb(0x6B7280))
-                                    .child(t(language, "about.icon")),
-                            )
-                            .child(
-                                div()
-                                    .text_center()
-                                    .text_color(rgb(0x111827))
-                                    .child(t(language, "about.icon_attribution")),
-                            )
-                            .child(
-                                div()
-                                    .text_center()
-                                    .text_color(rgb(0x111827))
-                                    .child(t(language, "about.wordmark")),
-                            ),
-                    ),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_center()
-                    .text_color(rgb(0x6B7280))
-                    .child(footer_text),
-            )
+        .child(div().child(img(brand_lockup).h(px(72.0))))
+        .child(
+            div()
+                .text_center()
+                .text_color(rgb(0x6B7280))
+                .child(version_text),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(12.0))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap(px(4.0))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_center()
+                                .text_color(rgb(0x6B7280))
+                                .child(t(language, "about.project_url")),
+                        )
+                        .child(
+                            div()
+                                .font_family("monospace")
+                                .text_center()
+                                .text_color(rgb(0x111827))
+                                .child(PROJECT_URL),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap(px(4.0))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_center()
+                                .text_color(rgb(0x6B7280))
+                                .child(t(language, "about.icon")),
+                        )
+                        .child(
+                            div()
+                                .text_center()
+                                .text_color(rgb(0x111827))
+                                .child(t(language, "about.icon_attribution")),
+                        )
+                        .child(
+                            div()
+                                .text_center()
+                                .text_color(rgb(0x111827))
+                                .child(t(language, "about.wordmark")),
+                        ),
+                ),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_center()
+                .text_color(rgb(0x6B7280))
+                .child(footer_text),
+        )
     }
 }
 
@@ -2829,7 +2831,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.species"))
+                                .child(t(language, "opt.extract_species"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -2846,7 +2848,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.path"))
+                                .child(t(language, "opt.extract_path"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -2864,7 +2866,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.individual"))
+                                .child(t(language, "opt.extract_individual"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -2882,7 +2884,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.rating"))
+                                .child(t(language, "opt.extract_rating"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -2900,7 +2902,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.event"))
+                                .child(t(language, "opt.extract_event"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -2918,7 +2920,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.custom"))
+                                .child(t(language, "opt.extract_custom"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -2936,7 +2938,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.advanced"))
+                                .child(t(language, "opt.extract_advanced"))
                         }),
                 )
                 .child(
@@ -3122,7 +3124,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.species"))
+                                .child(t(language, "opt.extract_species"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -3141,7 +3143,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.individual"))
+                                .child(t(language, "opt.extract_individual"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -3160,7 +3162,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.rating"))
+                                .child(t(language, "opt.extract_rating"))
                         })
                         .child({
                             let entity = entity.clone();
@@ -3179,7 +3181,7 @@ impl Render for RootView {
                                         cx.notify();
                                     });
                                 })
-                                .child(t(language, "opt.custom"))
+                                .child(t(language, "opt.extract_custom"))
                         }),
                 )
         } else {
@@ -3305,7 +3307,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("tag")
+                                        .child(t(language, "translate.preset.tag"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3331,7 +3333,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("tagCN")
+                                        .child(t(language, "translate.preset.tag_cn"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3357,7 +3359,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("mazeNameCN")
+                                        .child(t(language, "translate.preset.maze_name_cn"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3385,7 +3387,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("mazeScientificName")
+                                        .child(t(language, "translate.preset.maze_scientific_name"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3458,7 +3460,7 @@ impl Render for RootView {
                                                 view.set_translate_to_value("tag".to_string(), cx);
                                             });
                                         })
-                                        .child("tag")
+                                        .child(t(language, "translate.preset.tag"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3484,7 +3486,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("tagCN")
+                                        .child(t(language, "translate.preset.tag_cn"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3510,7 +3512,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("mazeNameCN")
+                                        .child(t(language, "translate.preset.maze_name_cn"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3538,7 +3540,7 @@ impl Render for RootView {
                                                 );
                                             });
                                         })
-                                        .child("mazeScientificName")
+                                        .child(t(language, "translate.preset.maze_scientific_name"))
                                 })
                                 .child({
                                     let entity = entity.clone();
@@ -3637,157 +3639,152 @@ impl Render for RootView {
                 }),
             language,
         )
-            .child(
-                div()
-                    .id("page-scroll")
-                    .size_full()
-                    .track_scroll(&self.page_scroll_handle)
-                    .overflow_y_scroll()
-                    .overflow_x_hidden()
-                    .scrollbar_width(px(8.0))
-                    .child(
-                        div()
-                            .w_full()
-                            .flex()
-                            .flex_col()
-                            .gap(px(8.0))
-                            .p(px(24.0))
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .flex_wrap()
-                                    .items_center()
-                                    .justify_between()
-                                    .gap(px(12.0))
-                                    .child(div().flex().child(img(brand_lockup).h(px(64.0))))
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_col()
-                                            .items_end()
-                                            .gap(px(8.0))
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_col()
-                                                    .items_end()
-                                                    .gap(px(4.0))
-                                                    .text_right()
-                                                    .child(
-                                                        div()
-                                                            .text_sm()
-                                                            .text_color(rgb(active_binary_color))
-                                                            .child(format!(
-                                                                "{}: {active_binary_text}",
-                                                                t(language, "app.active_binary")
-                                                            )),
-                                                    ),
-                                            )
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_row()
-                                                    .flex_wrap()
-                                                    .justify_end()
-                                                    .gap(px(8.0))
-                                                    .child({
-                                                        let entity_open_input = entity.clone();
-                                                        div()
-                                                            .id("open-input-dir")
-                                                            .bg(rgb(0xF3F4F6))
-                                                            .text_color(rgb(0x111827))
-                                                            .p(px(8.0))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, _, cx| {
-                                                                entity_open_input.update(
-                                                                    cx,
-                                                                    |view, cx| {
-                                                                        if let Some(path) =
-                                                                            view.resolve_input_dir()
-                                                                        {
-                                                                            cx.reveal_path(&path);
-                                                                        } else {
-                                                                            view.append_output(
+        .child(
+            div()
+                .id("page-scroll")
+                .size_full()
+                .track_scroll(&self.page_scroll_handle)
+                .overflow_y_scroll()
+                .overflow_x_hidden()
+                .scrollbar_width(px(8.0))
+                .child(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap(px(8.0))
+                        .p(px(24.0))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .flex_wrap()
+                                .items_center()
+                                .justify_between()
+                                .gap(px(12.0))
+                                .child(div().flex().child(img(brand_lockup).h(px(64.0))))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .items_end()
+                                        .gap(px(8.0))
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_col()
+                                                .items_end()
+                                                .gap(px(4.0))
+                                                .text_right()
+                                                .child(
+                                                    div()
+                                                        .text_sm()
+                                                        .text_color(rgb(active_binary_color))
+                                                        .child(format!(
+                                                            "{}: {active_binary_text}",
+                                                            t(language, "app.active_binary")
+                                                        )),
+                                                ),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .flex_wrap()
+                                                .justify_end()
+                                                .gap(px(8.0))
+                                                .child({
+                                                    let entity_open_input = entity.clone();
+                                                    div()
+                                                        .id("open-input-dir")
+                                                        .bg(rgb(0xF3F4F6))
+                                                        .text_color(rgb(0x111827))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity_open_input.update(
+                                                                cx,
+                                                                |view, cx| {
+                                                                    if let Some(path) =
+                                                                        view.resolve_input_dir()
+                                                                    {
+                                                                        cx.reveal_path(&path);
+                                                                    } else {
+                                                                        view.append_output(
                                                                     t(
                                                                         language,
                                                                         "message.no_input_dir",
                                                                     ),
                                                                     cx,
                                                                 );
-                                                                        }
-                                                                    },
-                                                                );
-                                                            })
-                                                            .child(t(
-                                                                language,
-                                                                "action.open_input_dir",
-                                                            ))
-                                                    })
-                                                    .child({
-                                                        let entity_open_output = entity.clone();
-                                                        div()
-                                                            .id("open-output-dir")
-                                                            .bg(rgb(0xF3F4F6))
-                                                            .text_color(rgb(0x111827))
-                                                            .p(px(8.0))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, _, cx| {
-                                                                entity_open_output.update(
-                                                                    cx,
-                                                                    |view, cx| {
-                                                                        if let Some(path) = view
-                                                                            .resolve_output_dir()
-                                                                        {
-                                                                            cx.reveal_path(&path);
-                                                                        } else {
-                                                                            view.append_output(
+                                                                    }
+                                                                },
+                                                            );
+                                                        })
+                                                        .child(t(language, "action.open_input_dir"))
+                                                })
+                                                .child({
+                                                    let entity_open_output = entity.clone();
+                                                    div()
+                                                        .id("open-output-dir")
+                                                        .bg(rgb(0xF3F4F6))
+                                                        .text_color(rgb(0x111827))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity_open_output.update(
+                                                                cx,
+                                                                |view, cx| {
+                                                                    if let Some(path) =
+                                                                        view.resolve_output_dir()
+                                                                    {
+                                                                        cx.reveal_path(&path);
+                                                                    } else {
+                                                                        view.append_output(
                                                                         t(
                                                                             language,
                                                                             "message.no_output_dir",
                                                                         ),
                                                                         cx,
                                                                     );
-                                                                        }
-                                                                    },
-                                                                );
-                                                            })
-                                                            .child(t(
-                                                                language,
-                                                                "action.open_output_dir",
-                                                            ))
-                                                    })
-                                                    .child({
-                                                        let entity_setup = entity.clone();
-                                                        div()
-                                                            .id("open-setup")
-                                                            .bg(rgb(0xF3F4F6))
-                                                            .text_color(rgb(0x111827))
-                                                            .p(px(8.0))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, _window, cx| {
-                                                                let setup_state =
-                                                                    entity_setup.read(cx);
-                                                                let current = setup_state
-                                                                    .serval_binary_path
-                                                                    .clone()
-                                                                    .unwrap_or_default();
-                                                                let language = setup_state.language;
-                                                                let root_for_window =
-                                                                    entity_setup.clone();
-                                                                let _ = cx.open_window(
-                                                                    setup_window_options(cx),
-                                                                    move |_, app| {
-                                                                        let root =
-                                                                            root_for_window.clone();
-                                                                        let initial =
-                                                                            current.clone();
-                                                                        let placeholder = t(
+                                                                    }
+                                                                },
+                                                            );
+                                                        })
+                                                        .child(t(
+                                                            language,
+                                                            "action.open_output_dir",
+                                                        ))
+                                                })
+                                                .child({
+                                                    let entity_setup = entity.clone();
+                                                    div()
+                                                        .id("open-setup")
+                                                        .bg(rgb(0xF3F4F6))
+                                                        .text_color(rgb(0x111827))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _window, cx| {
+                                                            let setup_state = entity_setup.read(cx);
+                                                            let current = setup_state
+                                                                .serval_binary_path
+                                                                .clone()
+                                                                .unwrap_or_default();
+                                                            let language = setup_state.language;
+                                                            let root_for_window =
+                                                                entity_setup.clone();
+                                                            let _ = cx.open_window(
+                                                                setup_window_options(cx),
+                                                                move |_, app| {
+                                                                    let root =
+                                                                        root_for_window.clone();
+                                                                    let initial = current.clone();
+                                                                    let placeholder = t(
                                                     language,
                                                     "setup.serval_binary_placeholder",
                                                 )
                                                 .to_string();
-                                                                        app.new(move |cx| {
+                                                                    app.new(move |cx| {
                                                                         let input = cx.new(|cx| {
                                                                         TextInput::new_with_value(
                                                                             cx,
@@ -3801,36 +3798,36 @@ impl Render for RootView {
                                                                                 input,
                                                                         }
                                                                     })
-                                                                    },
-                                                                );
-                                                            })
-                                                            .child(t(language, "action.setup"))
-                                                    })
-                                                    .child({
-                                                        let entity_about = entity.clone();
-                                                        div()
-                                                            .id("open-about")
-                                                            .bg(rgb(0xF3F4F6))
-                                                            .text_color(rgb(0x111827))
-                                                            .p(px(8.0))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, _window, cx| {
-                                                                let language =
-                                                                    entity_about.read(cx).language;
-                                                                let _ = cx.open_window(
-                                                                    about_window_options(cx),
-                                                                    move |_, app| {
-                                                                        app.new(|_| AboutView {
-                                                                            language,
-                                                                        })
-                                                                    },
-                                                                );
-                                                            })
-                                                            .child(t(language, "action.about"))
-                                                    })
-                                                    .child({
-                                                        let entity_helper = entity.clone();
-                                                        div()
+                                                                },
+                                                            );
+                                                        })
+                                                        .child(t(language, "action.setup"))
+                                                })
+                                                .child({
+                                                    let entity_about = entity.clone();
+                                                    div()
+                                                        .id("open-about")
+                                                        .bg(rgb(0xF3F4F6))
+                                                        .text_color(rgb(0x111827))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _window, cx| {
+                                                            let language =
+                                                                entity_about.read(cx).language;
+                                                            let _ = cx.open_window(
+                                                                about_window_options(cx),
+                                                                move |_, app| {
+                                                                    app.new(|_| AboutView {
+                                                                        language,
+                                                                    })
+                                                                },
+                                                            );
+                                                        })
+                                                        .child(t(language, "action.about"))
+                                                })
+                                                .child({
+                                                    let entity_helper = entity.clone();
+                                                    div()
                                                         .id("toggle-helper-mode")
                                                         .bg(rgb(if helper_mode {
                                                             0x111827
@@ -3866,308 +3863,11 @@ impl Render for RootView {
                                                         } else {
                                                             t(language, "action.helper_mode_off")
                                                         })
-                                                    })
-                                                    .child({
-                                                        let entity_run = entity.clone();
-                                                        div()
-                                                            .id("run-button")
-                                                            .bg(rgb(0x111827))
-                                                            .text_color(rgb(0xF9FAFB))
-                                                            .p(px(8.0))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, window, cx| {
-                                                                RootView::handle_run_click(
-                                                                    entity_run.clone(),
-                                                                    language,
-                                                                    window,
-                                                                    cx,
-                                                                );
-                                                            })
-                                                            .child(t(
-                                                                language,
-                                                                self.run_state.action_key(),
-                                                            ))
-                                                    }),
-                                            ),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(8.0))
-                                    .bg(rgb(0xFFFFFF))
-                                    .p(px(16.0))
-                                    .child(
-                                        div()
-                                            .text_color(rgb(0x6B7280))
-                                            .child(t(language, "panel.command")),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_row()
-                                            .flex_wrap()
-                                            .gap(px(8.0))
-                                            .child({
-                                                let entity_click = entity_observe.clone();
-                                                div()
-                                                    .id("command-observe")
-                                                    .bg(rgb(if observe_selected {
-                                                        0x111827
-                                                    } else {
-                                                        0xF3F4F6
-                                                    }))
-                                                    .text_color(rgb(if observe_selected {
-                                                        0xF9FAFB
-                                                    } else {
-                                                        0x111827
-                                                    }))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_click.update(cx, |view, cx| {
-                                                            view.select_command(
-                                                                CommandKind::Observe,
-                                                                cx,
-                                                            );
-                                                        });
-                                                    })
-                                                    .child(t(language, "cmd.observe"))
-                                            })
-                                            .child({
-                                                let entity_click = entity_capture.clone();
-                                                div()
-                                                    .id("command-capture")
-                                                    .bg(rgb(if capture_selected {
-                                                        0x111827
-                                                    } else {
-                                                        0xF3F4F6
-                                                    }))
-                                                    .text_color(rgb(if capture_selected {
-                                                        0xF9FAFB
-                                                    } else {
-                                                        0x111827
-                                                    }))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_click.update(cx, |view, cx| {
-                                                            view.select_command(
-                                                                CommandKind::Capture,
-                                                                cx,
-                                                            );
-                                                        });
-                                                    })
-                                                    .child(t(language, "cmd.capture"))
-                                            })
-                                            .child({
-                                                let entity_click = entity_xmp.clone();
-                                                div()
-                                                    .id("command-xmp")
-                                                    .bg(rgb(if xmp_selected {
-                                                        0x111827
-                                                    } else {
-                                                        0xF3F4F6
-                                                    }))
-                                                    .text_color(rgb(if xmp_selected {
-                                                        0xF9FAFB
-                                                    } else {
-                                                        0x111827
-                                                    }))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_click.update(cx, |view, cx| {
-                                                            view.select_command(
-                                                                CommandKind::Xmp,
-                                                                cx,
-                                                            );
-                                                        });
-                                                    })
-                                                    .child(t(language, "cmd.xmp"))
-                                            })
-                                            .child({
-                                                let entity_click = entity_extract.clone();
-                                                div()
-                                                    .id("command-extract")
-                                                    .bg(rgb(if extract_selected {
-                                                        0x111827
-                                                    } else {
-                                                        0xF3F4F6
-                                                    }))
-                                                    .text_color(rgb(if extract_selected {
-                                                        0xF9FAFB
-                                                    } else {
-                                                        0x111827
-                                                    }))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_click.update(cx, |view, cx| {
-                                                            view.select_command(
-                                                                CommandKind::Extract,
-                                                                cx,
-                                                            );
-                                                        });
-                                                    })
-                                                    .child(t(language, "cmd.extract"))
-                                            })
-                                            .child({
-                                                let entity_click = entity_translate.clone();
-                                                div()
-                                                    .id("command-translate")
-                                                    .bg(rgb(if translate_selected {
-                                                        0x111827
-                                                    } else {
-                                                        0xF3F4F6
-                                                    }))
-                                                    .text_color(rgb(if translate_selected {
-                                                        0xF9FAFB
-                                                    } else {
-                                                        0x111827
-                                                    }))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_click.update(cx, |view, cx| {
-                                                            view.select_command(
-                                                                CommandKind::Translate,
-                                                                cx,
-                                                            );
-                                                        });
-                                                    })
-                                                    .child(t(language, "cmd.translate"))
-                                            }),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(8.0))
-                                    .bg(rgb(0xFFFFFF))
-                                    .p(px(16.0))
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_row()
-                                            .justify_between()
-                                            .items_center()
-                                            .child(
-                                                div()
-                                                    .text_color(rgb(0x6B7280))
-                                                    .child(t(language, "panel.inputs")),
-                                            )
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_row()
-                                                    .items_center()
-                                                    .gap(px(8.0))
-                                                    .child({
-                                                        let entity = entity.clone();
-                                                        div()
-                                                            .id("toggle-input-panel")
-                                                            .text_color(rgb(0x6B7280))
-                                                            .cursor_pointer()
-                                                            .on_click(move |_, _, cx| {
-                                                                entity.update(cx, |view, cx| {
-                                                                    view.input_panel_open =
-                                                                        !view.input_panel_open;
-                                                                    cx.notify();
-                                                                });
-                                                            })
-                                                            .child(if input_panel_open {
-                                                                t(language, "action.collapse")
-                                                            } else {
-                                                                t(language, "action.expand")
-                                                            })
-                                                    }),
-                                            ),
-                                    )
-                                    .child(if input_panel_open {
-                                        input_section
-                                    } else {
-                                        div()
-                                    }),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(8.0))
-                                    .bg(rgb(0xFFFFFF))
-                                    .p(px(16.0))
-                                    .child({
-                                        let entity = entity.clone();
-                                        div()
-                                            .id("toggle-preview-panel")
-                                            .flex()
-                                            .flex_row()
-                                            .justify_between()
-                                            .items_center()
-                                            .cursor_pointer()
-                                            .on_click(move |_, _, cx| {
-                                                entity.update(cx, |view, cx| {
-                                                    view.preview_panel_open =
-                                                        !view.preview_panel_open;
-                                                    cx.notify();
-                                                });
-                                            })
-                                            .child(
-                                                div()
-                                                    .text_color(rgb(0x6B7280))
-                                                    .child(t(language, "panel.command_preview")),
-                                            )
-                                            .child(div().text_color(rgb(0x6B7280)).child(
-                                                if preview_panel_open {
-                                                    t(language, "action.collapse")
-                                                } else {
-                                                    t(language, "action.expand")
-                                                },
-                                            ))
-                                    })
-                                    .child(if preview_panel_open {
-                                        div().flex().flex_col().gap(px(8.0)).child(
-                                            div()
-                                                .flex()
-                                                .flex_row()
-                                                .flex_wrap()
-                                                .items_start()
-                                                .gap(px(8.0))
-                                                .bg(rgb(0xF3F4F6))
-                                                .text_color(rgb(0x111827))
-                                                .p(px(8.0))
-                                                .child(
-                                                    div()
-                                                        .flex_grow()
-                                                        .min_w(px(320.0))
-                                                        .child(preview),
-                                                )
-                                                .child({
-                                                    let entity = entity.clone();
-                                                    div()
-                                                        .id("copy-command")
-                                                        .bg(rgb(0xE5E7EB))
-                                                        .text_color(rgb(0x111827))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
-                                                        .on_click(move |_, _, cx| {
-                                                            entity.update(cx, |view, cx| {
-                                                                cx.write_to_clipboard(
-                                                                    ClipboardItem::new_string(
-                                                                        view.command_preview(),
-                                                                    ),
-                                                                );
-                                                            });
-                                                        })
-                                                        .child(t(language, "action.copy_command"))
                                                 })
                                                 .child({
                                                     let entity_run = entity.clone();
                                                     div()
-                                                        .id("run-button-preview-panel")
+                                                        .id("run-button")
                                                         .bg(rgb(0x111827))
                                                         .text_color(rgb(0xF9FAFB))
                                                         .p(px(8.0))
@@ -4185,219 +3885,503 @@ impl Render for RootView {
                                                             self.run_state.action_key(),
                                                         ))
                                                 }),
+                                        ),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.0))
+                                .bg(rgb(0xFFFFFF))
+                                .p(px(16.0))
+                                .child(
+                                    div()
+                                        .text_color(rgb(0x6B7280))
+                                        .child(t(language, "panel.command")),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .flex_wrap()
+                                        .gap(px(8.0))
+                                        .child({
+                                            let entity_click = entity_observe.clone();
+                                            div()
+                                                .id("command-observe")
+                                                .bg(rgb(if observe_selected {
+                                                    0x111827
+                                                } else {
+                                                    0xF3F4F6
+                                                }))
+                                                .text_color(rgb(if observe_selected {
+                                                    0xF9FAFB
+                                                } else {
+                                                    0x111827
+                                                }))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity_click.update(cx, |view, cx| {
+                                                        view.select_command(
+                                                            CommandKind::Observe,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .child(t(language, "cmd.observe"))
+                                        })
+                                        .child({
+                                            let entity_click = entity_capture.clone();
+                                            div()
+                                                .id("command-capture")
+                                                .bg(rgb(if capture_selected {
+                                                    0x111827
+                                                } else {
+                                                    0xF3F4F6
+                                                }))
+                                                .text_color(rgb(if capture_selected {
+                                                    0xF9FAFB
+                                                } else {
+                                                    0x111827
+                                                }))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity_click.update(cx, |view, cx| {
+                                                        view.select_command(
+                                                            CommandKind::Capture,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .child(t(language, "cmd.capture"))
+                                        })
+                                        .child({
+                                            let entity_click = entity_xmp.clone();
+                                            div()
+                                                .id("command-xmp")
+                                                .bg(rgb(if xmp_selected {
+                                                    0x111827
+                                                } else {
+                                                    0xF3F4F6
+                                                }))
+                                                .text_color(rgb(if xmp_selected {
+                                                    0xF9FAFB
+                                                } else {
+                                                    0x111827
+                                                }))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity_click.update(cx, |view, cx| {
+                                                        view.select_command(CommandKind::Xmp, cx);
+                                                    });
+                                                })
+                                                .child(t(language, "cmd.xmp"))
+                                        })
+                                        .child({
+                                            let entity_click = entity_extract.clone();
+                                            div()
+                                                .id("command-extract")
+                                                .bg(rgb(if extract_selected {
+                                                    0x111827
+                                                } else {
+                                                    0xF3F4F6
+                                                }))
+                                                .text_color(rgb(if extract_selected {
+                                                    0xF9FAFB
+                                                } else {
+                                                    0x111827
+                                                }))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity_click.update(cx, |view, cx| {
+                                                        view.select_command(
+                                                            CommandKind::Extract,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .child(t(language, "cmd.extract"))
+                                        })
+                                        .child({
+                                            let entity_click = entity_translate.clone();
+                                            div()
+                                                .id("command-translate")
+                                                .bg(rgb(if translate_selected {
+                                                    0x111827
+                                                } else {
+                                                    0xF3F4F6
+                                                }))
+                                                .text_color(rgb(if translate_selected {
+                                                    0xF9FAFB
+                                                } else {
+                                                    0x111827
+                                                }))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity_click.update(cx, |view, cx| {
+                                                        view.select_command(
+                                                            CommandKind::Translate,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .child(t(language, "cmd.translate"))
+                                        }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.0))
+                                .bg(rgb(0xFFFFFF))
+                                .p(px(16.0))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .justify_between()
+                                        .items_center()
+                                        .child(
+                                            div()
+                                                .text_color(rgb(0x6B7280))
+                                                .child(t(language, "panel.inputs")),
                                         )
-                                    } else {
-                                        div()
-                                    }),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(8.0))
-                                    .bg(rgb(0x0B0F1A))
-                                    .text_color(rgb(0xE5E7EB))
-                                    .p(px(16.0))
-                                    .min_h(px(220.0))
-                                    .child(
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap(px(8.0))
+                                                .child({
+                                                    let entity = entity.clone();
+                                                    div()
+                                                        .id("toggle-input-panel")
+                                                        .text_color(rgb(0x6B7280))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity.update(cx, |view, cx| {
+                                                                view.input_panel_open =
+                                                                    !view.input_panel_open;
+                                                                cx.notify();
+                                                            });
+                                                        })
+                                                        .child(if input_panel_open {
+                                                            t(language, "action.collapse")
+                                                        } else {
+                                                            t(language, "action.expand")
+                                                        })
+                                                }),
+                                        ),
+                                )
+                                .child(if input_panel_open {
+                                    input_section
+                                } else {
+                                    div()
+                                }),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.0))
+                                .bg(rgb(0xFFFFFF))
+                                .p(px(16.0))
+                                .child({
+                                    let entity = entity.clone();
+                                    div()
+                                        .id("toggle-preview-panel")
+                                        .flex()
+                                        .flex_row()
+                                        .justify_between()
+                                        .items_center()
+                                        .cursor_pointer()
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |view, cx| {
+                                                view.preview_panel_open = !view.preview_panel_open;
+                                                cx.notify();
+                                            });
+                                        })
+                                        .child(
+                                            div()
+                                                .text_color(rgb(0x6B7280))
+                                                .child(t(language, "panel.command_preview")),
+                                        )
+                                        .child(div().text_color(rgb(0x6B7280)).child(
+                                            if preview_panel_open {
+                                                t(language, "action.collapse")
+                                            } else {
+                                                t(language, "action.expand")
+                                            },
+                                        ))
+                                })
+                                .child(if preview_panel_open {
+                                    div().flex().flex_col().gap(px(8.0)).child(
                                         div()
                                             .flex()
                                             .flex_row()
-                                            .justify_between()
-                                            .items_center()
+                                            .flex_wrap()
+                                            .items_start()
+                                            .gap(px(8.0))
+                                            .bg(rgb(0xF3F4F6))
+                                            .text_color(rgb(0x111827))
+                                            .p(px(8.0))
                                             .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_row()
-                                                    .gap(px(8.0))
-                                                    .items_center()
-                                                    .child(
-                                                        div()
-                                                            .text_color(rgb(0x9CA3AF))
-                                                            .child(t(language, "panel.output")),
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .text_color(rgb(self.run_state.color()))
-                                                            .child(format!(
-                                                                "{}: {}",
-                                                                t(language, "label.status"),
-                                                                t(
-                                                                    language,
-                                                                    self.run_state.label_key()
-                                                                )
-                                                            )),
-                                                    ),
+                                                div().flex_grow().min_w(px(320.0)).child(preview),
                                             )
                                             .child({
                                                 let entity = entity.clone();
                                                 div()
-                                                    .id("copy-log")
-                                                    .bg(rgb(0x111827))
-                                                    .text_color(rgb(0xF9FAFB))
+                                                    .id("copy-command")
+                                                    .bg(rgb(0xE5E7EB))
+                                                    .text_color(rgb(0x111827))
                                                     .p(px(8.0))
                                                     .cursor_pointer()
                                                     .on_click(move |_, _, cx| {
                                                         entity.update(cx, |view, cx| {
                                                             cx.write_to_clipboard(
                                                                 ClipboardItem::new_string(
-                                                                    view.output_log.clone(),
+                                                                    view.command_preview(),
                                                                 ),
                                                             );
                                                         });
                                                     })
-                                                    .child(t(language, "action.copy_log"))
-                                            }),
-                                    )
-                                    .child(
-                                        div()
-                                            .font_family("monospace")
-                                            .text_size(px(12.0))
-                                            .line_height(px(16.0))
-                                            .whitespace_nowrap()
-                                            .id("output-scroll")
-                                            .track_scroll(&self.output_scroll_handle)
-                                            .min_h(px(220.0))
-                                            .w_full()
-                                            .overflow_y_scroll()
-                                            .overflow_x_scroll()
-                                            .scrollbar_width(px(8.0))
-                                            .child(output_text),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_row()
-                                            .gap(px(8.0))
-                                            .pt(px(8.0))
-                                            .child(div().flex_grow().child(pty_input.clone()))
+                                                    .child(t(language, "action.copy_command"))
+                                            })
                                             .child({
-                                                let entity = entity.clone();
+                                                let entity_run = entity.clone();
                                                 div()
-                                                    .id("send-pty")
+                                                    .id("run-button-preview-panel")
                                                     .bg(rgb(0x111827))
                                                     .text_color(rgb(0xF9FAFB))
                                                     .p(px(8.0))
                                                     .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity.update(cx, |view, cx| {
-                                                            view.send_pty_input(cx);
-                                                        });
+                                                    .on_click(move |_, window, cx| {
+                                                        RootView::handle_run_click(
+                                                            entity_run.clone(),
+                                                            language,
+                                                            window,
+                                                            cx,
+                                                        );
                                                     })
-                                                    .child(t(language, "action.send"))
+                                                    .child(t(language, self.run_state.action_key()))
                                             }),
-                                    ),
-                            )
-                            .child(interaction_helper_panel),
-                    ),
-            )
-            .child(if helper_mode && self.command_help_open {
-                {
-                    let base = div()
-                        .absolute()
-                        .w(px(500.0))
-                        .h(px(360.0))
-                        .occlude()
-                        .flex()
-                        .flex_col()
-                        .bg(rgb(0x111827))
-                        .opacity(0.94)
-                        .text_color(rgb(0xF9FAFB))
-                        .border_1()
-                        .border_color(rgb(0x374151))
-                        .rounded_md()
-                        .shadow_lg()
-                        .p(px(10.0))
-                        .text_size(px(12.0))
-                        .line_height(px(18.0))
-                        .font_family("monospace")
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .justify_between()
-                                .items_center()
-                                .child(
+                                    )
+                                } else {
                                     div()
-                                        .text_color(rgb(0x9CA3AF))
-                                        .child(t(language, "panel.help")),
-                                )
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("close-help-overlay")
-                                        .cursor_pointer()
-                                        .text_color(rgb(0xD1D5DB))
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.command_help_open = false;
-                                                view.command_help_key = None;
-                                                view.hover_help_key = None;
-                                                view.option_help_position = None;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .child("x")
                                 }),
                         )
                         .child(
                             div()
-                                .pt(px(6.0))
-                                .flex_grow()
-                                .id("help-overlay-scroll")
-                                .track_scroll(&self.command_help_scroll_handle)
-                                .overflow_y_scroll()
-                                .overflow_x_scroll()
-                                .scrollbar_width(px(8.0))
-                                .child(command_help_text),
-                        );
-                    base.top(px(96.0)).right(px(24.0))
-                }
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.0))
+                                .bg(rgb(0x0B0F1A))
+                                .text_color(rgb(0xE5E7EB))
+                                .p(px(16.0))
+                                .min_h(px(220.0))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .justify_between()
+                                        .items_center()
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .gap(px(8.0))
+                                                .items_center()
+                                                .child(
+                                                    div()
+                                                        .text_color(rgb(0x9CA3AF))
+                                                        .child(t(language, "panel.output")),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_color(rgb(self.run_state.color()))
+                                                        .child(format!(
+                                                            "{}: {}",
+                                                            t(language, "label.status"),
+                                                            t(language, self.run_state.label_key())
+                                                        )),
+                                                ),
+                                        )
+                                        .child({
+                                            let entity = entity.clone();
+                                            div()
+                                                .id("copy-log")
+                                                .bg(rgb(0x111827))
+                                                .text_color(rgb(0xF9FAFB))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity.update(cx, |view, cx| {
+                                                        cx.write_to_clipboard(
+                                                            ClipboardItem::new_string(
+                                                                view.output_log.clone(),
+                                                            ),
+                                                        );
+                                                    });
+                                                })
+                                                .child(t(language, "action.copy_log"))
+                                        }),
+                                )
+                                .child(
+                                    div()
+                                        .font_family("monospace")
+                                        .text_size(px(12.0))
+                                        .line_height(px(16.0))
+                                        .whitespace_nowrap()
+                                        .id("output-scroll")
+                                        .track_scroll(&self.output_scroll_handle)
+                                        .min_h(px(220.0))
+                                        .w_full()
+                                        .overflow_y_scroll()
+                                        .overflow_x_scroll()
+                                        .scrollbar_width(px(8.0))
+                                        .child(output_text),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .gap(px(8.0))
+                                        .pt(px(8.0))
+                                        .child(div().flex_grow().child(pty_input.clone()))
+                                        .child({
+                                            let entity = entity.clone();
+                                            div()
+                                                .id("send-pty")
+                                                .bg(rgb(0x111827))
+                                                .text_color(rgb(0xF9FAFB))
+                                                .p(px(8.0))
+                                                .cursor_pointer()
+                                                .on_click(move |_, _, cx| {
+                                                    entity.update(cx, |view, cx| {
+                                                        view.send_pty_input(cx);
+                                                    });
+                                                })
+                                                .child(t(language, "action.send"))
+                                        }),
+                                ),
+                        )
+                        .child(interaction_helper_panel),
+                ),
+        )
+        .child(if helper_mode && self.command_help_open {
+            {
+                let base = div()
+                    .absolute()
+                    .w(px(500.0))
+                    .h(px(360.0))
+                    .occlude()
+                    .flex()
+                    .flex_col()
+                    .bg(rgb(0x111827))
+                    .opacity(0.94)
+                    .text_color(rgb(0xF9FAFB))
+                    .border_1()
+                    .border_color(rgb(0x374151))
+                    .rounded_md()
+                    .shadow_lg()
+                    .p(px(10.0))
+                    .text_size(px(12.0))
+                    .line_height(px(18.0))
+                    .font_family("monospace")
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .justify_between()
+                            .items_center()
+                            .child(
+                                div()
+                                    .text_color(rgb(0x9CA3AF))
+                                    .child(t(language, "panel.help")),
+                            )
+                            .child({
+                                let entity = entity.clone();
+                                div()
+                                    .id("close-help-overlay")
+                                    .cursor_pointer()
+                                    .text_color(rgb(0xD1D5DB))
+                                    .on_click(move |_, _, cx| {
+                                        entity.update(cx, |view, cx| {
+                                            view.command_help_open = false;
+                                            view.command_help_key = None;
+                                            view.hover_help_key = None;
+                                            view.option_help_position = None;
+                                            cx.notify();
+                                        });
+                                    })
+                                    .child("x")
+                            }),
+                    )
+                    .child(
+                        div()
+                            .pt(px(6.0))
+                            .flex_grow()
+                            .id("help-overlay-scroll")
+                            .track_scroll(&self.command_help_scroll_handle)
+                            .overflow_y_scroll()
+                            .overflow_x_scroll()
+                            .scrollbar_width(px(8.0))
+                            .child(command_help_text),
+                    );
+                base.top(px(96.0)).right(px(24.0))
+            }
+        } else {
+            div()
+        })
+        .child(if helper_mode {
+            if let (Some(help_text), Some(pos)) = (option_help_text, option_help_position) {
+                div()
+                    .absolute()
+                    .left(pos.x + px(14.0))
+                    .top(pos.y + px(14.0))
+                    .w(px(360.0))
+                    .h(px(170.0))
+                    .flex()
+                    .flex_col()
+                    .bg(rgb(0x111827))
+                    .opacity(0.94)
+                    .text_color(rgb(0xF9FAFB))
+                    .border_1()
+                    .border_color(rgb(0x374151))
+                    .rounded_md()
+                    .shadow_lg()
+                    .p(px(8.0))
+                    .text_size(px(12.0))
+                    .line_height(px(18.0))
+                    .font_family("monospace")
+                    .child(
+                        div()
+                            .text_color(rgb(0x9CA3AF))
+                            .child(t(language, "panel.option_help")),
+                    )
+                    .child(
+                        div()
+                            .pt(px(4.0))
+                            .flex_grow()
+                            .id("option-help-overlay-scroll")
+                            .overflow_y_scroll()
+                            .overflow_x_scroll()
+                            .scrollbar_width(px(8.0))
+                            .child(help_text),
+                    )
             } else {
                 div()
-            })
-            .child(if helper_mode {
-                if let (Some(help_text), Some(pos)) = (option_help_text, option_help_position) {
-                    div()
-                        .absolute()
-                        .left(pos.x + px(14.0))
-                        .top(pos.y + px(14.0))
-                        .w(px(360.0))
-                        .h(px(170.0))
-                        .flex()
-                        .flex_col()
-                        .bg(rgb(0x111827))
-                        .opacity(0.94)
-                        .text_color(rgb(0xF9FAFB))
-                        .border_1()
-                        .border_color(rgb(0x374151))
-                        .rounded_md()
-                        .shadow_lg()
-                        .p(px(8.0))
-                        .text_size(px(12.0))
-                        .line_height(px(18.0))
-                        .font_family("monospace")
-                        .child(
-                            div()
-                                .text_color(rgb(0x9CA3AF))
-                                .child(t(language, "panel.option_help")),
-                        )
-                        .child(
-                            div()
-                                .pt(px(4.0))
-                                .flex_grow()
-                                .id("option-help-overlay-scroll")
-                                .overflow_y_scroll()
-                                .overflow_x_scroll()
-                                .scrollbar_width(px(8.0))
-                                .child(help_text),
-                        )
-                } else {
-                    div()
-                }
-            } else {
-                div()
-            })
+            }
+        } else {
+            div()
+        })
     }
 }
 

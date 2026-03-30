@@ -258,7 +258,6 @@ Options:
       --from <FROM>             Column name (in taglist) to translate from
       --to <TO>                 Column name (in taglist) to translate to
   -h, --help                    Print help"#;
-
 fn zh_text_for_key(key: &str) -> Option<&'static str> {
     match key {
         "observe" => Some(OBSERVE_HELP_ZH),
@@ -275,207 +274,94 @@ fn zh_text_for_key(key: &str) -> Option<&'static str> {
         "observe|--video" => Some("仅处理视频文件。"),
         "observe|--image" => Some("仅处理图像文件。"),
         "observe|--debug" => Some("启用调试输出。"),
-        "capture|--event" => Some("创建事件 ID。"),
-        "capture|--no-exclude" => {
-            Some("在独立捕获统计中不自动去除这些标签：Blank 无动物、Useless data 不可用数据、Unidentified 不确定物种、Blur（仅在个体识别中使用）。")
-        }
-        "capture|--camtrap-dp" => Some("使用 camtrap-dp 数据包中的 observation 表。"),
-        "xmp-init|--info" => Some("启用 info 模式，并写出一个 XMP 初始化时间 CSV。"),
+        "capture|--event" => Some("对每一个独立捕获事件创建一个 ID，并输出在表格中。"),
+        "capture|--no-exclude" => Some(
+            "在独立捕获统计中不自动去除这些标签：
+Blank 无动物
+Useless data 不可用数据
+Unidentified 不确定物种
+Blur（仅用于个体识别）",
+        ),
+        "capture|--camtrap-dp" => Some("使用 camtrap-dp 数据包中的 observation 表来进行统计，此时 CSV 路径应为 observation.csv 的路径。"),
+        "xmp-init|--info" => Some("启用信息汇总模式，在初始化 XMP 的同时，读取媒体所有可参考的时间信息，汇总生成一个 CSV 用于时间的观察，并给出 `xmp_update_datetime` 列便于修正。"),
         "xmp-update|--datetime" => {
-            Some("使用 datetime 模式（读取 `xmp_update_datetime`，而不是 xmp_update）。")
+            Some("使用时间模式对时间信息进行更新（读取 CSV 表格中的 `xmp_update_datetime` 列）。")
         }
-        "xmp-update|species" => Some("将 --tag-type 设置为 species。"),
-        "xmp-update|individual" => Some("将 --tag-type 设置为 individual。"),
-        "xmp-update|count" => Some("将 --tag-type 设置为 count。"),
-        "xmp-update|sex" => Some("将 --tag-type 设置为 sex。"),
-        "xmp-update|bodypart" => Some("将 --tag-type 设置为 bodypart。"),
-        "extract|--rename" => Some("启用重命名模式（文件名中包含标签）。"),
-        "extract|--skip-existing" => Some("如果目标文件已存在则跳过复制（不自动重命名）。"),
-        "extract|--use-subdir" => Some("使用子目录组织资源。"),
+        "xmp-update|species" => Some(
+            "使用标签模式对物种信息进行更新（读取 CSV 表格中的 `xmp_update` 列）。",
+        ),
+        "xmp-update|individual" => Some(
+            "使用标签模式对个体信息进行更新（读取 CSV 表格中的 `xmp_update` 列）。",
+        ),
+        "xmp-update|count" => Some(
+            "使用标签模式对数量信息进行更新（读取 CSV 表格中的 `xmp_update` 列）。",
+        ),
+        "xmp-update|sex" => Some(
+            "使用标签模式对性别信息进行更新（读取 CSV 表格中的 `xmp_update` 列）。",
+        ),
+        "xmp-update|bodypart" => Some(
+            "使用标签模式对身体部位信息进行更新（读取 CSV 表格中的 `xmp_update` 列）。",
+        ),
+        "extract|--rename" => Some("给提取出来的媒体加上标签前缀，以便查看，格式为：物种名-个体名-原文件名。"),
+        "extract|--skip-existing" => Some("如果目标文件已存在，则跳过复制（一般不勾选，主要用于断点续传）"),
+        "extract|--use-subdir" => Some("使用子目录来组织提取出来的媒体，如物种、个体、星级等。"),
         _ => None,
     }
 }
 
-const OBSERVE_HELP_ZH: &str = r#"从媒体元数据中提取标签
+const OBSERVE_HELP_ZH: &str = r#"将媒体的元数据信息（包括媒体路径、媒体类型、时间、标签等）提取至一个 CSV 表格，便于后续分析。
+在这个命令中，你可以指定：
+· 观察媒体本身还是观察它的附属 XMP 文件；
+· 只观察照片或只观察视频；
+· 或直接进入调试模式进行更多操作。"#;
 
-用法: serval observe [OPTIONS] <MEDIA_DIR>
+const CAPTURE_HELP_ZH: &str = r#"使用“媒体信息观察”得到的 tags.csv，或 camtrap-dp 中的 observation.csv，进行独立捕获统计。
+你需要在下方命令行中根据你的需求声明：
+· 独立捕获的时间间隔；
+· 是与该物种上一次独立捕获的首条媒体比较时间间隔（Last independent record）还是与该物种上一条记录比较时间间隔（Last record）；
+· 是对物种还是个体进行独立捕获统计；
+· 给出的选项中，哪一个代表了相机位点的存储层级。
 
-参数:
-  <MEDIA_DIR>
+独立捕获统计默认去除这些标签：无动物、不可用数据、不确定物种，和个体识别标签中的模糊。对于鸟类、狐类、小型啮齿类等未定义到物种级别的标签，没有在这一步中去除，需要在后续统计时予以关注。"#;
 
-选项:
-  -o, --output <OUTPUT_DIR>  输出目录 [默认: ./serval_output/serval_observe]
-  -x, --xmp                  从 XMP 文件读取
-      --video                仅处理视频
-      --image                仅处理图像
-  -d, --debug                调试模式
-  -h, --help                 打印帮助"#;
+const XMP_HELP_ZH: &str = r#"这里是一系列与 XMP 文件有关的子命令，具体帮助请点击子命令进行查看。"#;
 
-const CAPTURE_HELP_ZH: &str = r#"对 CSV 文件进行独立捕获统计
+const XMP_COPY_HELP_ZH: &str = r#"递归查找路径中的所有 XMP 文件，并按照存储结构将其复制到输出目录。可以用来进行 XMP 的备份操作，或在不需要拷贝媒体原文件的情况下传递媒体的元数据信息。"#;
 
-用法: serval capture [OPTIONS] <CSV_PATH>
+const XMP_INIT_HELP_ZH: &str = r#"为媒体文件初始化 XMP 文件，将媒体文件已有的时间和标签信息写入 XMP 文件中。
 
-参数:
-  <CSV_PATH>  tags.csv 路径
+其中，启用信息汇总模式，可以在初始化时，读取媒体所有可参考的时间信息并写入一个 CSV 文件，用于时间的观察与修正。"#;
 
-选项:
-      --event                创建独立事件 ID
-      --no-exclude           在独立捕获统计中不自动去除这些标签：Blank 无动物、Useless data 不可用数据、Unidentified 不确定物种、Blur（仅在个体识别中使用）
-      --camtrap-dp           使用 camtrap-dp 数据包中的 observation 表
-  -o, --output <OUTPUT_DIR>  输出目录 [默认: ./serval_output/serval_capture]
-  -h, --help                 打印帮助"#;
+const XMP_UPDATE_HELP_ZH: &str = r#"根据 CSV 更新 XMP 文件。在 tags.csv 的基础上，可以新建 xmp_update 列（用于更新物种、个体等标签）或 xmp_update_datetime 列（用于更新时间）来进行信息的更新。
 
-const XMP_HELP_ZH: &str = r#"XMP 文件操作
+注意：
+· 更改的标签填入新建的列中，不要进行原位修改；
+· 保存 CSV 表格时，格式选择为 CSV UTF-8 编码"#;
 
-用法: serval xmp <COMMAND>
+const XMP_REMOVE_HELP_ZH: &str = r#"递归删除目录中的所有 XMP 文件"#;
 
-子命令:
-  copy    递归查找路径中的所有 XMP 文件并复制到输出目录
-  init    为媒体文件初始化 XMP 文件
-  update  根据 CSV 更新 XMP 文件。标签模式：使用 CSV 中的 `xmp_update` 列，并根据 `--tag-type` 标签类别选择更新 `species`（物种）或 `individual`（个体）。时间模式：使用 CSV 中的 `xmp_update_datetime` 列（格式：yyyy-MM-dd HH:mm:ss）更新 XMP 中的时间
-  remove  递归删除目录中的所有 XMP 文件
-  sync    将 XMP 元数据同步到对应的媒体文件
-  help    打印此消息或指定子命令的帮助
+const XMP_SYNC_HELP_ZH: &str = r#"将 XMP 元数据同步到对应的媒体文件，可以选择对路径下所有文件进行同步，也可以通过 CSV 表格指定需要同步的媒体。"#;
 
-选项:
-  -h, --help  打印帮助"#;
+const EXTRACT_HELP_ZH: &str = r#"根据目标值筛选媒体，并复制到输出路径。可以实现如下功能：
 
-const XMP_COPY_HELP_ZH: &str = r#"递归查找路径中的所有 XMP 文件并复制到输出目录
+# 基础筛选：对单字段查询进行简单的筛选
+示例 1：提取“物种”为“雪豹”的所有媒体
+筛选类别：物种筛选
+值：雪豹
+示例 2：提取“星级”为“4-5”的所有媒体
+筛选类别：星级筛选
+值：4-5
 
-用法: serval xmp copy <SOURCE_DIR> <OUTPUT_DIR>
+# 高级筛选：包含逻辑运算符的复杂多字段筛选（AND/OR）
+示例 1：提取所有既有“岩羊”又有“雪豹”的媒体
+筛选类别：高级筛选
+值：species:岩羊 and species:雪豹
 
-参数:
-  <SOURCE_DIR>
-  <OUTPUT_DIR>
+# 也可以在 tags.csv 中新建 custom 列，手动筛选并赋值后，再用筛选类别中的“自定义筛选”进行提取
 
-选项:
-  -h, --help  打印帮助"#;
+提取时，可以以物种、个体、星级等存储方式创建子路径，与此同时还可以选择是否保留相机位点名称。"#;
 
-const XMP_INIT_HELP_ZH: &str = r#"为媒体文件初始化 XMP 文件
-
-用法: serval xmp init [OPTIONS] <SOURCE_DIR>
-
-参数:
-  <SOURCE_DIR>
-
-选项:
-  -i, --info  启用 info 模式，并写出一个 XMP 初始化时间 CSV
-  -h, --help  打印帮助"#;
-
-const XMP_UPDATE_HELP_ZH: &str = r#"根据 CSV 更新 XMP 文件。标签模式使用 `xmp_update`，并根据 `--tag-type` 选择 `species` 或 `individual`。时间模式（`--datetime`）使用 `xmp_update_datetime`（格式: yyyy-MM-dd HH:mm:ss）
-
-用法: serval xmp update [OPTIONS] <CSV_PATH>
-
-参数:
-  <CSV_PATH>
-
-选项:
-  -t, --tag-type <TYPE>  标签模式下的标签类别：`species`（物种）或 `individual`（个体 ID） [其它可选值: count, sex, bodypart]
-      --datetime         使用时间更新模式（读取 CSV 中的 `xmp_update_datetime` 列，而不是 `xmp_update` 列）
-  -h, --help             打印帮助"#;
-
-const XMP_REMOVE_HELP_ZH: &str = r#"递归删除目录中的所有 XMP 文件
-
-用法: serval xmp remove <SOURCE_DIR>
-
-参数:
-  <SOURCE_DIR>
-
-选项:
-  -h, --help  打印帮助"#;
-
-const XMP_SYNC_HELP_ZH: &str = r#"将 XMP 元数据同步到对应的媒体文件
-
-用法: serval xmp sync [OPTIONS] [DIR]
-
-参数:
-  [DIR]  包含待同步 XMP 文件的目录
-
-选项:
-      --csv <CSV_PATH>  包含待同步 XMP 文件路径的 CSV 文件
-  -h, --help            打印帮助"#;
-
-const EXTRACT_HELP_ZH: &str = r#"根据目标值筛选并提取（复制）资源（基于 tags.csv）
-
-# 基础筛选
-对单字段查询进行简单的筛选：
-serval extract tags.csv -f species -v "Snow leopard" （提取“物种”为“雪豹”的所有媒体）
-serval extract tags.csv -f rating -v "4-5" （提取“星级”为“4到5”的所有媒体）
-
-# 高级筛选
-对包含逻辑运算符的复杂多字段查询使用 `-f advanced`：
-
-多物种 AND（同时包含多物种的图片）:
--f advanced -v "species:Blue sheep and species:Snow leopard" （提取所有既有“岩羊”又有“雪豹”的媒体）
-
-AND 条件:
--f advanced -v "species:Serval and rating:4-5" （提取所有星级为“4到5”的“薮猫”媒体）
-OR 条件:
--f advanced -v "species:Serval or species:White-lipped deer" （提取所有“物种”为“薮猫”或“白唇鹿”的媒体）
-
-复杂组合:
--f advanced -v "(species:Serval and rating:4-5) or (species:Snow leopard and rating:5)" （提取所有“4到5星”的“薮猫”媒体和所有“5星”的“雪豹”媒体）
-
-# 字段别名
-species: sp, s  |  individual: ind, i  |  rating: rate, r
-path: p  |  event: e  |  custom: c
-
-# 运算符
-精确匹配:     species:Fox
-范围:         rating:3-5
-比较:         rating:>=4, rating:>4, rating:<5, rating:<=5
-
-用法: serval extract [OPTIONS] --filter-type <FILTER> --value <VALUE> <CSV_PATH>
-
-参数:
-  <CSV_PATH>
-          tags.csv 路径
-
-选项:
-  -f, --filter-type <FILTER>
-          指定筛选类型
-
-          [可选值: species 物种, path 路径, individual 个体, rating 星级, event 独立捕获事件ID, custom 自定义, advanced 逻辑]
-
-  -v, --value <VALUE>
-          目标值（对于 path 过滤器则为子串），使用 "ALL_VALUES" 表示所有非空值
-
-      --rename
-          启用重命名模式（文件名中包含标签）
-
-      --skip-existing
-          如果目标文件已存在则跳过复制（不自动重命名）
-
-      --use-subdir
-          使用子目录组织资源
-
-      --subdir-type <SUBDIR_TYPE>
-          指定创建子目录时使用的类型
-
-          [默认: species 物种]
-          [可选值: species 物种, individual 个体, rating 星级, custom 自定义]
-
-  -o, --output <OUTPUT_DIR>
-          设置输出目录
-
-          [默认: ./serval_output/serval_extract]
-
-  -h, --help
-          打印帮助（使用 '-h' 可查看摘要）"#;
-
-const TRANSLATE_HELP_ZH: &str = r#"根据 taglist 转换 csv 中的物种列
-
-用法: serval translate [OPTIONS] --taglist-path <TAGLIST> --from <FROM> --to <TO> <CSV_PATH>
-
-参数:
-  <CSV_PATH>  tags.csv 路径
-
-选项:
-  -t, --taglist-path <TAGLIST>  taglist csv 文件路径
-  -o, --output <OUTPUT_DIR>     输出目录 [默认: ./serval_output/serval_translate]
-      --from <FROM>             要作为源进行转换的列名（位于 taglist 中）
-      --to <TO>                 要转换到的目标列名（位于 taglist 中）
-  -h, --help                    打印帮助"#;
+const TRANSLATE_HELP_ZH: &str = r#"实现 CSV 中物种列的中文名、英文名、拉丁名等的相互转换"#;
 
 #[cfg(test)]
 mod tests {
