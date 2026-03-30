@@ -28,6 +28,9 @@ use setup_config::SetupConfig;
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
 const APP_ID: &str = "io.github.wsyxbcl.waxbill";
+const PROJECT_URL: &str = "https://github.com/wsyxbcl/serval-gpui";
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const APP_LICENSE: &str = env!("CARGO_PKG_LICENSE");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {
@@ -355,6 +358,10 @@ struct RootView {
 struct SetupView {
     root: Entity<RootView>,
     serval_binary_input: Entity<TextInput>,
+}
+
+struct AboutView {
+    language: Language,
 }
 
 fn apply_browse_result(
@@ -1500,6 +1507,93 @@ impl Render for SetupView {
                     })
                     .child(t(language, "action.save"))
             })
+    }
+}
+
+impl Render for AboutView {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let language = self.language;
+        let brand_lockup = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("assets/icons/io.github.wsyxbcl.waxbill-lockup.png");
+        let version_text = format!("v{APP_VERSION}");
+        let footer_text = format!("{} {APP_LICENSE}.", t(language, "about.footer_license"));
+
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(16.0))
+            .p(px(20.0))
+            .bg(rgb(0xFFFFFF))
+            .child(div().child(img(brand_lockup).h(px(72.0))))
+            .child(
+                div()
+                    .text_center()
+                    .text_color(rgb(0x6B7280))
+                    .child(version_text),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap(px(12.0))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .gap(px(4.0))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_center()
+                                    .text_color(rgb(0x6B7280))
+                                    .child(t(language, "about.project_url")),
+                            )
+                            .child(
+                                div()
+                                    .font_family("monospace")
+                                    .text_center()
+                                    .text_color(rgb(0x111827))
+                                    .child(PROJECT_URL),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .gap(px(4.0))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_center()
+                                    .text_color(rgb(0x6B7280))
+                                    .child(t(language, "about.icon")),
+                            )
+                            .child(
+                                div()
+                                    .text_center()
+                                    .text_color(rgb(0x111827))
+                                    .child(t(language, "about.icon_attribution")),
+                            )
+                            .child(
+                                div()
+                                    .text_center()
+                                    .text_color(rgb(0x111827))
+                                    .child(t(language, "about.wordmark")),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_center()
+                    .text_color(rgb(0x6B7280))
+                    .child(footer_text),
+            )
     }
 }
 
@@ -3637,6 +3731,28 @@ impl Render for RootView {
                                                             .child(t(language, "action.setup"))
                                                     })
                                                     .child({
+                                                        let entity_about = entity.clone();
+                                                        div()
+                                                            .id("open-about")
+                                                            .bg(rgb(0xF3F4F6))
+                                                            .text_color(rgb(0x111827))
+                                                            .p(px(8.0))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, _window, cx| {
+                                                                let language =
+                                                                    entity_about.read(cx).language;
+                                                                let _ = cx.open_window(
+                                                                    about_window_options(cx),
+                                                                    move |_, app| {
+                                                                        app.new(|_| AboutView {
+                                                                            language,
+                                                                        })
+                                                                    },
+                                                                );
+                                                            })
+                                                            .child(t(language, "action.about"))
+                                                    })
+                                                    .child({
                                                         let entity_helper = entity.clone();
                                                         div()
                                                         .id("toggle-helper-mode")
@@ -4471,5 +4587,12 @@ fn setup_window_options(cx: &App) -> WindowOptions {
     let mut options = app_window_options();
     options.window_bounds = Some(WindowBounds::centered(size(px(760.0), px(240.0)), cx));
     options.window_min_size = Some(size(px(640.0), px(220.0)));
+    options
+}
+
+fn about_window_options(cx: &App) -> WindowOptions {
+    let mut options = app_window_options();
+    options.window_bounds = Some(WindowBounds::centered(size(px(720.0), px(420.0)), cx));
+    options.window_min_size = Some(size(px(620.0), px(360.0)));
     options
 }
