@@ -29,6 +29,7 @@ fn en(key: &str) -> &'static str {
         "app.serval_version_unavailable" => {
             "Version unavailable for the configured executable. Use Setup to choose the executable."
         }
+        "app.serval_version_loading" => "Checking Serval version...",
         "action.open_input_dir" => "Open Input Dir",
         "action.open_output_dir" => "Open Output Dir",
         "action.setup" => "Setup",

@@ -88,6 +88,8 @@ Rules:
 - [x] Add an About dialog in the header with centered version, source link, attribution, and copyright footer details.
 - [x] Sync the built-in help text with the current Serval CLI and complete bilingual help coverage.
 - [x] Give the command help overlay its own scroll context so long help text does not scroll the whole page.
+- [x] Investigate Windows startup/save UI stalls and move setup persistence plus Serval version detection off the UI thread.
+- [x] Suppress transient Windows console flashes for background `serval` and `taskkill` subprocesses.
 
 ---
 

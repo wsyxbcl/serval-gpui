@@ -1,6 +1,8 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 use gpui::*;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
@@ -31,6 +33,8 @@ const APP_ID: &str = "io.github.wsyxbcl.waxbill";
 const PROJECT_URL: &str = "https://github.com/wsyxbcl/serval-gpui";
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const APP_LICENSE: &str = env!("CARGO_PKG_LICENSE");
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {
@@ -89,6 +93,7 @@ enum RunningProcessHandle {
 
 #[derive(Clone, Debug)]
 enum ServalVersionStatus {
+    Checking,
     Configured(String),
     PathFallback(String),
     Missing,
@@ -99,7 +104,7 @@ impl RunningProcessHandle {
     fn kill(&self) -> std::io::Result<()> {
         #[cfg(windows)]
         if let Some(pid) = self.process_id() {
-            let status = Command::new("taskkill")
+            let status = configure_background_command(Command::new("taskkill"))
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
@@ -348,6 +353,7 @@ struct RootView {
     helper_mode: bool,
     input_panel_open: bool,
     preview_panel_open: bool,
+    serval_version_refresh_in_flight: bool,
     help_cache: HashMap<String, String>,
     command_help_open: bool,
     command_help_key: Option<String>,
@@ -432,6 +438,33 @@ fn browse_into_text_input(
         spawn_path_prompt(cx, options, input, root, language);
     }
 }
+
+fn apply_ui_font<E: Styled>(element: E, language: Language) -> E {
+    #[cfg(target_os = "windows")]
+    {
+        let family = match language {
+            Language::En => "Segoe UI",
+            Language::ZhCn => "Microsoft YaHei UI",
+        };
+        element.font_family(family)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = language;
+        element
+    }
+}
+
+fn configure_background_command(mut command: Command) -> Command {
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    command
+}
+
 impl RootView {
     fn first_non_empty_output_line(output: &Output) -> Option<String> {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -454,7 +487,10 @@ impl RootView {
         });
 
         let program = configured_path.unwrap_or("serval");
-        let output = match Command::new(program).arg("--version").output() {
+        let output = match configure_background_command(Command::new(program))
+            .arg("--version")
+            .output()
+        {
             Ok(output) => output,
             Err(_) => {
                 return if configured_path.is_some() {
@@ -491,15 +527,47 @@ impl RootView {
         }
     }
 
-    fn refresh_serval_version_status(&mut self) {
-        self.serval_version_status =
-            Self::detect_serval_version_status(self.serval_binary_path.as_deref());
+    fn queue_serval_version_status_refresh_in(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.serval_version_refresh_in_flight {
+            return;
+        }
+
+        self.serval_version_refresh_in_flight = true;
+        let configured_path = self.serval_binary_path.clone();
+        let view = cx.weak_entity();
+        window
+            .spawn(cx, async move |cx| {
+            let status = cx
+                .background_executor()
+                .spawn(async move {
+                    RootView::detect_serval_version_status(configured_path.as_deref())
+                })
+                .await;
+
+            let _ = view.update(cx, |view, cx| {
+                view.serval_version_status = status;
+                view.serval_version_refresh_in_flight = false;
+                cx.notify();
+            });
+            })
+            .detach();
     }
 
     fn active_binary_display(&self) -> (String, u32) {
         let active_binary = self.executable_program();
 
         match &self.serval_version_status {
+            ServalVersionStatus::Checking => (
+                format!(
+                    "{} ({active_binary})",
+                    t(self.language, "app.serval_version_loading")
+                ),
+                0x6B7280,
+            ),
             ServalVersionStatus::Configured(version) => {
                 (format!("{version} ({active_binary})"), 0x6B7280)
             }
@@ -538,7 +606,7 @@ impl RootView {
         }
     }
 
-    fn set_language(&mut self, language: Language, cx: &mut Context<Self>) {
+    fn set_language(&mut self, language: Language, window: &Window, cx: &mut Context<Self>) {
         if self.language != language {
             self.language = language;
             self.help_cache.clear();
@@ -598,7 +666,7 @@ impl RootView {
                 input.set_placeholder(t(language, "placeholder.interactive_input"), cx);
             });
 
-            self.persist_setup(cx);
+            self.persist_setup_in(window, cx);
 
             self.refresh_command_help(cx);
             return;
@@ -618,7 +686,12 @@ impl RootView {
             .preview_with_program(&self.executable_program())
     }
 
-    fn set_serval_binary_path(&mut self, path: Option<String>, cx: &mut Context<Self>) {
+    fn set_serval_binary_path(
+        &mut self,
+        path: Option<String>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
         self.serval_binary_path = path.and_then(|p| {
             let trimmed = p.trim().to_string();
             if trimmed.is_empty() {
@@ -627,8 +700,9 @@ impl RootView {
                 Some(trimmed)
             }
         });
-        self.refresh_serval_version_status();
-        self.persist_setup(cx);
+        self.serval_version_status = ServalVersionStatus::Checking;
+        self.queue_serval_version_status_refresh_in(window, cx);
+        self.persist_setup_in(window, cx);
         self.help_cache.clear();
         self.hover_help_key = None;
         self.option_help_position = None;
@@ -642,13 +716,21 @@ impl RootView {
         }
     }
 
-    fn persist_setup(&mut self, cx: &mut Context<Self>) {
-        if let Err(err) = self.setup_config().save() {
-            self.append_output(
-                format!("{}: {err}", t(self.language, "message.failed_save_setup")),
-                cx,
-            );
-        }
+    fn persist_setup_in(&self, window: &Window, cx: &mut Context<Self>) {
+        let config = self.setup_config();
+        let language = self.language;
+        let view = cx.weak_entity();
+        window
+            .spawn(cx, async move |cx| {
+                let result = cx.background_executor().spawn(async move { config.save() }).await;
+                if let Err(err) = result {
+                    let message = format!("{}: {err}", t(language, "message.failed_save_setup"));
+                    let _ = view.update(cx, |view, cx| {
+                        view.append_output(message, cx);
+                    });
+                }
+            })
+            .detach();
     }
 
     fn select_command(&mut self, kind: CommandKind, cx: &mut Context<Self>) {
@@ -1013,7 +1095,7 @@ impl RootView {
             });
         } else {
             thread::spawn(move || {
-                let child = match Command::new(&program)
+                let child = match configure_background_command(Command::new(&program))
                     .args(&args)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
@@ -1385,13 +1467,16 @@ impl Render for SetupView {
         let root = self.root.clone();
         let serval_binary_input = self.serval_binary_input.clone();
         let language = root.read(cx).language;
-        div()
-            .size_full()
-            .flex()
-            .flex_col()
-            .gap(px(10.0))
-            .p(px(16.0))
-            .bg(rgb(0xFFFFFF))
+        apply_ui_font(
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .gap(px(10.0))
+                .p(px(16.0))
+                .bg(rgb(0xFFFFFF)),
+            language,
+        )
             .child(
                 div()
                     .text_color(rgb(0x6B7280))
@@ -1418,8 +1503,10 @@ impl Render for SetupView {
                             }))
                             .p(px(8.0))
                             .cursor_pointer()
-                            .on_click(move |_, _, cx| {
-                                root.update(cx, |view, cx| view.set_language(Language::En, cx));
+                            .on_click(move |_, window, cx| {
+                                root.update(cx, |view, cx| {
+                                    view.set_language(Language::En, window, cx)
+                                });
                             })
                             .child(t(language, "setup.language_en"))
                     })
@@ -1439,8 +1526,10 @@ impl Render for SetupView {
                             }))
                             .p(px(8.0))
                             .cursor_pointer()
-                            .on_click(move |_, _, cx| {
-                                root.update(cx, |view, cx| view.set_language(Language::ZhCn, cx));
+                            .on_click(move |_, window, cx| {
+                                root.update(cx, |view, cx| {
+                                    view.set_language(Language::ZhCn, window, cx)
+                                });
                             })
                             .child(t(language, "setup.language_zh_cn"))
                     }),
@@ -1497,7 +1586,7 @@ impl Render for SetupView {
                     .on_click(move |_, window, cx| {
                         let value = serval_binary_input.read(cx).value().to_string();
                         root.update(cx, |view, cx| {
-                            view.set_serval_binary_path(Some(value), cx);
+                            view.set_serval_binary_path(Some(value), window, cx);
                             view.append_output(t(language, "message.binary_updated"), cx);
                         });
                         window.remove_window();
@@ -1515,14 +1604,17 @@ impl Render for AboutView {
         let version_text = format!("v{APP_VERSION}");
         let footer_text = format!("{} {APP_LICENSE}.", t(language, "about.footer_license"));
 
-        div()
-            .size_full()
-            .flex()
-            .flex_col()
-            .items_center()
-            .gap(px(16.0))
-            .p(px(20.0))
-            .bg(rgb(0xFFFFFF))
+        apply_ui_font(
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(16.0))
+                .p(px(20.0))
+                .bg(rgb(0xFFFFFF)),
+            language,
+        )
             .child(div().child(img(brand_lockup).h(px(72.0))))
             .child(
                 div()
@@ -1659,7 +1751,13 @@ fn is_translate_column_preset(value: &str) -> bool {
     TRANSLATE_COLUMN_OPTIONS.contains(&value.trim())
 }
 impl Render for RootView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if matches!(self.serval_version_status, ServalVersionStatus::Checking)
+            && !self.serval_version_refresh_in_flight
+        {
+            self.queue_serval_version_status_refresh_in(window, cx);
+        }
+
         let entity = cx.entity();
         let entity_observe = entity.clone();
         let entity_capture = entity.clone();
@@ -3511,23 +3609,26 @@ impl Render for RootView {
                 .child(self.render_auto_output_dir_hint())
         };
 
-        div()
-            .size_full()
-            .relative()
-            .bg(rgb(0xF7F4EF))
-            .text_color(rgb(0x1E1E1E))
-            .on_mouse_move({
-                let entity = entity.clone();
-                move |event: &MouseMoveEvent, _, cx| {
-                    entity.update(cx, |view, cx| {
-                        view.cursor_position = event.position;
-                        if view.hover_help_key.is_some() {
-                            view.option_help_position = Some(event.position);
-                            cx.notify();
-                        }
-                    });
-                }
-            })
+        apply_ui_font(
+            div()
+                .size_full()
+                .relative()
+                .bg(rgb(0xF7F4EF))
+                .text_color(rgb(0x1E1E1E))
+                .on_mouse_move({
+                    let entity = entity.clone();
+                    move |event: &MouseMoveEvent, _, cx| {
+                        entity.update(cx, |view, cx| {
+                            view.cursor_position = event.position;
+                            if view.hover_help_key.is_some() {
+                                view.option_help_position = Some(event.position);
+                                cx.notify();
+                            }
+                        });
+                    }
+                }),
+            language,
+        )
             .child(
                 div()
                     .id("page-scroll")
@@ -4303,8 +4404,6 @@ fn main() {
                 };
                 let language = setup_config.language;
                 let serval_binary_path = setup_config.serval_binary_path.clone();
-                let serval_version_status =
-                    RootView::detect_serval_version_status(serval_binary_path.as_deref());
                 let observe_input =
                     cx.new(|cx| TextInput::new(cx, t(language, "placeholder.observe_media_dir")));
                 let observe_output_input =
@@ -4486,7 +4585,7 @@ fn main() {
                     command_state: CommandState::default(),
                     language,
                     serval_binary_path,
-                    serval_version_status,
+                    serval_version_status: ServalVersionStatus::Checking,
                     observe_input,
                     observe_output_input,
                     capture_input,
@@ -4519,6 +4618,7 @@ fn main() {
                     helper_mode: false,
                     input_panel_open: true,
                     preview_panel_open: true,
+                    serval_version_refresh_in_flight: false,
                     help_cache: HashMap::new(),
                     command_help_open: false,
                     command_help_key: None,
