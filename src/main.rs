@@ -343,6 +343,7 @@ struct RootView {
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
     page_scroll_handle: ScrollHandle,
+    command_help_scroll_handle: ScrollHandle,
     interaction_helper: InteractionHelperModel,
     helper_mode: bool,
     input_panel_open: bool,
@@ -599,13 +600,8 @@ impl RootView {
 
             self.persist_setup(cx);
 
-            if self.command_help_open {
-                let key = self.current_help_key();
-                self.command_help_key = Some(key.clone());
-                self.ensure_help_loaded_for_key(key, cx);
-                return;
-            }
-            cx.notify();
+            self.refresh_command_help(cx);
+            return;
         }
     }
 
@@ -636,13 +632,7 @@ impl RootView {
         self.help_cache.clear();
         self.hover_help_key = None;
         self.option_help_position = None;
-        if self.command_help_open {
-            let key = self.current_help_key();
-            self.command_help_key = Some(key.clone());
-            self.ensure_help_loaded_for_key(key, cx);
-        } else {
-            cx.notify();
-        }
+        self.refresh_command_help(cx);
     }
 
     fn setup_config(&self) -> SetupConfig {
@@ -669,13 +659,7 @@ impl RootView {
             }
             self.hover_help_key = None;
             self.option_help_position = None;
-            if self.command_help_open {
-                let key = self.current_help_key();
-                self.command_help_key = Some(key.clone());
-                self.ensure_help_loaded_for_key(key, cx);
-            } else {
-                cx.notify();
-            }
+            self.refresh_command_help(cx);
         }
     }
 
@@ -1287,8 +1271,21 @@ impl RootView {
         }
     }
 
+    fn refresh_command_help(&mut self, cx: &mut Context<Self>) {
+        if self.command_help_open {
+            let key = self.current_help_key();
+            self.command_help_key = Some(key.clone());
+            self.command_help_scroll_handle
+                .set_offset(point(px(0.0), px(0.0)));
+            self.ensure_help_loaded_for_key(key, cx);
+        } else {
+            cx.notify();
+        }
+    }
+
     fn ensure_help_loaded_for_key(&mut self, key: String, cx: &mut Context<Self>) {
         if self.help_cache.contains_key(&key) {
+            cx.notify();
             return;
         }
 
@@ -2154,13 +2151,7 @@ impl Render for RootView {
                                     .on_click(move |_, _, cx| {
                                         entity_click.update(cx, |view, cx| {
                                             view.command_state.xmp.subcommand = XmpSubcommand::Copy;
-                                            if view.command_help_open {
-                                                let key = view.current_help_key();
-                                                view.command_help_key = Some(key.clone());
-                                                view.ensure_help_loaded_for_key(key, cx);
-                                            } else {
-                                                cx.notify();
-                                            }
+                                            view.refresh_command_help(cx);
                                         });
                                     })
                                     .child(t(language, "opt.copy"))
@@ -2178,13 +2169,7 @@ impl Render for RootView {
                                     .on_click(move |_, _, cx| {
                                         entity_click.update(cx, |view, cx| {
                                             view.command_state.xmp.subcommand = XmpSubcommand::Init;
-                                            if view.command_help_open {
-                                                let key = view.current_help_key();
-                                                view.command_help_key = Some(key.clone());
-                                                view.ensure_help_loaded_for_key(key, cx);
-                                            } else {
-                                                cx.notify();
-                                            }
+                                            view.refresh_command_help(cx);
                                         });
                                     })
                                     .child(t(language, "opt.init"))
@@ -2202,13 +2187,7 @@ impl Render for RootView {
                                     .on_click(move |_, _, cx| {
                                         entity_click.update(cx, |view, cx| {
                                             view.command_state.xmp.subcommand = XmpSubcommand::Update;
-                                            if view.command_help_open {
-                                                let key = view.current_help_key();
-                                                view.command_help_key = Some(key.clone());
-                                                view.ensure_help_loaded_for_key(key, cx);
-                                            } else {
-                                                cx.notify();
-                                            }
+                                            view.refresh_command_help(cx);
                                         });
                                     })
                                     .child(t(language, "opt.update"))
@@ -2226,13 +2205,7 @@ impl Render for RootView {
                                     .on_click(move |_, _, cx| {
                                         entity_click.update(cx, |view, cx| {
                                             view.command_state.xmp.subcommand = XmpSubcommand::Remove;
-                                            if view.command_help_open {
-                                                let key = view.current_help_key();
-                                                view.command_help_key = Some(key.clone());
-                                                view.ensure_help_loaded_for_key(key, cx);
-                                            } else {
-                                                cx.notify();
-                                            }
+                                            view.refresh_command_help(cx);
                                         });
                                     })
                                     .child(t(language, "opt.remove"))
@@ -2250,13 +2223,7 @@ impl Render for RootView {
                                     .on_click(move |_, _, cx| {
                                         entity_click.update(cx, |view, cx| {
                                             view.command_state.xmp.subcommand = XmpSubcommand::Sync;
-                                            if view.command_help_open {
-                                                let key = view.current_help_key();
-                                                view.command_help_key = Some(key.clone());
-                                                view.ensure_help_loaded_for_key(key, cx);
-                                            } else {
-                                                cx.notify();
-                                            }
+                                            view.refresh_command_help(cx);
                                         });
                                     })
                                     .child(t(language, "opt.sync"))
@@ -3773,14 +3740,8 @@ impl Render for RootView {
                                                                 view.helper_mode =
                                                                     !view.helper_mode;
                                                                 if view.helper_mode {
-                                                                    let key =
-                                                                        view.current_help_key();
                                                                     view.command_help_open = true;
-                                                                    view.command_help_key =
-                                                                        Some(key.clone());
-                                                                    view.ensure_help_loaded_for_key(
-                                                                    key, cx,
-                                                                );
+                                                                    view.refresh_command_help(cx);
                                                                 } else {
                                                                     view.command_help_open = false;
                                                                     view.command_help_key = None;
@@ -4227,6 +4188,7 @@ impl Render for RootView {
                         .absolute()
                         .w(px(500.0))
                         .h(px(360.0))
+                        .occlude()
                         .flex()
                         .flex_col()
                         .bg(rgb(0x111827))
@@ -4274,6 +4236,7 @@ impl Render for RootView {
                                 .pt(px(6.0))
                                 .flex_grow()
                                 .id("help-overlay-scroll")
+                                .track_scroll(&self.command_help_scroll_handle)
                                 .overflow_y_scroll()
                                 .overflow_x_scroll()
                                 .scrollbar_width(px(8.0))
@@ -4551,6 +4514,7 @@ fn main() {
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),
                     page_scroll_handle: ScrollHandle::new(),
+                    command_help_scroll_handle: ScrollHandle::new(),
                     interaction_helper: InteractionHelperModel::default(),
                     helper_mode: false,
                     input_panel_open: true,

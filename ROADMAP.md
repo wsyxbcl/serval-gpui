@@ -87,6 +87,7 @@ Rules:
 - [x] Persist Setup preferences across launches using cross-platform config storage.
 - [x] Add an About dialog in the header with centered version, source link, attribution, and copyright footer details.
 - [x] Sync the built-in help text with the current Serval CLI and complete bilingual help coverage.
+- [x] Give the command help overlay its own scroll context so long help text does not scroll the whole page.
 
 ---
 
