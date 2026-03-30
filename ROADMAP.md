@@ -86,6 +86,7 @@ Rules:
 - [x] Give the Setup window a compact default size instead of opening it at the full app size.
 - [x] Persist Setup preferences across launches using cross-platform config storage.
 - [x] Add an About dialog in the header with centered version, source link, attribution, and copyright footer details.
+- [x] Sync the built-in help text with the current Serval CLI and complete bilingual help coverage.
 
 ---
 
