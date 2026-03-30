@@ -6,7 +6,7 @@ pub enum Language {
 
 impl Default for Language {
     fn default() -> Self {
-        Self::En
+        Self::ZhCn
     }
 }
 
@@ -188,7 +188,7 @@ fn zh_cn(key: &str) -> &'static str {
         "app.serval_version_unavailable" => "Serval 版本未知，请检查“设置”中的 Serval 可执行文件。",
         "action.open_input_dir" => "打开输入目录",
         "action.open_output_dir" => "打开输出目录",
-        "action.setup" => "设置",
+        "action.setup" => "设置/Setup",
         "action.about" => "关于",
         "action.run" => "运行",
         "action.send" => "发送",
@@ -204,7 +204,7 @@ fn zh_cn(key: &str) -> &'static str {
         "translate.preset.maze_scientific_name" => "学名",
         "action.helper_mode_on" => "帮助模式：开",
         "action.helper_mode_off" => "帮助模式：关",
-        "action.save" => "保存",
+        "action.save" => "保存/Save",
         "about.project_url" => "开源地址",
         "about.icon" => "图标",
         "about.icon_attribution" => "图标设计：@timber3",
@@ -298,7 +298,7 @@ fn zh_cn(key: &str) -> &'static str {
         "opt.rename" => "提取时重命名媒体",
         "opt.skip_existing" => "跳过已存在媒体",
         "opt.use_subdir" => "提取时创建额外子路径",
-        "setup.language" => "语言",
+        "setup.language" => "语言/Language",
         "setup.language_en" => "English",
         "setup.language_zh_cn" => "简体中文",
         "setup.serval_binary" => "Serval 可执行文件",
