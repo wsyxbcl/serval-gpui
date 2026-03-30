@@ -486,36 +486,26 @@ impl RootView {
             Self::detect_serval_version_status(self.serval_binary_path.as_deref());
     }
 
-    fn active_binary_display(&self) -> (String, u32, Option<(String, u32)>) {
+    fn active_binary_display(&self) -> (String, u32) {
         let active_binary = self.executable_program();
 
         match &self.serval_version_status {
             ServalVersionStatus::Configured(version) => {
-                (format!("{version} ({active_binary})"), 0x6B7280, None)
+                (format!("{version} ({active_binary})"), 0x6B7280)
             }
-            ServalVersionStatus::PathFallback(version) => (
-                format!("{version} ({active_binary})"),
-                0x6B7280,
-                Some((
-                    t(self.language, "app.serval_version_via_path").to_string(),
-                    0xB45309,
-                )),
-            ),
+            ServalVersionStatus::PathFallback(version) => {
+                (format!("{version} ({active_binary})"), 0x6B7280)
+            }
             ServalVersionStatus::Missing => (
-                t(self.language, "app.binary_not_configured").to_string(),
+                t(self.language, "app.serval_version_not_configured").to_string(),
                 0xB45309,
-                Some((
-                    t(self.language, "app.serval_version_not_configured").to_string(),
-                    0xB45309,
-                )),
             ),
             ServalVersionStatus::Error => (
-                active_binary,
-                0x6B7280,
-                Some((
-                    t(self.language, "app.serval_version_unavailable").to_string(),
-                    0xDC2626,
-                )),
+                format!(
+                    "{active_binary}. {}",
+                    t(self.language, "app.serval_version_unavailable")
+                ),
+                0xDC2626,
             ),
         }
     }
@@ -1564,8 +1554,10 @@ impl Render for RootView {
         let entity_xmp = entity.clone();
         let entity_extract = entity.clone();
         let entity_translate = entity.clone();
+        let brand_lockup = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("assets/icons/io.github.wsyxbcl.waxbill-lockup.png");
         let preview = self.command_preview();
-        let (active_binary_text, active_binary_color, header_prompt) = self.active_binary_display();
+        let (active_binary_text, active_binary_color) = self.active_binary_display();
         let observe_selected = self.command_state.kind == CommandKind::Observe;
         let capture_selected = self.command_state.kind == CommandKind::Capture;
         let xmp_selected = self.command_state.kind == CommandKind::Xmp;
@@ -3477,203 +3469,219 @@ impl Render for RootView {
                                     .items_center()
                                     .justify_between()
                                     .gap(px(12.0))
+                                    .child(div().flex().child(img(brand_lockup).h(px(64.0))))
                                     .child(
                                         div()
                                             .flex()
                                             .flex_col()
-                                            .gap(px(4.0))
-                                            .child(div().child(t(language, "app.title")))
+                                            .items_end()
+                                            .gap(px(8.0))
                                             .child(
                                                 div()
-                                                    .text_sm()
-                                                    .text_color(rgb(active_binary_color))
-                                                    .child(format!(
-                                                        "{}: {active_binary_text}",
-                                                        t(language, "app.active_binary")
-                                                    )),
+                                                    .flex()
+                                                    .flex_col()
+                                                    .items_end()
+                                                    .gap(px(4.0))
+                                                    .text_right()
+                                                    .child(
+                                                        div()
+                                                            .text_sm()
+                                                            .text_color(rgb(active_binary_color))
+                                                            .child(format!(
+                                                                "{}: {active_binary_text}",
+                                                                t(language, "app.active_binary")
+                                                            )),
+                                                    ),
                                             )
                                             .child(
-                                                if let Some((prompt_text, prompt_color)) =
-                                                    &header_prompt
-                                                {
-                                                    div()
-                                                        .text_sm()
-                                                        .text_color(rgb(*prompt_color))
-                                                        .child(prompt_text.clone())
-                                                        .into_any_element()
-                                                } else {
-                                                    div().into_any_element()
-                                                },
-                                            ),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_row()
-                                            .flex_wrap()
-                                            .justify_end()
-                                            .gap(px(8.0))
-                                            .child({
-                                                let entity_open_input = entity.clone();
                                                 div()
-                                                    .id("open-input-dir")
-                                                    .bg(rgb(0xF3F4F6))
-                                                    .text_color(rgb(0x111827))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_open_input.update(cx, |view, cx| {
-                                                            if let Some(path) =
-                                                                view.resolve_input_dir()
-                                                            {
-                                                                cx.reveal_path(&path);
-                                                            } else {
-                                                                view.append_output(
+                                                    .flex()
+                                                    .flex_row()
+                                                    .flex_wrap()
+                                                    .justify_end()
+                                                    .gap(px(8.0))
+                                                    .child({
+                                                        let entity_open_input = entity.clone();
+                                                        div()
+                                                            .id("open-input-dir")
+                                                            .bg(rgb(0xF3F4F6))
+                                                            .text_color(rgb(0x111827))
+                                                            .p(px(8.0))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, _, cx| {
+                                                                entity_open_input.update(
+                                                                    cx,
+                                                                    |view, cx| {
+                                                                        if let Some(path) =
+                                                                            view.resolve_input_dir()
+                                                                        {
+                                                                            cx.reveal_path(&path);
+                                                                        } else {
+                                                                            view.append_output(
                                                                     t(
                                                                         language,
                                                                         "message.no_input_dir",
                                                                     ),
                                                                     cx,
                                                                 );
-                                                            }
-                                                        });
+                                                                        }
+                                                                    },
+                                                                );
+                                                            })
+                                                            .child(t(
+                                                                language,
+                                                                "action.open_input_dir",
+                                                            ))
                                                     })
-                                                    .child(t(language, "action.open_input_dir"))
-                                            })
-                                            .child({
-                                                let entity_open_output = entity.clone();
-                                                div()
-                                                    .id("open-output-dir")
-                                                    .bg(rgb(0xF3F4F6))
-                                                    .text_color(rgb(0x111827))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_open_output.update(
-                                                            cx,
-                                                            |view, cx| {
-                                                                if let Some(path) =
-                                                                    view.resolve_output_dir()
-                                                                {
-                                                                    cx.reveal_path(&path);
-                                                                } else {
-                                                                    view.append_output(
+                                                    .child({
+                                                        let entity_open_output = entity.clone();
+                                                        div()
+                                                            .id("open-output-dir")
+                                                            .bg(rgb(0xF3F4F6))
+                                                            .text_color(rgb(0x111827))
+                                                            .p(px(8.0))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, _, cx| {
+                                                                entity_open_output.update(
+                                                                    cx,
+                                                                    |view, cx| {
+                                                                        if let Some(path) = view
+                                                                            .resolve_output_dir()
+                                                                        {
+                                                                            cx.reveal_path(&path);
+                                                                        } else {
+                                                                            view.append_output(
                                                                         t(
                                                                             language,
                                                                             "message.no_output_dir",
                                                                         ),
                                                                         cx,
                                                                     );
-                                                                }
-                                                            },
-                                                        );
+                                                                        }
+                                                                    },
+                                                                );
+                                                            })
+                                                            .child(t(
+                                                                language,
+                                                                "action.open_output_dir",
+                                                            ))
                                                     })
-                                                    .child(t(language, "action.open_output_dir"))
-                                            })
-                                            .child({
-                                                let entity_setup = entity.clone();
-                                                div()
-                                                    .id("open-setup")
-                                                    .bg(rgb(0xF3F4F6))
-                                                    .text_color(rgb(0x111827))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _window, cx| {
-                                                        let setup_state = entity_setup.read(cx);
-                                                        let current = setup_state
-                                                            .serval_binary_path
-                                                            .clone()
-                                                            .unwrap_or_default();
-                                                        let language = setup_state.language;
-                                                        let root_for_window = entity_setup.clone();
-                                                        let _ = cx.open_window(
-                                                            app_window_options(),
-                                                            move |_, app| {
-                                                                let root = root_for_window.clone();
-                                                                let initial = current.clone();
-                                                                let placeholder = t(
+                                                    .child({
+                                                        let entity_setup = entity.clone();
+                                                        div()
+                                                            .id("open-setup")
+                                                            .bg(rgb(0xF3F4F6))
+                                                            .text_color(rgb(0x111827))
+                                                            .p(px(8.0))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, _window, cx| {
+                                                                let setup_state =
+                                                                    entity_setup.read(cx);
+                                                                let current = setup_state
+                                                                    .serval_binary_path
+                                                                    .clone()
+                                                                    .unwrap_or_default();
+                                                                let language = setup_state.language;
+                                                                let root_for_window =
+                                                                    entity_setup.clone();
+                                                                let _ = cx.open_window(
+                                                                    setup_window_options(cx),
+                                                                    move |_, app| {
+                                                                        let root =
+                                                                            root_for_window.clone();
+                                                                        let initial =
+                                                                            current.clone();
+                                                                        let placeholder = t(
                                                     language,
                                                     "setup.serval_binary_placeholder",
                                                 )
                                                 .to_string();
-                                                                app.new(move |cx| {
-                                                                    let input = cx.new(|cx| {
+                                                                        app.new(move |cx| {
+                                                                        let input = cx.new(|cx| {
                                                                         TextInput::new_with_value(
                                                                             cx,
                                                                             placeholder.clone(),
                                                                             initial.clone(),
                                                                         )
                                                                     });
-                                                                    SetupView {
-                                                                        root: root.clone(),
-                                                                        serval_binary_input: input,
-                                                                    }
-                                                                })
-                                                            },
-                                                        );
+                                                                        SetupView {
+                                                                            root: root.clone(),
+                                                                            serval_binary_input:
+                                                                                input,
+                                                                        }
+                                                                    })
+                                                                    },
+                                                                );
+                                                            })
+                                                            .child(t(language, "action.setup"))
                                                     })
-                                                    .child(t(language, "action.setup"))
-                                            })
-                                            .child({
-                                                let entity_helper = entity.clone();
-                                                div()
-                                                    .id("toggle-helper-mode")
-                                                    .bg(rgb(if helper_mode {
-                                                        0x111827
-                                                    } else {
-                                                        0xF3F4F6
-                                                    }))
-                                                    .text_color(rgb(if helper_mode {
-                                                        0xF9FAFB
-                                                    } else {
-                                                        0x111827
-                                                    }))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, _, cx| {
-                                                        entity_helper.update(cx, |view, cx| {
-                                                            view.helper_mode = !view.helper_mode;
-                                                            if view.helper_mode {
-                                                                let key = view.current_help_key();
-                                                                view.command_help_open = true;
-                                                                view.command_help_key =
-                                                                    Some(key.clone());
-                                                                view.ensure_help_loaded_for_key(
+                                                    .child({
+                                                        let entity_helper = entity.clone();
+                                                        div()
+                                                        .id("toggle-helper-mode")
+                                                        .bg(rgb(if helper_mode {
+                                                            0x111827
+                                                        } else {
+                                                            0xF3F4F6
+                                                        }))
+                                                        .text_color(rgb(if helper_mode {
+                                                            0xF9FAFB
+                                                        } else {
+                                                            0x111827
+                                                        }))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity_helper.update(cx, |view, cx| {
+                                                                view.helper_mode =
+                                                                    !view.helper_mode;
+                                                                if view.helper_mode {
+                                                                    let key =
+                                                                        view.current_help_key();
+                                                                    view.command_help_open = true;
+                                                                    view.command_help_key =
+                                                                        Some(key.clone());
+                                                                    view.ensure_help_loaded_for_key(
                                                                     key, cx,
                                                                 );
-                                                            } else {
-                                                                view.command_help_open = false;
-                                                                view.command_help_key = None;
-                                                                view.hover_help_key = None;
-                                                                view.option_help_position = None;
-                                                                cx.notify();
-                                                            }
-                                                        });
+                                                                } else {
+                                                                    view.command_help_open = false;
+                                                                    view.command_help_key = None;
+                                                                    view.hover_help_key = None;
+                                                                    view.option_help_position =
+                                                                        None;
+                                                                    cx.notify();
+                                                                }
+                                                            });
+                                                        })
+                                                        .child(if helper_mode {
+                                                            t(language, "action.helper_mode_on")
+                                                        } else {
+                                                            t(language, "action.helper_mode_off")
+                                                        })
                                                     })
-                                                    .child(if helper_mode {
-                                                        t(language, "action.helper_mode_on")
-                                                    } else {
-                                                        t(language, "action.helper_mode_off")
-                                                    })
-                                            })
-                                            .child({
-                                                let entity_run = entity.clone();
-                                                div()
-                                                    .id("run-button")
-                                                    .bg(rgb(0x111827))
-                                                    .text_color(rgb(0xF9FAFB))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
-                                                    .on_click(move |_, window, cx| {
-                                                        RootView::handle_run_click(
-                                                            entity_run.clone(),
-                                                            language,
-                                                            window,
-                                                            cx,
-                                                        );
-                                                    })
-                                                    .child(t(language, self.run_state.action_key()))
-                                            }),
+                                                    .child({
+                                                        let entity_run = entity.clone();
+                                                        div()
+                                                            .id("run-button")
+                                                            .bg(rgb(0x111827))
+                                                            .text_color(rgb(0xF9FAFB))
+                                                            .p(px(8.0))
+                                                            .cursor_pointer()
+                                                            .on_click(move |_, window, cx| {
+                                                                RootView::handle_run_click(
+                                                                    entity_run.clone(),
+                                                                    language,
+                                                                    window,
+                                                                    cx,
+                                                                );
+                                                            })
+                                                            .child(t(
+                                                                language,
+                                                                self.run_state.action_key(),
+                                                            ))
+                                                    }),
+                                            ),
                                     ),
                             )
                             .child(
@@ -4422,5 +4430,12 @@ fn main() {
 fn app_window_options() -> WindowOptions {
     let mut options = WindowOptions::default();
     options.app_id = Some(APP_ID.to_string());
+    options
+}
+
+fn setup_window_options(cx: &App) -> WindowOptions {
+    let mut options = app_window_options();
+    options.window_bounds = Some(WindowBounds::centered(size(px(760.0), px(240.0)), cx));
+    options.window_min_size = Some(size(px(640.0), px(220.0)));
     options
 }

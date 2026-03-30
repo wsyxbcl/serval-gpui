@@ -75,11 +75,16 @@ Rules:
 - [x] Build the Windows app as a GUI subsystem executable so it does not open an empty console window
 - [x] Keep the UI usable on smaller devices with a page-level scrollbar and wrapped top-level control rows.
 - [x] Show serval version at the top, and guide the user to Setup when the executable is only coming from PATH or not configured.
+- [x] Refine the Active Binary status line so version/setup guidance stays on one line, and only prompt Setup when Serval is missing or its version cannot be read.
 - [x] Adapt to latest serval v0.6.7: remove stale observe options and add `serval xmp init --info`
 - [x] Add gui assit layer for xmp init --info
 - [x] The font color in input box of the interactive step is too light, make it black
 - [x] remove the collapse ability of the command panel
 - [x] Provide some default options for from and to in serval translate, default options are: tag, tagCN, mazeNameCN and mazeScientificName
+- [x] Show the Waxbill lockup image in the top-left header area.
+- [x] Refine Chinese status copy so header messaging explicitly refers to Serval.
+- [x] Give the Setup window a compact default size instead of opening it at the full app size.
+- [ ] Automatically save setup for next run (should be cross-platform)
 
 ---
 
