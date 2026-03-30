@@ -19,8 +19,6 @@ Rules:
 - [x] Decided to support both plain subprocess execution and PTY-backed interactive execution.
 - [x] Identified GPUI as the GUI framework for the first implementation.
 - [x] Established that Serval should remain unchanged for v1 unless refactoring is clearly needed.
-
-### Pending
 - [x] Create the initial repository structure for `serval-gpui`.
 - [x] Create a minimal runnable GPUI application.
 - [x] Add a basic app layout with a command selection area and an output pane.
