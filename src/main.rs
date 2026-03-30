@@ -14,6 +14,7 @@ mod commands;
 mod help_texts;
 mod i18n;
 mod interaction_helper;
+mod setup_config;
 mod text_input;
 
 use commands::{
@@ -23,6 +24,7 @@ use commands::{
 use i18n::{t, Language};
 use interaction_helper::InteractionHelperModel;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
+use setup_config::SetupConfig;
 use text_input::{bind_text_input_keys, TextInput, TextInputSubmitted};
 
 const APP_ID: &str = "io.github.wsyxbcl.waxbill";
@@ -588,6 +590,8 @@ impl RootView {
                 input.set_placeholder(t(language, "placeholder.interactive_input"), cx);
             });
 
+            self.persist_setup(cx);
+
             if self.command_help_open {
                 let key = self.current_help_key();
                 self.command_help_key = Some(key.clone());
@@ -621,6 +625,7 @@ impl RootView {
             }
         });
         self.refresh_serval_version_status();
+        self.persist_setup(cx);
         self.help_cache.clear();
         self.hover_help_key = None;
         self.option_help_position = None;
@@ -630,6 +635,22 @@ impl RootView {
             self.ensure_help_loaded_for_key(key, cx);
         } else {
             cx.notify();
+        }
+    }
+
+    fn setup_config(&self) -> SetupConfig {
+        SetupConfig {
+            language: self.language,
+            serval_binary_path: self.serval_binary_path.clone(),
+        }
+    }
+
+    fn persist_setup(&mut self, cx: &mut Context<Self>) {
+        if let Err(err) = self.setup_config().save() {
+            self.append_output(
+                format!("{}: {err}", t(self.language, "message.failed_save_setup")),
+                cx,
+            );
         }
     }
 
@@ -4197,54 +4218,58 @@ fn main() {
         bind_text_input_keys(app);
         app.open_window(app_window_options(), |_window, app| {
             app.new(|cx| {
-                let observe_input = cx
-                    .new(|cx| TextInput::new(cx, t(Language::En, "placeholder.observe_media_dir")));
-                let observe_output_input = cx.new(|cx| {
-                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
-                });
+                let (setup_config, setup_load_error) = match SetupConfig::load() {
+                    Ok(config) => (config, None),
+                    Err(err) => (SetupConfig::default(), Some(err.to_string())),
+                };
+                let language = setup_config.language;
+                let serval_binary_path = setup_config.serval_binary_path.clone();
+                let serval_version_status =
+                    RootView::detect_serval_version_status(serval_binary_path.as_deref());
+                let observe_input =
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.observe_media_dir")));
+                let observe_output_input =
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.optional_output_dir")));
                 let capture_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
-                let capture_output_input = cx.new(|cx| {
-                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
-                });
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.tags_csv")));
+                let capture_output_input =
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.optional_output_dir")));
                 let xmp_source_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.source_dir")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.source_dir")));
                 let xmp_output_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.output_dir")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.output_dir")));
                 let xmp_csv_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.csv_file")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.csv_file")));
                 let xmp_dir_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.directory")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.directory")));
                 let extract_csv_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.tags_csv")));
                 let extract_value_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.filter_value")));
-                let extract_output_input = cx.new(|cx| {
-                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
-                });
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.filter_value")));
+                let extract_output_input =
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.optional_output_dir")));
                 let translate_csv_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.tags_csv")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.tags_csv")));
                 let translate_taglist_input =
-                    cx.new(|cx| TextInput::new(cx, t(Language::En, "placeholder.taglist_csv")));
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.taglist_csv")));
                 let translate_from_input = cx.new(|cx| {
                     TextInput::new_with_value(
                         cx,
-                        t(Language::En, "placeholder.translate_from"),
+                        t(language, "placeholder.translate_from"),
                         DEFAULT_TRANSLATE_FROM,
                     )
                 });
                 let translate_to_input = cx.new(|cx| {
                     TextInput::new_with_value(
                         cx,
-                        t(Language::En, "placeholder.translate_to"),
+                        t(language, "placeholder.translate_to"),
                         DEFAULT_TRANSLATE_TO,
                     )
                 });
-                let translate_output_input = cx.new(|cx| {
-                    TextInput::new(cx, t(Language::En, "placeholder.optional_output_dir"))
-                });
+                let translate_output_input =
+                    cx.new(|cx| TextInput::new(cx, t(language, "placeholder.optional_output_dir")));
                 let pty_input = cx.new(|cx| {
-                    TextInput::new_submit(cx, t(Language::En, "placeholder.interactive_input"))
+                    TextInput::new_submit(cx, t(language, "placeholder.interactive_input"))
                 });
 
                 cx.observe(&observe_input, |view: &mut RootView, input, cx| {
@@ -4378,11 +4403,11 @@ fn main() {
                 )
                 .detach();
 
-                RootView {
+                let mut root = RootView {
                     command_state: CommandState::default(),
-                    language: Language::default(),
-                    serval_binary_path: None,
-                    serval_version_status: RootView::detect_serval_version_status(None),
+                    language,
+                    serval_binary_path,
+                    serval_version_status,
                     observe_input,
                     observe_output_input,
                     capture_input,
@@ -4420,7 +4445,16 @@ fn main() {
                     hover_help_key: None,
                     option_help_position: None,
                     cursor_position: point(px(0.0), px(0.0)),
+                };
+
+                if let Some(err) = setup_load_error {
+                    root.append_output(
+                        format!("{}: {err}", t(root.language, "message.failed_load_setup")),
+                        cx,
+                    );
                 }
+
+                root
             })
         })
         .unwrap();
