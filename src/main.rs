@@ -8,7 +8,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -35,6 +35,8 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const APP_LICENSE: &str = env!("CARGO_PKG_LICENSE");
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+const BRAND_LOCKUP_PNG: &[u8] =
+    include_bytes!("../assets/icons/io.github.wsyxbcl.waxbill-lockup.png");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {
@@ -463,6 +465,14 @@ fn configure_background_command(mut command: Command) -> Command {
     }
 
     command
+}
+
+fn brand_lockup_image() -> Arc<Image> {
+    static IMAGE: OnceLock<Arc<Image>> = OnceLock::new();
+
+    IMAGE
+        .get_or_init(|| Arc::new(Image::from_bytes(ImageFormat::Png, BRAND_LOCKUP_PNG.to_vec())))
+        .clone()
 }
 
 impl RootView {
@@ -1599,8 +1609,7 @@ impl Render for SetupView {
 impl Render for AboutView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let language = self.language;
-        let brand_lockup = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("assets/icons/io.github.wsyxbcl.waxbill-lockup.png");
+        let brand_lockup = brand_lockup_image();
         let version_text = format!("v{APP_VERSION}");
         let footer_text = format!("{} {APP_LICENSE}.", t(language, "about.footer_license"));
 
@@ -1764,8 +1773,7 @@ impl Render for RootView {
         let entity_xmp = entity.clone();
         let entity_extract = entity.clone();
         let entity_translate = entity.clone();
-        let brand_lockup = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("assets/icons/io.github.wsyxbcl.waxbill-lockup.png");
+        let brand_lockup = brand_lockup_image();
         let preview = self.command_preview();
         let (active_binary_text, active_binary_color) = self.active_binary_display();
         let observe_selected = self.command_state.kind == CommandKind::Observe;

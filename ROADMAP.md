@@ -90,6 +90,7 @@ Rules:
 - [x] Give the command help overlay its own scroll context so long help text does not scroll the whole page.
 - [x] Investigate Windows startup/save UI stalls and move setup persistence plus Serval version detection off the UI thread.
 - [x] Suppress transient Windows console flashes for background `serval` and `taskkill` subprocesses.
+- [x] Embed the Waxbill lockup image into the binary so packaged Windows builds always show the header logo.
 
 ---
 
