@@ -1,0 +1,62 @@
+name: macos-build
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: waxbill
+
+jobs:
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build binary
+        run: cargo build --release --target "${{ matrix.target }}"
+
+      - name: Package build artifact
+        shell: bash
+        run: |
+          artifact_name="${BIN_NAME}-${GITHUB_REF_NAME}-${GITHUB_SHA::7}-${{ matrix.target }}"
+          staging_dir="${RUNNER_TEMP}/${artifact_name}"
+          mkdir -p "${staging_dir}"
+          cp "target/${{ matrix.target }}/release/${BIN_NAME}" "${staging_dir}/"
+          chmod +x "${staging_dir}/${BIN_NAME}"
+          if [ -f README.md ]; then
+            cp README.md "${staging_dir}/"
+          fi
+          if [ -f LICENSE ]; then
+            cp LICENSE "${staging_dir}/"
+          fi
+          if [ -f NOTICE ]; then
+            cp NOTICE "${staging_dir}/"
+          fi
+          ditto -c -k --sequesterRsrc --keepParent "${staging_dir}" "${artifact_name}.zip"
+          echo "ASSET_NAME=${artifact_name}" >> "${GITHUB_ENV}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ASSET_NAME }}.zip

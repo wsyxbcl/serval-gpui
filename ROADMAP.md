@@ -91,6 +91,7 @@ Rules:
 - [x] Investigate Windows startup/save UI stalls and move setup persistence plus Serval version detection off the UI thread.
 - [x] Suppress transient Windows console flashes for background `serval` and `taskkill` subprocesses.
 - [x] Embed the Waxbill lockup image into the binary so packaged Windows builds always show the header logo.
+- [x] Add a GitHub Actions workflow to build macOS artifacts for both Intel and Apple Silicon.
 
 ---
 
