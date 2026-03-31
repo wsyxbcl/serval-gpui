@@ -16,5 +16,9 @@ gpui = "0.2.2"
 unicode-segmentation = "1.11"
 portable-pty = "0.9"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Keep the transitive macOS font stack aligned with gpui's current zed-font-kit.
+core-text = "=21.0.0"
+
 [build-dependencies]
 embed-resource = "3.0.2"

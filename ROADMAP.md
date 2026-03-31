@@ -92,6 +92,7 @@ Rules:
 - [x] Suppress transient Windows console flashes for background `serval` and `taskkill` subprocesses.
 - [x] Embed the Waxbill lockup image into the binary so packaged Windows builds always show the header logo.
 - [x] Add a GitHub Actions workflow to build macOS artifacts for both Intel and Apple Silicon.
+- [x] Pin the macOS font-stack dependencies so the manual macOS workflow resolves a compatible `core-text` and `core-graphics` pair.
 
 ---
 
