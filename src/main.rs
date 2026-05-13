@@ -1102,6 +1102,13 @@ impl RootView {
     fn observe_interaction_helper_output(&mut self, chunk: &str, cx: &mut Context<Self>) {
         let chunk = sanitize_log_output(chunk);
         if self.interaction_helper.observe_output(&chunk) {
+            if self
+                .interaction_helper
+                .prompt()
+                .is_some_and(|prompt| !prompt.options.is_empty())
+            {
+                self.page_scroll_handle.scroll_to_bottom();
+            }
             cx.notify();
         }
     }

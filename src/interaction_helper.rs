@@ -70,7 +70,6 @@ fn detect_prompt(buffer: &str) -> Option<InteractionHelperPrompt> {
         .or_else(|| detect_xmp_init_info_prompt(buffer))
         .or_else(|| detect_analysis_prompt(buffer))
         .or_else(|| detect_compare_mode_prompt(buffer))
-        .or_else(|| detect_minutes_prompt(buffer))
 }
 
 fn detect_numbered_choice_prompt(buffer: &str, prompt: &str) -> Option<InteractionHelperPrompt> {
@@ -146,22 +145,6 @@ fn detect_compare_mode_prompt(buffer: &str) -> Option<InteractionHelperPrompt> {
                     label: "Last record".to_string(),
                 },
             ],
-        });
-    }
-
-    None
-}
-
-fn detect_minutes_prompt(buffer: &str) -> Option<InteractionHelperPrompt> {
-    if let Some(line) = buffer
-        .lines()
-        .rev()
-        .find(|line| line.trim().contains("Input the Minimum Time Difference"))
-    {
-        return Some(InteractionHelperPrompt {
-            prompt: line.trim().to_string(),
-            sample_path: None,
-            options: Vec::new(),
         });
     }
 
@@ -286,5 +269,13 @@ mod tests {
         assert_eq!(prompt.options.len(), 3);
         assert_eq!(prompt.options[0].label, "tmp");
         assert_eq!(prompt.options[2].value, "3");
+    }
+
+    #[test]
+    fn ignores_free_text_minimum_time_difference_prompt() {
+        assert!(detect_prompt(
+            "Input the Minimum Time Difference (when considering records as independent) in minutes (e.g. 30):"
+        )
+        .is_none());
     }
 }

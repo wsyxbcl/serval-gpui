@@ -99,6 +99,8 @@ Rules:
 - [x] Fix nested output/helper scrolling so wheel events update the internal panes instead of the page.
 - [x] Add visible scrollbar thumbs for the page and PTY output panes.
 - [x] Add mouse drag/click support to the visible page, PTY output, and interaction helper scrollbars.
+- [x] Stop showing the interaction helper for free-text prompts that already use the PTY input field.
+- [x] Auto-scroll the page when a clickable interaction helper appears.
 
 ---
 
