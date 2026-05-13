@@ -37,6 +37,10 @@ const APP_LICENSE: &str = env!("CARGO_PKG_LICENSE");
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const BRAND_LOCKUP_PNG: &[u8] =
     include_bytes!("../assets/icons/io.github.wsyxbcl.waxbill-lockup.png");
+const OUTPUT_VIEWPORT_HEIGHT: f32 = 260.0;
+const INTERACTION_HELPER_VIEWPORT_HEIGHT: f32 = 180.0;
+const SCROLLBAR_WIDTH: f32 = 6.0;
+const SCROLLBAR_MIN_THUMB_HEIGHT: f32 = 28.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {
@@ -45,6 +49,13 @@ enum RunState {
     Success,
     Failed,
     Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ScrollbarDragTarget {
+    Page,
+    Output,
+    InteractionHelper,
 }
 
 impl RunState {
@@ -218,6 +229,12 @@ impl TerminalBuffer {
             .join("\n")
     }
 
+    fn clear(&mut self) {
+        self.lines.clear();
+        self.cursor_row = 0;
+        self.cursor_col = 0;
+    }
+
     fn apply_csi(&mut self, params: &str, command: char) {
         if command != 'K' {
             return;
@@ -350,6 +367,8 @@ struct RootView {
     pty_writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
     output_scroll_handle: ScrollHandle,
     page_scroll_handle: ScrollHandle,
+    interaction_helper_scroll_handle: ScrollHandle,
+    scrollbar_drag_target: Option<ScrollbarDragTarget>,
     command_help_scroll_handle: ScrollHandle,
     interaction_helper: InteractionHelperModel,
     helper_mode: bool,
@@ -465,6 +484,168 @@ fn configure_background_command(mut command: Command) -> Command {
     }
 
     command
+}
+
+fn scroll_handle_by_wheel(
+    handle: &ScrollHandle,
+    event: &ScrollWheelEvent,
+    line_height: Pixels,
+    allow_x: bool,
+) -> bool {
+    let max_offset = handle.max_offset();
+    if max_offset.height <= px(0.0) && (!allow_x || max_offset.width <= px(0.0)) {
+        return false;
+    }
+
+    let delta = event.delta.pixel_delta(line_height);
+    let mut offset = handle.offset();
+    let old_offset = offset;
+
+    offset.y = (offset.y + delta.y).clamp(-max_offset.height, px(0.0));
+    if allow_x {
+        offset.x = (offset.x + delta.x).clamp(-max_offset.width, px(0.0));
+    }
+
+    if offset != old_offset {
+        handle.set_offset(offset);
+        true
+    } else {
+        false
+    }
+}
+
+fn set_scrollbar_offset_from_mouse(
+    handle: &ScrollHandle,
+    track_bounds: Bounds<Pixels>,
+    thumb_height: Pixels,
+    mouse_y: Pixels,
+) {
+    let max_offset = handle.max_offset();
+    if max_offset.height <= px(0.0) {
+        return;
+    }
+
+    let travel = (track_bounds.size.height - thumb_height).max(px(0.0));
+    if travel <= px(0.0) {
+        return;
+    }
+
+    let ratio = ((mouse_y - track_bounds.top() - thumb_height / 2.0) / travel).clamp(0.0, 1.0);
+    let mut offset = handle.offset();
+    offset.y = -max_offset.height * ratio;
+    handle.set_offset(offset);
+}
+
+fn render_vertical_scrollbar(
+    id: &'static str,
+    handle: &ScrollHandle,
+    target: ScrollbarDragTarget,
+    entity: Entity<RootView>,
+    dark: bool,
+) -> AnyElement {
+    let bounds = handle.bounds();
+    let max_offset = handle.max_offset();
+    let viewport_height = bounds.size.height;
+    if viewport_height <= px(0.0) || max_offset.height <= px(0.0) {
+        return div().id(id).into_any_element();
+    }
+
+    let content_height = viewport_height + max_offset.height;
+    let thumb_height = ((viewport_height / content_height) * viewport_height)
+        .clamp(px(SCROLLBAR_MIN_THUMB_HEIGHT), viewport_height);
+    let travel = (viewport_height - thumb_height).max(px(0.0));
+    let scroll_ratio = (-handle.offset().y / max_offset.height).clamp(0.0, 1.0);
+    let thumb_top = travel * scroll_ratio;
+    let track_color = if dark { 0x1F2937 } else { 0xE5E7EB };
+    let thumb_color = if dark { 0x9CA3AF } else { 0x9CA3AF };
+    let drag_handle = handle.clone();
+    let drag_entity = entity.clone();
+
+    div()
+        .id(id)
+        .absolute()
+        .top(px(0.0))
+        .right(px(2.0))
+        .h(viewport_height)
+        .w(px(SCROLLBAR_WIDTH))
+        .bg(rgb(track_color))
+        .rounded_lg()
+        .cursor_pointer()
+        .child(
+            canvas(
+                |_, _, _| (),
+                move |track_bounds, _, window, _| {
+                    window.on_mouse_event({
+                        let handle = drag_handle.clone();
+                        let entity = drag_entity.clone();
+                        move |event: &MouseDownEvent, _, _, cx| {
+                            if !track_bounds.contains(&event.position) {
+                                return;
+                            }
+
+                            set_scrollbar_offset_from_mouse(
+                                &handle,
+                                track_bounds,
+                                thumb_height,
+                                event.position.y,
+                            );
+                            entity.update(cx, |view, cx| {
+                                view.scrollbar_drag_target = Some(target);
+                                cx.notify();
+                            });
+                            cx.stop_propagation();
+                        }
+                    });
+                    window.on_mouse_event({
+                        let entity = drag_entity.clone();
+                        move |_: &MouseUpEvent, _, _, cx| {
+                            entity.update(cx, |view, cx| {
+                                if view.scrollbar_drag_target == Some(target) {
+                                    view.scrollbar_drag_target = None;
+                                    cx.notify();
+                                }
+                            });
+                        }
+                    });
+                    window.on_mouse_event({
+                        let handle = drag_handle.clone();
+                        let entity = drag_entity.clone();
+                        move |event: &MouseMoveEvent, _, _, cx| {
+                            if !event.dragging() {
+                                return;
+                            }
+
+                            let is_dragging = entity.read(cx).scrollbar_drag_target == Some(target);
+                            if !is_dragging {
+                                return;
+                            }
+
+                            set_scrollbar_offset_from_mouse(
+                                &handle,
+                                track_bounds,
+                                thumb_height,
+                                event.position.y,
+                            );
+                            cx.notify(entity.entity_id());
+                            cx.stop_propagation();
+                        }
+                    });
+                },
+            )
+            .absolute()
+            .size_full(),
+        )
+        .child(
+            div()
+                .absolute()
+                .top(thumb_top)
+                .right(px(0.0))
+                .h(thumb_height)
+                .w(px(SCROLLBAR_WIDTH))
+                .bg(rgb(thumb_color))
+                .rounded_lg(),
+        )
+        .into_any_element()
 }
 
 fn brand_lockup_image() -> Arc<Image> {
@@ -774,6 +955,12 @@ impl RootView {
         self.terminal_buffer.push_chunk(chunk.as_ref());
         self.output_log = self.terminal_buffer.render_text();
         self.output_scroll_handle.scroll_to_bottom();
+        cx.notify();
+    }
+
+    fn clear_output(&mut self, cx: &mut Context<Self>) {
+        self.terminal_buffer.clear();
+        self.output_log.clear();
         cx.notify();
     }
 
@@ -1416,62 +1603,108 @@ impl RootView {
                     .text_color(rgb(0x6B7280))
                     .child(t(language, "panel.interaction_helper")),
             )
-            .child(div().text_color(rgb(0x111827)).child(prompt.prompt.clone()))
-            .child(if let Some(sample_path) = prompt.sample_path.clone() {
+            .child(
                 div()
-                    .text_color(rgb(0x4B5563))
-                    .font_family("monospace")
-                    .text_size(px(12.0))
-                    .child(sample_path)
-            } else {
-                div()
-            })
-            .child(if !has_options {
-                div().into_any_element()
-            } else {
-                prompt
-                    .options
-                    .into_iter()
-                    .fold(
-                        div().flex().flex_row().flex_wrap().gap(px(8.0)),
-                        |container, option| {
-                            let entity_click = entity.clone();
-                            let value = option.value.clone();
-                            let button_text = format!("{}: {}", option.value, option.label);
-                            container.child(
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.0))
+                    .relative()
+                    .h(px(INTERACTION_HELPER_VIEWPORT_HEIGHT))
+                    .id("interaction-helper-scroll")
+                    .track_scroll(&self.interaction_helper_scroll_handle)
+                    .on_scroll_wheel({
+                        let entity = entity.clone();
+                        let scroll_handle = self.interaction_helper_scroll_handle.clone();
+                        move |event, window, cx| {
+                            if scroll_handle_by_wheel(
+                                &scroll_handle,
+                                event,
+                                window.line_height(),
+                                false,
+                            ) {
+                                cx.stop_propagation();
+                                cx.notify(entity.entity_id());
+                            }
+                        }
+                    })
+                    .overflow_y_scroll()
+                    .scrollbar_width(px(8.0))
+                    .child(
+                        div()
+                            .flex_none()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .pr(px(12.0))
+                            .child(div().text_color(rgb(0x111827)).child(prompt.prompt.clone()))
+                            .child(if let Some(sample_path) = prompt.sample_path.clone() {
                                 div()
-                                    .id(SharedString::from(format!("interaction-helper-{}", value)))
-                                    .bg(rgb(0x111827))
-                                    .text_color(rgb(0xF9FAFB))
-                                    .p(px(8.0))
-                                    .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.write_pty_value(&value, cx);
-                                        });
-                                    })
-                                    .child(button_text),
-                            )
-                        },
+                                    .text_color(rgb(0x4B5563))
+                                    .font_family("monospace")
+                                    .text_size(px(12.0))
+                                    .child(sample_path)
+                            } else {
+                                div()
+                            })
+                            .child(if !has_options {
+                                div().into_any_element()
+                            } else {
+                                prompt
+                                    .options
+                                    .into_iter()
+                                    .fold(
+                                        div().flex().flex_row().flex_wrap().gap(px(8.0)),
+                                        |container, option| {
+                                            let entity_click = entity.clone();
+                                            let value = option.value.clone();
+                                            let button_text =
+                                                format!("{}: {}", option.value, option.label);
+                                            container.child(
+                                                div()
+                                                    .id(SharedString::from(format!(
+                                                        "interaction-helper-{}",
+                                                        value
+                                                    )))
+                                                    .bg(rgb(0x111827))
+                                                    .text_color(rgb(0xF9FAFB))
+                                                    .p(px(8.0))
+                                                    .cursor_pointer()
+                                                    .on_click(move |_, _, cx| {
+                                                        entity_click.update(cx, |view, cx| {
+                                                            view.write_pty_value(&value, cx);
+                                                        });
+                                                    })
+                                                    .child(button_text),
+                                            )
+                                        },
+                                    )
+                                    .into_any_element()
+                            })
+                            .child(if !has_options {
+                                div()
+                                    .text_color(rgb(0x4B5563))
+                                    .child(t(language, "message.interactive_prompt_enter_hint"))
+                            } else {
+                                div()
+                            })
+                            .child(if let Some(last_submission) = last_submission {
+                                div().text_color(rgb(0x4B5563)).child(format!(
+                                    "{}: {}",
+                                    t(language, "label.last_sent"),
+                                    last_submission
+                                ))
+                            } else {
+                                div()
+                            }),
                     )
-                    .into_any_element()
-            })
-            .child(if !has_options {
-                div()
-                    .text_color(rgb(0x4B5563))
-                    .child(t(language, "message.interactive_prompt_enter_hint"))
-            } else {
-                div()
-            })
-            .child(if let Some(last_submission) = last_submission {
-                div().text_color(rgb(0x4B5563)).child(format!(
-                    "{}: {}",
-                    t(language, "label.last_sent"),
-                    last_submission
-                ))
-            } else {
-                div()
-            })
+                    .child(render_vertical_scrollbar(
+                        "interaction-helper-scrollbar",
+                        &self.interaction_helper_scroll_handle,
+                        ScrollbarDragTarget::InteractionHelper,
+                        entity.clone(),
+                        false,
+                    )),
+            )
             .into_any_element()
     }
 }
@@ -3644,6 +3877,21 @@ impl Render for RootView {
                 .id("page-scroll")
                 .size_full()
                 .track_scroll(&self.page_scroll_handle)
+                .on_scroll_wheel({
+                    let entity = entity.clone();
+                    let scroll_handle = self.page_scroll_handle.clone();
+                    move |event, window, cx| {
+                        if scroll_handle_by_wheel(
+                            &scroll_handle,
+                            event,
+                            window.line_height(),
+                            false,
+                        ) {
+                            cx.stop_propagation();
+                            cx.notify(entity.entity_id());
+                        }
+                    }
+                })
                 .overflow_y_scroll()
                 .overflow_x_hidden()
                 .scrollbar_width(px(8.0))
@@ -4213,40 +4461,90 @@ impl Render for RootView {
                                                         )),
                                                 ),
                                         )
-                                        .child({
-                                            let entity = entity.clone();
+                                        .child(
                                             div()
-                                                .id("copy-log")
-                                                .bg(rgb(0x111827))
-                                                .text_color(rgb(0xF9FAFB))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity.update(cx, |view, cx| {
-                                                        cx.write_to_clipboard(
-                                                            ClipboardItem::new_string(
-                                                                view.output_log.clone(),
-                                                            ),
-                                                        );
-                                                    });
+                                                .flex()
+                                                .flex_row()
+                                                .gap(px(8.0))
+                                                .child({
+                                                    let entity = entity.clone();
+                                                    div()
+                                                        .id("copy-log")
+                                                        .bg(rgb(0x111827))
+                                                        .text_color(rgb(0xF9FAFB))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity.update(cx, |view, cx| {
+                                                                cx.write_to_clipboard(
+                                                                    ClipboardItem::new_string(
+                                                                        view.output_log.clone(),
+                                                                    ),
+                                                                );
+                                                            });
+                                                        })
+                                                        .child(t(language, "action.copy_log"))
                                                 })
-                                                .child(t(language, "action.copy_log"))
-                                        }),
+                                                .child({
+                                                    let entity = entity.clone();
+                                                    div()
+                                                        .id("clear-log")
+                                                        .bg(rgb(0x111827))
+                                                        .text_color(rgb(0xF9FAFB))
+                                                        .p(px(8.0))
+                                                        .cursor_pointer()
+                                                        .on_click(move |_, _, cx| {
+                                                            entity.update(cx, |view, cx| {
+                                                                view.clear_output(cx);
+                                                            });
+                                                        })
+                                                        .child(t(language, "action.clear_log"))
+                                                }),
+                                        ),
                                 )
                                 .child(
                                     div()
-                                        .font_family("monospace")
-                                        .text_size(px(12.0))
-                                        .line_height(px(16.0))
-                                        .whitespace_nowrap()
-                                        .id("output-scroll")
-                                        .track_scroll(&self.output_scroll_handle)
-                                        .min_h(px(220.0))
+                                        .relative()
+                                        .h(px(OUTPUT_VIEWPORT_HEIGHT))
                                         .w_full()
-                                        .overflow_y_scroll()
-                                        .overflow_x_scroll()
-                                        .scrollbar_width(px(8.0))
-                                        .child(output_text),
+                                        .child(
+                                            div()
+                                                .font_family("monospace")
+                                                .text_size(px(12.0))
+                                                .line_height(px(16.0))
+                                                .whitespace_nowrap()
+                                                .id("output-scroll")
+                                                .track_scroll(&self.output_scroll_handle)
+                                                .on_scroll_wheel({
+                                                    let entity = entity.clone();
+                                                    let scroll_handle =
+                                                        self.output_scroll_handle.clone();
+                                                    move |event, window, cx| {
+                                                        if scroll_handle_by_wheel(
+                                                            &scroll_handle,
+                                                            event,
+                                                            window.line_height(),
+                                                            true,
+                                                        ) {
+                                                            cx.stop_propagation();
+                                                            cx.notify(entity.entity_id());
+                                                        }
+                                                    }
+                                                })
+                                                .size_full()
+                                                .pr(px(12.0))
+                                                .overflow_y_scroll()
+                                                .overflow_x_scroll()
+                                                .scrollbar_width(px(8.0))
+                                                .child(div().flex_none().child(output_text)),
+                                        )
+                                        .child(render_vertical_scrollbar(
+                                            "output-scrollbar",
+                                            &self.output_scroll_handle,
+                                            ScrollbarDragTarget::Output,
+                                            entity.clone(),
+                                            true,
+                                        )),
                                 )
                                 .child(
                                     div()
@@ -4275,6 +4573,13 @@ impl Render for RootView {
                         .child(interaction_helper_panel),
                 ),
         )
+        .child(render_vertical_scrollbar(
+            "page-scrollbar",
+            &self.page_scroll_handle,
+            ScrollbarDragTarget::Page,
+            entity.clone(),
+            false,
+        ))
         .child(if helper_mode && self.command_help_open {
             {
                 let base = div()
@@ -4605,6 +4910,8 @@ fn main() {
                     pty_writer: None,
                     output_scroll_handle: ScrollHandle::new(),
                     page_scroll_handle: ScrollHandle::new(),
+                    interaction_helper_scroll_handle: ScrollHandle::new(),
+                    scrollbar_drag_target: None,
                     command_help_scroll_handle: ScrollHandle::new(),
                     interaction_helper: InteractionHelperModel::default(),
                     helper_mode: false,

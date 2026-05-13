@@ -94,6 +94,11 @@ Rules:
 - [x] Add a GitHub Actions workflow to build macOS artifacts for both Intel and Apple Silicon.
 - [x] Pin the macOS font-stack dependencies so the manual macOS workflow resolves a compatible `core-text` and `core-graphics` pair.
 - [x] Update the macOS x86 workflow runner label to a currently supported Intel macOS image.
+- [x] Keep the PTY output pane fixed-size with internal scrolling, and add a clear-log action.
+- [x] Keep the interaction helper bounded with internal scrolling when prompts/options are long.
+- [x] Fix nested output/helper scrolling so wheel events update the internal panes instead of the page.
+- [x] Add visible scrollbar thumbs for the page and PTY output panes.
+- [x] Add mouse drag/click support to the visible page, PTY output, and interaction helper scrollbars.
 
 ---
 
