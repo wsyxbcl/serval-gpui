@@ -147,11 +147,29 @@ impl RunningProcessHandle {
     }
 }
 
-#[derive(Default)]
+/// PTY width. TerminalBuffer wraps at the same width: indicatif pads its
+/// frame lines to exactly the terminal width and relies on cursor wrapping
+/// (no newlines) to move below printed lines, so buffer and PTY must agree.
+const PTY_COLS: u16 = 512;
+
 struct TerminalBuffer {
     lines: Vec<Vec<char>>,
     cursor_row: usize,
     cursor_col: usize,
+    cols: usize,
+    pending_escape: String,
+}
+
+impl Default for TerminalBuffer {
+    fn default() -> Self {
+        Self {
+            lines: Vec::new(),
+            cursor_row: 0,
+            cursor_col: 0,
+            cols: PTY_COLS as usize,
+            pending_escape: String::new(),
+        }
+    }
 }
 
 impl TerminalBuffer {
@@ -174,6 +192,12 @@ impl TerminalBuffer {
     }
 
     fn push_chunk(&mut self, text: &str) {
+        // Reassemble escape sequences split across PTY read chunks.
+        let text = if self.pending_escape.is_empty() {
+            text.to_string()
+        } else {
+            std::mem::take(&mut self.pending_escape) + text
+        };
         let mut chars = text.chars().peekable();
         while let Some(ch) = chars.next() {
             match ch {
@@ -193,25 +217,44 @@ impl TerminalBuffer {
                     Some('[') => {
                         let _ = chars.next();
                         let mut params = String::new();
-                        while let Some(next) = chars.next() {
+                        let mut complete = false;
+                        for next in chars.by_ref() {
                             if next.is_ascii_alphabetic() {
                                 self.apply_csi(&params, next);
+                                complete = true;
                                 break;
                             }
                             params.push(next);
                         }
+                        if !complete {
+                            self.stash_escape(format!("\u{001b}[{params}"));
+                            return;
+                        }
                     }
                     Some(']') => {
                         let _ = chars.next();
+                        let mut consumed = String::new();
+                        let mut complete = false;
                         while let Some(next) = chars.next() {
                             if next == '\u{0007}' {
+                                complete = true;
                                 break;
                             }
                             if next == '\u{001b}' && matches!(chars.peek().copied(), Some('\\')) {
                                 let _ = chars.next();
+                                complete = true;
                                 break;
                             }
+                            consumed.push(next);
                         }
+                        if !complete {
+                            self.stash_escape(format!("\u{001b}]{consumed}"));
+                            return;
+                        }
+                    }
+                    None => {
+                        self.pending_escape = "\u{001b}".to_string();
+                        return;
                     }
                     _ => {}
                 },
@@ -221,10 +264,22 @@ impl TerminalBuffer {
         }
     }
 
+    fn stash_escape(&mut self, sequence: String) {
+        // Guard against pathological streams that never terminate a sequence.
+        if sequence.len() <= 4096 {
+            self.pending_escape = sequence;
+        }
+    }
+
     fn render_text(&self) -> String {
         self.lines
             .iter()
-            .map(|line| line.iter().collect::<String>())
+            .map(|line| {
+                // Trim the padding indicatif's {wide_msg} adds to fill the
+                // (wide) PTY line.
+                let text: String = line.iter().collect();
+                text.trim_end().to_string()
+            })
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -233,42 +288,85 @@ impl TerminalBuffer {
         self.lines.clear();
         self.cursor_row = 0;
         self.cursor_col = 0;
+        self.pending_escape.clear();
     }
 
     fn apply_csi(&mut self, params: &str, command: char) {
-        if command != 'K' {
-            return;
-        }
+        let first_param = params.split(';').next().filter(|part| !part.is_empty());
 
-        let mode = params
-            .split(';')
-            .next()
-            .filter(|part| !part.is_empty())
-            .unwrap_or("0");
-
-        match mode {
-            "0" => {
+        match command {
+            'K' => match first_param.unwrap_or("0") {
+                "0" => {
+                    self.ensure_line(self.cursor_row);
+                    self.lines[self.cursor_row].truncate(self.cursor_col);
+                }
+                "1" => {
+                    self.ensure_line(self.cursor_row);
+                    let line = &mut self.lines[self.cursor_row];
+                    let end = self.cursor_col.min(line.len());
+                    for ch in &mut line[..end] {
+                        *ch = ' ';
+                    }
+                }
+                "2" => {
+                    self.ensure_line(self.cursor_row);
+                    self.lines[self.cursor_row].clear();
+                    self.cursor_col = 0;
+                }
+                _ => {}
+            },
+            // Cursor up/down: indicatif redraws its progress area with these
+            // when printing lines above the bar (warnings) or when a frame
+            // spans multiple visual rows.
+            'A' => {
+                let n = first_param
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap_or(1)
+                    .max(1);
+                self.cursor_row = self.cursor_row.saturating_sub(n);
                 self.ensure_line(self.cursor_row);
-                self.lines[self.cursor_row].truncate(self.cursor_col);
             }
-            "1" => {
+            'B' => {
+                let n = first_param
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap_or(1)
+                    .max(1);
+                self.cursor_row += n;
                 self.ensure_line(self.cursor_row);
-                let line = &mut self.lines[self.cursor_row];
-                let end = self.cursor_col.min(line.len());
-                for ch in &mut line[..end] {
-                    *ch = ' ';
+            }
+            // Erase below cursor (console emits "\r\x1b[0J" to clear the bar).
+            'J' => {
+                if first_param.unwrap_or("0") == "0" {
+                    self.ensure_line(self.cursor_row);
+                    self.lines[self.cursor_row].truncate(self.cursor_col);
+                    self.lines.truncate(self.cursor_row + 1);
                 }
             }
-            "2" => {
-                self.ensure_line(self.cursor_row);
-                self.lines[self.cursor_row].clear();
-                self.cursor_col = 0;
+            // Cursor forward/back within the line (rustyline prompt redraws).
+            'C' => {
+                let n = first_param
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap_or(1)
+                    .max(1);
+                self.cursor_col = (self.cursor_col + n).min(self.cols);
+            }
+            'D' => {
+                let n = first_param
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap_or(1)
+                    .max(1);
+                self.cursor_col = self.cursor_col.saturating_sub(n);
             }
             _ => {}
         }
     }
 
     fn write_char(&mut self, ch: char) {
+        // Deferred wrap at terminal width, like a real terminal: the cursor
+        // stays past the last column until the next character is written.
+        if self.cursor_col >= self.cols {
+            self.new_line();
+        }
         self.ensure_line(self.cursor_row);
         let line = &mut self.lines[self.cursor_row];
         if self.cursor_col < line.len() {
@@ -326,6 +424,67 @@ mod tests {
         buffer.push_chunk("Working...");
         buffer.append_log_line("Done");
         assert_eq!(buffer.render_text(), "Working...\nDone\n");
+    }
+
+    #[test]
+    fn cursor_up_redraw_keeps_lines_printed_above_progress_bar() {
+        // indicatif prints a warning above the bar by moving the cursor up
+        // over the previously drawn frame, clearing each line, then writing
+        // the warning followed by a fresh bar (console::Term sequences).
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("intro line\nold bar");
+        buffer.push_chunk("\u{001b}[1A\r\u{001b}[2K\u{001b}[1B\r\u{001b}[2K\u{001b}[1A");
+        buffer.push_chunk("Warning: something happened\nnew bar");
+        assert_eq!(buffer.render_text(), "Warning: something happened\nnew bar");
+    }
+
+    #[test]
+    fn erase_below_removes_stale_progress_frame() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("kept line\nbar line one\nbar line two");
+        buffer.push_chunk("\u{001b}[1A\r\u{001b}[0J");
+        buffer.push_chunk("final bar");
+        assert_eq!(buffer.render_text(), "kept line\nfinal bar");
+    }
+
+    #[test]
+    fn full_width_padded_lines_wrap_below_like_a_terminal() {
+        // indicatif prints lines above the bar by padding each line to the
+        // terminal width (no newlines) and letting the cursor wrap; the next
+        // frame re-anchors with \r and clears only the bar's own row.
+        let mut buffer = TerminalBuffer::default();
+        let width = buffer.cols;
+        let mut warning = String::from("Warning: renamed");
+        warning.push_str(&" ".repeat(width - warning.len()));
+        buffer.push_chunk("\r\u{001b}[2K");
+        buffer.push_chunk(&warning);
+        buffer.push_chunk("[===] 1/2 Copying");
+        buffer.push_chunk("\r\u{001b}[2K[=====] 2/2 done");
+        assert_eq!(buffer.render_text(), "Warning: renamed\n[=====] 2/2 done");
+    }
+
+    #[test]
+    fn escape_sequences_split_across_chunks_are_reassembled() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("old bar");
+        buffer.push_chunk("\r\u{001b}");
+        buffer.push_chunk("[2Knew bar");
+        assert_eq!(buffer.render_text(), "new bar");
+    }
+
+    /// Debug helper: replay a captured raw PTY stream through the buffer.
+    /// GPUI_REPLAY_FILE=/path/to/stream cargo test replay_ -- --nocapture
+    #[test]
+    fn replay_captured_pty_stream() {
+        let Ok(path) = std::env::var("GPUI_REPLAY_FILE") else {
+            return;
+        };
+        let data = std::fs::read(path).expect("readable capture file");
+        let mut buffer = TerminalBuffer::default();
+        for chunk in data.chunks(8192) {
+            buffer.push_chunk(&String::from_utf8_lossy(chunk));
+        }
+        println!("{}", buffer.render_text());
     }
 
     #[test]
@@ -1220,9 +1379,10 @@ impl RootView {
         if use_pty {
             thread::spawn(move || {
                 let pty_system = native_pty_system();
+                // Width must match TerminalBuffer's wrap width; see PTY_COLS.
                 let pair = match pty_system.openpty(PtySize {
                     rows: 24,
-                    cols: 120,
+                    cols: PTY_COLS,
                     pixel_width: 0,
                     pixel_height: 0,
                 }) {
@@ -1277,12 +1437,34 @@ impl RootView {
                 let tx_reader = tx.clone();
                 thread::spawn(move || {
                     let mut buf = [0u8; 8192];
+                    // Carry incomplete trailing UTF-8 sequences over to the
+                    // next read so multi-byte characters split across chunk
+                    // boundaries don't decode as replacement characters.
+                    let mut pending: Vec<u8> = Vec::new();
                     loop {
                         match reader.read(&mut buf) {
-                            Ok(0) => break,
+                            Ok(0) => {
+                                if !pending.is_empty() {
+                                    let text = String::from_utf8_lossy(&pending).to_string();
+                                    let _ = tx_reader.send(OutputEvent::Chunk(text));
+                                }
+                                break;
+                            }
                             Ok(n) => {
-                                let text = String::from_utf8_lossy(&buf[..n]).to_string();
-                                let _ = tx_reader.send(OutputEvent::Chunk(text));
+                                pending.extend_from_slice(&buf[..n]);
+                                let valid_len = match std::str::from_utf8(&pending) {
+                                    Ok(_) => pending.len(),
+                                    // error_len() == None means the tail is an
+                                    // incomplete (not invalid) sequence.
+                                    Err(err) if err.error_len().is_none() => err.valid_up_to(),
+                                    Err(_) => pending.len(),
+                                };
+                                if valid_len > 0 {
+                                    let text =
+                                        String::from_utf8_lossy(&pending[..valid_len]).to_string();
+                                    let _ = tx_reader.send(OutputEvent::Chunk(text));
+                                    pending.drain(..valid_len);
+                                }
                             }
                             Err(err) => {
                                 let _ = tx_reader.send(OutputEvent::Error(format!(
