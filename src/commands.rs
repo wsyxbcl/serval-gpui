@@ -135,7 +135,7 @@ pub enum CommandKind {
     Translate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ObserveInput {
     pub media_dir: String,
     pub output_dir: Option<String>,
@@ -145,38 +145,13 @@ pub struct ObserveInput {
     pub debug: bool,
 }
 
-impl Default for ObserveInput {
-    fn default() -> Self {
-        Self {
-            media_dir: String::new(),
-            output_dir: None,
-            xmp: false,
-            video_only: false,
-            image_only: false,
-            debug: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CaptureInput {
     pub csv_path: String,
     pub output_dir: Option<String>,
     pub event: bool,
     pub no_exclude: bool,
     pub camtrap_dp: bool,
-}
-
-impl Default for CaptureInput {
-    fn default() -> Self {
-        Self {
-            csv_path: String::new(),
-            output_dir: None,
-            event: false,
-            no_exclude: false,
-            camtrap_dp: false,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -203,10 +178,6 @@ impl Default for CommandState {
 }
 
 impl CommandState {
-    pub fn preview(&self) -> String {
-        self.preview_with_program("serval")
-    }
-
     pub fn preview_with_program(&self, program: &str) -> String {
         let args = match self.kind {
             CommandKind::Observe => preview_observe_args(&self.observe),
@@ -218,7 +189,7 @@ impl CommandState {
         format_shell_command(program, &args)
     }
 
-    pub fn build_command(&self) -> Result<(String, Vec<String>), String> {
+    pub fn build_command(&self) -> Result<Vec<String>, String> {
         match self.kind {
             CommandKind::Observe => build_observe(&self.observe),
             CommandKind::Capture => build_capture(&self.capture),
@@ -547,7 +518,7 @@ fn preview_translate_args(input: &TranslateInput) -> Vec<String> {
     parts
 }
 
-fn build_observe(input: &ObserveInput) -> Result<(String, Vec<String>), String> {
+fn build_observe(input: &ObserveInput) -> Result<Vec<String>, String> {
     if input.media_dir.trim().is_empty() {
         return Err("MEDIA_DIR is required.".to_string());
     }
@@ -573,10 +544,10 @@ fn build_observe(input: &ObserveInput) -> Result<(String, Vec<String>), String> 
 
     args.push(input.media_dir.clone());
 
-    Ok(("serval".to_string(), args))
+    Ok(args)
 }
 
-fn build_capture(input: &CaptureInput) -> Result<(String, Vec<String>), String> {
+fn build_capture(input: &CaptureInput) -> Result<Vec<String>, String> {
     if input.csv_path.trim().is_empty() {
         return Err("CSV_PATH is required.".to_string());
     }
@@ -599,10 +570,10 @@ fn build_capture(input: &CaptureInput) -> Result<(String, Vec<String>), String> 
 
     args.push(input.csv_path.clone());
 
-    Ok(("serval".to_string(), args))
+    Ok(args)
 }
 
-fn build_xmp(input: &XmpInput) -> Result<(String, Vec<String>), String> {
+fn build_xmp(input: &XmpInput) -> Result<Vec<String>, String> {
     let mut args = vec!["xmp".to_string()];
 
     match input.subcommand {
@@ -662,10 +633,10 @@ fn build_xmp(input: &XmpInput) -> Result<(String, Vec<String>), String> {
         }
     }
 
-    Ok(("serval".to_string(), args))
+    Ok(args)
 }
 
-fn build_extract(input: &ExtractInput) -> Result<(String, Vec<String>), String> {
+fn build_extract(input: &ExtractInput) -> Result<Vec<String>, String> {
     if input.csv_path.trim().is_empty() {
         return Err("Extract requires CSV_PATH.".to_string());
     }
@@ -703,10 +674,10 @@ fn build_extract(input: &ExtractInput) -> Result<(String, Vec<String>), String> 
     }
     args.push(input.csv_path.clone());
 
-    Ok(("serval".to_string(), args))
+    Ok(args)
 }
 
-fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), String> {
+fn build_translate(input: &TranslateInput) -> Result<Vec<String>, String> {
     if input.csv_path.trim().is_empty() {
         return Err("Translate requires CSV_PATH.".to_string());
     }
@@ -737,7 +708,7 @@ fn build_translate(input: &TranslateInput) -> Result<(String, Vec<String>), Stri
 
     args.push(input.csv_path.clone());
 
-    Ok(("serval".to_string(), args))
+    Ok(args)
 }
 
 #[cfg(test)]
@@ -776,17 +747,19 @@ mod tests {
 
     #[test]
     fn extract_preview_quotes_spaced_filter_values() {
-        let mut state = CommandState::default();
-        state.kind = CommandKind::Extract;
-        state.extract = ExtractInput {
-            csv_path: "/tmp/records.csv".to_string(),
-            value: "Snow leopard".to_string(),
-            subdir_type: None,
-            ..ExtractInput::default()
+        let state = CommandState {
+            kind: CommandKind::Extract,
+            extract: ExtractInput {
+                csv_path: "/tmp/records.csv".to_string(),
+                value: "Snow leopard".to_string(),
+                subdir_type: None,
+                ..ExtractInput::default()
+            },
+            ..CommandState::default()
         };
 
         assert_eq!(
-            state.preview(),
+            state.preview_with_program("serval"),
             r#"serval extract --filter-type species --value "Snow leopard" -o /tmp/serval_output/serval_extract /tmp/records.csv"#
         );
     }
@@ -798,7 +771,7 @@ mod tests {
             ..ObserveInput::default()
         };
 
-        let (_, args) = super::build_observe(&input).expect("observe command should build");
+        let args = super::build_observe(&input).expect("observe command should build");
 
         assert_eq!(
             args,
@@ -821,7 +794,7 @@ mod tests {
             ..ObserveInput::default()
         };
 
-        let (_, args) = super::build_observe(&input).expect("observe command should build");
+        let args = super::build_observe(&input).expect("observe command should build");
 
         assert_eq!(
             args,
@@ -846,21 +819,23 @@ mod tests {
             ..XmpInput::default()
         };
 
-        let (_, args) = super::build_xmp(&input).expect("xmp init command should build");
+        let args = super::build_xmp(&input).expect("xmp init command should build");
 
         assert_eq!(args, vec!["xmp", "init", "--info", "/tmp/media"]);
     }
 
     #[test]
     fn translate_hint_uses_csv_parent_when_output_dir_is_blank() {
-        let mut state = CommandState::default();
-        state.kind = CommandKind::Translate;
-        state.translate = TranslateInput {
-            csv_path: "/tmp/jobs/tags.csv".to_string(),
-            taglist_path: "/tmp/jobs/taglist.csv".to_string(),
-            from: "species".to_string(),
-            to: "species_cn".to_string(),
-            ..TranslateInput::default()
+        let state = CommandState {
+            kind: CommandKind::Translate,
+            translate: TranslateInput {
+                csv_path: "/tmp/jobs/tags.csv".to_string(),
+                taglist_path: "/tmp/jobs/taglist.csv".to_string(),
+                from: "species".to_string(),
+                to: "species_cn".to_string(),
+                ..TranslateInput::default()
+            },
+            ..CommandState::default()
         };
 
         assert_eq!(
@@ -871,13 +846,15 @@ mod tests {
 
     #[test]
     fn explicit_output_dir_disables_auto_hint() {
-        let mut state = CommandState::default();
-        state.kind = CommandKind::Extract;
-        state.extract = ExtractInput {
-            csv_path: "/tmp/records.csv".to_string(),
-            value: "Snow leopard".to_string(),
-            output_dir: Some("/tmp/custom-output".to_string()),
-            ..ExtractInput::default()
+        let state = CommandState {
+            kind: CommandKind::Extract,
+            extract: ExtractInput {
+                csv_path: "/tmp/records.csv".to_string(),
+                value: "Snow leopard".to_string(),
+                output_dir: Some("/tmp/custom-output".to_string()),
+                ..ExtractInput::default()
+            },
+            ..CommandState::default()
         };
 
         assert_eq!(state.auto_output_dir_hint(), None);

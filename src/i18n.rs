@@ -1,13 +1,8 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Language {
     En,
+    #[default]
     ZhCn,
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Self::ZhCn
-    }
 }
 
 pub fn t(language: Language, key: &str) -> &'static str {

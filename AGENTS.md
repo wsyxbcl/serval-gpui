@@ -40,7 +40,7 @@ The current preferred direction is:
 
 ## Git behavior
 
-1. You are working on the `main` branch unless the repo state clearly requires otherwise.
+1. You are working on the `master` branch unless the repo state clearly requires otherwise.
 2. You may commit whenever it is useful.
 3. Commits should be small, coherent, and descriptive.
 

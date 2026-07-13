@@ -101,6 +101,7 @@ Rules:
 - [x] Add mouse drag/click support to the visible page, PTY output, and interaction helper scrollbars.
 - [x] Stop showing the interaction helper for free-text prompts that already use the PTY input field.
 - [x] Auto-scroll the page when a clickable interaction helper appears.
+- [x] Clean up clippy warnings and dead code across the codebase (derived Defaults, dead program tuple in command builders, platform-gated pid fields).
 
 ---
 

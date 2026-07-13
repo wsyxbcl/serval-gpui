@@ -95,10 +95,13 @@ impl RunState {
 #[derive(Clone)]
 enum RunningProcessHandle {
     Pty {
+        // Only consulted by the Windows taskkill path in `kill`.
+        #[cfg_attr(not(windows), allow(dead_code))]
         pid: Option<u32>,
         killer: Arc<Mutex<Box<dyn ChildKiller + Send + Sync>>>,
     },
     Process {
+        #[cfg_attr(not(windows), allow(dead_code))]
         pid: u32,
         child: Arc<Mutex<std::process::Child>>,
     },
@@ -139,6 +142,7 @@ impl RunningProcessHandle {
         }
     }
 
+    #[cfg(windows)]
     fn process_id(&self) -> Option<u32> {
         match self {
             Self::Pty { pid, .. } => *pid,
@@ -398,102 +402,6 @@ impl TerminalBuffer {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{commands::CommandKind, RootView, TerminalBuffer};
-
-    #[test]
-    fn carriage_return_overwrites_current_line() {
-        let mut buffer = TerminalBuffer::default();
-        buffer.push_chunk("Progress 1");
-        buffer.push_chunk("\rProgress 2");
-        assert_eq!(buffer.render_text(), "Progress 2");
-    }
-
-    #[test]
-    fn clear_to_end_of_line_removes_old_progress_tail() {
-        let mut buffer = TerminalBuffer::default();
-        buffer.push_chunk("100% complete");
-        buffer.push_chunk("\r42%\u{001b}[K");
-        assert_eq!(buffer.render_text(), "42%");
-    }
-
-    #[test]
-    fn log_lines_start_after_partial_progress_line() {
-        let mut buffer = TerminalBuffer::default();
-        buffer.push_chunk("Working...");
-        buffer.append_log_line("Done");
-        assert_eq!(buffer.render_text(), "Working...\nDone\n");
-    }
-
-    #[test]
-    fn cursor_up_redraw_keeps_lines_printed_above_progress_bar() {
-        // indicatif prints a warning above the bar by moving the cursor up
-        // over the previously drawn frame, clearing each line, then writing
-        // the warning followed by a fresh bar (console::Term sequences).
-        let mut buffer = TerminalBuffer::default();
-        buffer.push_chunk("intro line\nold bar");
-        buffer.push_chunk("\u{001b}[1A\r\u{001b}[2K\u{001b}[1B\r\u{001b}[2K\u{001b}[1A");
-        buffer.push_chunk("Warning: something happened\nnew bar");
-        assert_eq!(buffer.render_text(), "Warning: something happened\nnew bar");
-    }
-
-    #[test]
-    fn erase_below_removes_stale_progress_frame() {
-        let mut buffer = TerminalBuffer::default();
-        buffer.push_chunk("kept line\nbar line one\nbar line two");
-        buffer.push_chunk("\u{001b}[1A\r\u{001b}[0J");
-        buffer.push_chunk("final bar");
-        assert_eq!(buffer.render_text(), "kept line\nfinal bar");
-    }
-
-    #[test]
-    fn full_width_padded_lines_wrap_below_like_a_terminal() {
-        // indicatif prints lines above the bar by padding each line to the
-        // terminal width (no newlines) and letting the cursor wrap; the next
-        // frame re-anchors with \r and clears only the bar's own row.
-        let mut buffer = TerminalBuffer::default();
-        let width = buffer.cols;
-        let mut warning = String::from("Warning: renamed");
-        warning.push_str(&" ".repeat(width - warning.len()));
-        buffer.push_chunk("\r\u{001b}[2K");
-        buffer.push_chunk(&warning);
-        buffer.push_chunk("[===] 1/2 Copying");
-        buffer.push_chunk("\r\u{001b}[2K[=====] 2/2 done");
-        assert_eq!(buffer.render_text(), "Warning: renamed\n[=====] 2/2 done");
-    }
-
-    #[test]
-    fn escape_sequences_split_across_chunks_are_reassembled() {
-        let mut buffer = TerminalBuffer::default();
-        buffer.push_chunk("old bar");
-        buffer.push_chunk("\r\u{001b}");
-        buffer.push_chunk("[2Knew bar");
-        assert_eq!(buffer.render_text(), "new bar");
-    }
-
-    /// Debug helper: replay a captured raw PTY stream through the buffer.
-    /// GPUI_REPLAY_FILE=/path/to/stream cargo test replay_ -- --nocapture
-    #[test]
-    fn replay_captured_pty_stream() {
-        let Ok(path) = std::env::var("GPUI_REPLAY_FILE") else {
-            return;
-        };
-        let data = std::fs::read(path).expect("readable capture file");
-        let mut buffer = TerminalBuffer::default();
-        for chunk in data.chunks(8192) {
-            buffer.push_chunk(&String::from_utf8_lossy(chunk));
-        }
-        println!("{}", buffer.render_text());
-    }
-
-    #[test]
-    fn xmp_commands_use_pty_for_progress_rendering() {
-        assert!(RootView::command_uses_pty(CommandKind::Xmp));
-        assert!(!RootView::command_uses_pty(CommandKind::Translate));
-    }
-}
-
 struct RootView {
     command_state: CommandState,
     language: Language,
@@ -562,14 +470,14 @@ fn apply_browse_result(
         Ok(Some(paths)) => {
             if let Some(path) = paths.first() {
                 let value = path.to_string_lossy().to_string();
-                let _ = input.update(app, |input, cx| {
+                input.update(app, |input, cx| {
                     input.set_value(value, cx);
                 });
             }
         }
         Ok(None) => {}
         Err(err) => {
-            let _ = root.update(app, |view, cx| {
+            root.update(app, |view, cx| {
                 view.append_output(
                     format!("{}: {err}", t(language, "message.path_dialog_error")),
                     cx,
@@ -636,12 +544,14 @@ fn apply_ui_font<E: Styled>(element: E, language: Language) -> E {
     }
 }
 
+#[cfg(windows)]
 fn configure_background_command(mut command: Command) -> Command {
-    #[cfg(windows)]
-    {
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
 
+#[cfg(not(windows))]
+fn configure_background_command(command: Command) -> Command {
     command
 }
 
@@ -716,7 +626,7 @@ fn render_vertical_scrollbar(
     let scroll_ratio = (-handle.offset().y / max_offset.height).clamp(0.0, 1.0);
     let thumb_top = travel * scroll_ratio;
     let track_color = if dark { 0x1F2937 } else { 0xE5E7EB };
-    let thumb_color = if dark { 0x9CA3AF } else { 0x9CA3AF };
+    let thumb_color = 0x9CA3AF;
     let drag_handle = handle.clone();
     let drag_entity = entity.clone();
 
@@ -1020,7 +930,6 @@ impl RootView {
             self.persist_setup_in(window, cx);
 
             self.refresh_command_help(cx);
-            return;
         }
     }
 
@@ -1354,15 +1263,14 @@ impl RootView {
                 }
 
                 match view.command_state.build_command() {
-                    Ok(command) => {
+                    Ok(args) => {
                         let executable = view.executable_program();
                         let kind = view.command_state.kind;
-                        let display =
-                            format!("$ {}", format_shell_command(&executable, &command.1));
+                        let display = format!("$ {}", format_shell_command(&executable, &args));
                         let use_interaction_helper = view.command_uses_interaction_helper();
                         view.begin_run(kind, use_interaction_helper, display, cx);
                         let use_pty = RootView::command_uses_pty(kind);
-                        Some((executable, command.1, use_pty, use_interaction_helper))
+                        Some((executable, args, use_pty, use_interaction_helper))
                     }
                     Err(message) => {
                         view.append_output(message, cx);
@@ -2136,7 +2044,7 @@ fn strip_ansi_escapes(input: &str) -> String {
             match chars.peek().copied() {
                 Some('[') => {
                     let _ = chars.next();
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next.is_ascii_alphabetic() {
                             break;
                         }
@@ -5130,9 +5038,10 @@ fn main() {
 }
 
 fn app_window_options() -> WindowOptions {
-    let mut options = WindowOptions::default();
-    options.app_id = Some(APP_ID.to_string());
-    options
+    WindowOptions {
+        app_id: Some(APP_ID.to_string()),
+        ..WindowOptions::default()
+    }
 }
 
 fn setup_window_options(cx: &App) -> WindowOptions {
@@ -5147,4 +5056,100 @@ fn about_window_options(cx: &App) -> WindowOptions {
     options.window_bounds = Some(WindowBounds::centered(size(px(720.0), px(420.0)), cx));
     options.window_min_size = Some(size(px(620.0), px(360.0)));
     options
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{commands::CommandKind, RootView, TerminalBuffer};
+
+    #[test]
+    fn carriage_return_overwrites_current_line() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("Progress 1");
+        buffer.push_chunk("\rProgress 2");
+        assert_eq!(buffer.render_text(), "Progress 2");
+    }
+
+    #[test]
+    fn clear_to_end_of_line_removes_old_progress_tail() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("100% complete");
+        buffer.push_chunk("\r42%\u{001b}[K");
+        assert_eq!(buffer.render_text(), "42%");
+    }
+
+    #[test]
+    fn log_lines_start_after_partial_progress_line() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("Working...");
+        buffer.append_log_line("Done");
+        assert_eq!(buffer.render_text(), "Working...\nDone\n");
+    }
+
+    #[test]
+    fn cursor_up_redraw_keeps_lines_printed_above_progress_bar() {
+        // indicatif prints a warning above the bar by moving the cursor up
+        // over the previously drawn frame, clearing each line, then writing
+        // the warning followed by a fresh bar (console::Term sequences).
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("intro line\nold bar");
+        buffer.push_chunk("\u{001b}[1A\r\u{001b}[2K\u{001b}[1B\r\u{001b}[2K\u{001b}[1A");
+        buffer.push_chunk("Warning: something happened\nnew bar");
+        assert_eq!(buffer.render_text(), "Warning: something happened\nnew bar");
+    }
+
+    #[test]
+    fn erase_below_removes_stale_progress_frame() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("kept line\nbar line one\nbar line two");
+        buffer.push_chunk("\u{001b}[1A\r\u{001b}[0J");
+        buffer.push_chunk("final bar");
+        assert_eq!(buffer.render_text(), "kept line\nfinal bar");
+    }
+
+    #[test]
+    fn full_width_padded_lines_wrap_below_like_a_terminal() {
+        // indicatif prints lines above the bar by padding each line to the
+        // terminal width (no newlines) and letting the cursor wrap; the next
+        // frame re-anchors with \r and clears only the bar's own row.
+        let mut buffer = TerminalBuffer::default();
+        let width = buffer.cols;
+        let mut warning = String::from("Warning: renamed");
+        warning.push_str(&" ".repeat(width - warning.len()));
+        buffer.push_chunk("\r\u{001b}[2K");
+        buffer.push_chunk(&warning);
+        buffer.push_chunk("[===] 1/2 Copying");
+        buffer.push_chunk("\r\u{001b}[2K[=====] 2/2 done");
+        assert_eq!(buffer.render_text(), "Warning: renamed\n[=====] 2/2 done");
+    }
+
+    #[test]
+    fn escape_sequences_split_across_chunks_are_reassembled() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("old bar");
+        buffer.push_chunk("\r\u{001b}");
+        buffer.push_chunk("[2Knew bar");
+        assert_eq!(buffer.render_text(), "new bar");
+    }
+
+    /// Debug helper: replay a captured raw PTY stream through the buffer.
+    /// GPUI_REPLAY_FILE=/path/to/stream cargo test replay_ -- --nocapture
+    #[test]
+    fn replay_captured_pty_stream() {
+        let Ok(path) = std::env::var("GPUI_REPLAY_FILE") else {
+            return;
+        };
+        let data = std::fs::read(path).expect("readable capture file");
+        let mut buffer = TerminalBuffer::default();
+        for chunk in data.chunks(8192) {
+            buffer.push_chunk(&String::from_utf8_lossy(chunk));
+        }
+        println!("{}", buffer.render_text());
+    }
+
+    #[test]
+    fn xmp_commands_use_pty_for_progress_rendering() {
+        assert!(RootView::command_uses_pty(CommandKind::Xmp));
+        assert!(!RootView::command_uses_pty(CommandKind::Translate));
+    }
 }
