@@ -104,6 +104,7 @@ Rules:
 - [x] Clean up clippy warnings and dead code across the codebase (derived Defaults, dead program tuple in command builders, platform-gated pid fields).
 - [x] Harden process/output handling: stop the output pump spinning when a worker thread dies, cap terminal scrollback and CSI cursor-down moves, bound the interaction-helper scan buffer, report PTY write failures, fix POSIX quoting of backslash/`!` args, and guard positional args starting with `-` behind `--`.
 - [x] Make the output pane scale to long runs: per-line render cache with lazy per-frame rebuild instead of re-rendering the whole buffer on every PTY chunk, and sticky auto-scroll that stops following the tail while the user has scrolled up.
+- [x] Refactor `RootView::render` to extract shared `chip`/`chip_base`/`input_row`/`browse_button`/`muted_label` helpers and centralize the chip color palette, cutting `main.rs` from ~5150 to ~4030 lines with no behavior change.
 
 ---
 

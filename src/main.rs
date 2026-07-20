@@ -42,6 +42,13 @@ const INTERACTION_HELPER_VIEWPORT_HEIGHT: f32 = 180.0;
 const SCROLLBAR_WIDTH: f32 = 6.0;
 const SCROLLBAR_MIN_THUMB_HEIGHT: f32 = 28.0;
 
+// Shared palette for the chip-style buttons that make up most of the UI.
+const CHIP_ACTIVE_BG: u32 = 0x111827;
+const CHIP_ACTIVE_FG: u32 = 0xF9FAFB;
+const CHIP_IDLE_BG: u32 = 0xF3F4F6;
+const CHIP_IDLE_FG: u32 = 0x111827;
+const TEXT_MUTED: u32 = 0x6B7280;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RunState {
     Idle,
@@ -767,6 +774,96 @@ fn render_vertical_scrollbar(
                 .rounded_lg(),
         )
         .into_any_element()
+}
+
+/// Base styling shared by every chip-style button.
+fn chip_base(id: &'static str, active: bool) -> Stateful<Div> {
+    div()
+        .id(id)
+        .bg(rgb(if active { CHIP_ACTIVE_BG } else { CHIP_IDLE_BG }))
+        .text_color(rgb(if active { CHIP_ACTIVE_FG } else { CHIP_IDLE_FG }))
+        .p(px(8.0))
+        .cursor_pointer()
+}
+
+/// A chip that mutates `RootView` state on click, optionally wired to the
+/// hover help overlay via `help_key`.
+fn chip(
+    id: &'static str,
+    label: impl IntoElement,
+    active: bool,
+    entity: &Entity<RootView>,
+    help_key: Option<&'static str>,
+    on_click: impl Fn(&mut RootView, &mut Context<RootView>) + 'static,
+) -> Stateful<Div> {
+    let click_entity = entity.clone();
+    let mut el = chip_base(id, active).on_click(move |_, _, cx| {
+        click_entity.update(cx, |view, cx| on_click(view, cx));
+    });
+    if let Some(key) = help_key {
+        let hover_entity = entity.clone();
+        el = el.on_hover(move |hovered, _, cx| {
+            hover_entity.update(cx, |view, cx| {
+                if *hovered {
+                    view.set_hover_help_key(key, cx);
+                } else {
+                    view.clear_hover_help_key(key, cx);
+                }
+            });
+        });
+    }
+    el.child(label)
+}
+
+/// A wrapping row of chips.
+fn chip_row() -> Div {
+    div().flex().flex_row().flex_wrap().gap(px(8.0))
+}
+
+fn muted_label(language: Language, key: &'static str) -> Div {
+    div().text_color(rgb(TEXT_MUTED)).child(t(language, key))
+}
+
+fn bare_input_row(input: &Entity<TextInput>) -> Div {
+    div()
+        .flex()
+        .flex_row()
+        .gap(px(8.0))
+        .child(div().flex_grow().child(input.clone()))
+}
+
+fn input_row(input: &Entity<TextInput>, browse: Stateful<Div>) -> Div {
+    bare_input_row(input).child(browse)
+}
+
+/// A Browse button that opens a file/directory picker into `input`.
+fn browse_button(
+    id: &'static str,
+    entity: &Entity<RootView>,
+    language: Language,
+    input: &Entity<TextInput>,
+    directories: bool,
+    prompt_key: &'static str,
+) -> Stateful<Div> {
+    let entity = entity.clone();
+    let input = input.clone();
+    chip_base(id, false)
+        .on_click(move |_, window, cx| {
+            browse_into_text_input(
+                window,
+                cx,
+                PathPromptOptions {
+                    files: !directories,
+                    directories,
+                    multiple: false,
+                    prompt: Some(t(language, prompt_key).into()),
+                },
+                input.clone(),
+                entity.clone(),
+                language,
+            );
+        })
+        .child(t(language, "action.browse"))
 }
 
 fn brand_lockup_image() -> Arc<Image> {
@@ -1811,11 +1908,7 @@ impl RootView {
             .pt(px(8.0))
             .border_t_1()
             .border_color(rgb(0x374151))
-            .child(
-                div()
-                    .text_color(rgb(0x6B7280))
-                    .child(t(language, "panel.interaction_helper")),
-            )
+            .child(muted_label(language, "panel.interaction_helper"))
             .child(
                 div()
                     .flex()
@@ -1937,11 +2030,7 @@ impl Render for SetupView {
                 .bg(rgb(0xFFFFFF)),
             language,
         )
-        .child(
-            div()
-                .text_color(rgb(0x6B7280))
-                .child(t(language, "setup.language")),
-        )
+        .child(muted_label(language, "setup.language"))
         .child(
             div()
                 .flex()
@@ -1949,20 +2038,7 @@ impl Render for SetupView {
                 .gap(px(8.0))
                 .child({
                     let root = root.clone();
-                    div()
-                        .id("setup-lang-en")
-                        .bg(rgb(if language == Language::En {
-                            0x111827
-                        } else {
-                            0xF3F4F6
-                        }))
-                        .text_color(rgb(if language == Language::En {
-                            0xF9FAFB
-                        } else {
-                            0x111827
-                        }))
-                        .p(px(8.0))
-                        .cursor_pointer()
+                    chip_base("setup-lang-en", language == Language::En)
                         .on_click(move |_, window, cx| {
                             root.update(cx, |view, cx| view.set_language(Language::En, window, cx));
                         })
@@ -1970,20 +2046,7 @@ impl Render for SetupView {
                 })
                 .child({
                     let root = root.clone();
-                    div()
-                        .id("setup-lang-zh-cn")
-                        .bg(rgb(if language == Language::ZhCn {
-                            0x111827
-                        } else {
-                            0xF3F4F6
-                        }))
-                        .text_color(rgb(if language == Language::ZhCn {
-                            0xF9FAFB
-                        } else {
-                            0x111827
-                        }))
-                        .p(px(8.0))
-                        .cursor_pointer()
+                    chip_base("setup-lang-zh-cn", language == Language::ZhCn)
                         .on_click(move |_, window, cx| {
                             root.update(cx, |view, cx| {
                                 view.set_language(Language::ZhCn, window, cx)
@@ -1992,55 +2055,26 @@ impl Render for SetupView {
                         .child(t(language, "setup.language_zh_cn"))
                 }),
         )
-        .child(
-            div()
-                .text_color(rgb(0x6B7280))
-                .child(t(language, "setup.serval_binary")),
-        )
+        .child(muted_label(language, "setup.serval_binary"))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .gap(px(8.0))
                 .child(div().flex_grow().child(serval_binary_input.clone()))
-                .child({
-                    let root = root.clone();
-                    let serval_binary_input = serval_binary_input.clone();
-                    div()
-                        .id("browse-serval-binary")
-                        .bg(rgb(0xF3F4F6))
-                        .text_color(rgb(0x111827))
-                        .p(px(8.0))
-                        .cursor_pointer()
-                        .on_click(move |_, window, cx| {
-                            browse_into_text_input(
-                                window,
-                                cx,
-                                PathPromptOptions {
-                                    files: true,
-                                    directories: false,
-                                    multiple: false,
-                                    prompt: Some(
-                                        t(language, "setup.select_serval_executable").into(),
-                                    ),
-                                },
-                                serval_binary_input.clone(),
-                                root.clone(),
-                                language,
-                            );
-                        })
-                        .child(t(language, "action.browse"))
-                }),
+                .child(browse_button(
+                    "browse-serval-binary",
+                    &root,
+                    language,
+                    &serval_binary_input,
+                    false,
+                    "setup.select_serval_executable",
+                )),
         )
         .child({
             let root = root.clone();
             let serval_binary_input = serval_binary_input.clone();
-            div()
-                .id("save-serval-binary")
-                .bg(rgb(0x111827))
-                .text_color(rgb(0xF9FAFB))
-                .p(px(8.0))
-                .cursor_pointer()
+            chip_base("save-serval-binary", true)
                 .on_click(move |_, window, cx| {
                     let value = serval_binary_input.read(cx).value().to_string();
                     root.update(cx, |view, cx| {
@@ -2218,11 +2252,6 @@ impl Render for RootView {
         self.refresh_output_log();
 
         let entity = cx.entity();
-        let entity_observe = entity.clone();
-        let entity_capture = entity.clone();
-        let entity_xmp = entity.clone();
-        let entity_extract = entity.clone();
-        let entity_translate = entity.clone();
         let brand_lockup = brand_lockup_image();
         let preview = self.command_preview();
         let (active_binary_text, active_binary_color) = self.active_binary_display();
@@ -2230,7 +2259,6 @@ impl Render for RootView {
         let capture_selected = self.command_state.kind == CommandKind::Capture;
         let xmp_selected = self.command_state.kind == CommandKind::Xmp;
         let extract_selected = self.command_state.kind == CommandKind::Extract;
-        let translate_selected = self.command_state.kind == CommandKind::Translate;
         let translate_from_value = self.command_state.translate.from.clone();
         let translate_to_value = self.command_state.translate.to.clone();
         let translate_from_custom = !is_translate_column_preset(&translate_from_value);
@@ -2284,1786 +2312,662 @@ impl Render for RootView {
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.media_dir")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(observe_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-observe")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: false,
-                                            directories: true,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_media_directory").into(),
-                                            ),
-                                        },
-                                        observe_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.output_dir")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(observe_output_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-observe-output")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: false,
-                                            directories: true,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_output_directory")
-                                                    .into(),
-                                            ),
-                                        },
-                                        observe_output_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
+                .child(muted_label(language, "label.media_dir"))
+                .child(input_row(
+                    &observe_input,
+                    browse_button(
+                        "browse-observe",
+                        &entity,
+                        language,
+                        &observe_input,
+                        true,
+                        "prompt.select_media_directory",
+                    ),
+                ))
+                .child(muted_label(language, "label.output_dir"))
+                .child(input_row(
+                    &observe_output_input,
+                    browse_button(
+                        "browse-observe-output",
+                        &entity,
+                        language,
+                        &observe_output_input,
+                        true,
+                        "prompt.select_output_directory",
+                    ),
+                ))
                 .child(self.render_auto_output_dir_hint())
+                .child(muted_label(language, "label.options"))
                 .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.options")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .gap(px(8.0))
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.observe.xmp;
-                            div()
-                                .id("toggle-observe-xmp")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.xmp =
-                                            !view.command_state.observe.xmp;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--xmp", cx);
-                                        } else {
-                                            view.clear_hover_help_key("observe|--xmp", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.xmp"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.observe.video_only;
-                            div()
-                                .id("toggle-observe-video")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.video_only =
-                                            !view.command_state.observe.video_only;
-                                        if view.command_state.observe.video_only {
-                                            view.command_state.observe.image_only = false;
-                                        }
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--video", cx);
-                                        } else {
-                                            view.clear_hover_help_key("observe|--video", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.video_only"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.observe.image_only;
-                            div()
-                                .id("toggle-observe-image")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.image_only =
-                                            !view.command_state.observe.image_only;
-                                        if view.command_state.observe.image_only {
-                                            view.command_state.observe.video_only = false;
-                                        }
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--image", cx);
-                                        } else {
-                                            view.clear_hover_help_key("observe|--image", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.image_only"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.observe.debug;
-                            div()
-                                .id("toggle-observe-debug")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.observe.debug =
-                                            !view.command_state.observe.debug;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("observe|--debug", cx);
-                                        } else {
-                                            view.clear_hover_help_key("observe|--debug", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.debug"))
-                        }),
+                    chip_row()
+                        .child(chip(
+                            "toggle-observe-xmp",
+                            t(language, "opt.xmp"),
+                            self.command_state.observe.xmp,
+                            &entity,
+                            Some("observe|--xmp"),
+                            |view, cx| {
+                                view.command_state.observe.xmp = !view.command_state.observe.xmp;
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "toggle-observe-video",
+                            t(language, "opt.video_only"),
+                            self.command_state.observe.video_only,
+                            &entity,
+                            Some("observe|--video"),
+                            |view, cx| {
+                                view.command_state.observe.video_only =
+                                    !view.command_state.observe.video_only;
+                                if view.command_state.observe.video_only {
+                                    view.command_state.observe.image_only = false;
+                                }
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "toggle-observe-image",
+                            t(language, "opt.image_only"),
+                            self.command_state.observe.image_only,
+                            &entity,
+                            Some("observe|--image"),
+                            |view, cx| {
+                                view.command_state.observe.image_only =
+                                    !view.command_state.observe.image_only;
+                                if view.command_state.observe.image_only {
+                                    view.command_state.observe.video_only = false;
+                                }
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "toggle-observe-debug",
+                            t(language, "opt.debug"),
+                            self.command_state.observe.debug,
+                            &entity,
+                            Some("observe|--debug"),
+                            |view, cx| {
+                                view.command_state.observe.debug =
+                                    !view.command_state.observe.debug;
+                                cx.notify();
+                            },
+                        )),
                 )
         } else if capture_selected {
             div()
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.csv_path")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(capture_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-capture")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: true,
-                                            directories: false,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_tags_csv").into(),
-                                            ),
-                                        },
-                                        capture_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.output_dir")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(capture_output_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-capture-output")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: false,
-                                            directories: true,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_output_directory")
-                                                    .into(),
-                                            ),
-                                        },
-                                        capture_output_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
+                .child(muted_label(language, "label.csv_path"))
+                .child(input_row(
+                    &capture_input,
+                    browse_button(
+                        "browse-capture",
+                        &entity,
+                        language,
+                        &capture_input,
+                        false,
+                        "prompt.select_tags_csv",
+                    ),
+                ))
+                .child(muted_label(language, "label.output_dir"))
+                .child(input_row(
+                    &capture_output_input,
+                    browse_button(
+                        "browse-capture-output",
+                        &entity,
+                        language,
+                        &capture_output_input,
+                        true,
+                        "prompt.select_output_directory",
+                    ),
+                ))
                 .child(self.render_auto_output_dir_hint())
+                .child(muted_label(language, "label.options"))
                 .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.options")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .gap(px(8.0))
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.capture.event;
-                            div()
-                                .id("toggle-capture-event")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.capture.event =
-                                            !view.command_state.capture.event;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("capture|--event", cx);
-                                        } else {
-                                            view.clear_hover_help_key("capture|--event", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.event"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.capture.no_exclude;
-                            div()
-                                .id("toggle-capture-no-exclude")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.capture.no_exclude =
-                                            !view.command_state.capture.no_exclude;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("capture|--no-exclude", cx);
-                                        } else {
-                                            view.clear_hover_help_key("capture|--no-exclude", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.no_exclude"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.capture.camtrap_dp;
-                            div()
-                                .id("toggle-capture-camtrap")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.capture.camtrap_dp =
-                                            !view.command_state.capture.camtrap_dp;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("capture|--camtrap-dp", cx);
-                                        } else {
-                                            view.clear_hover_help_key("capture|--camtrap-dp", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.camtrap_dp"))
-                        }),
+                    chip_row()
+                        .child(chip(
+                            "toggle-capture-event",
+                            t(language, "opt.event"),
+                            self.command_state.capture.event,
+                            &entity,
+                            Some("capture|--event"),
+                            |view, cx| {
+                                view.command_state.capture.event =
+                                    !view.command_state.capture.event;
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "toggle-capture-no-exclude",
+                            t(language, "opt.no_exclude"),
+                            self.command_state.capture.no_exclude,
+                            &entity,
+                            Some("capture|--no-exclude"),
+                            |view, cx| {
+                                view.command_state.capture.no_exclude =
+                                    !view.command_state.capture.no_exclude;
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "toggle-capture-camtrap",
+                            t(language, "opt.camtrap_dp"),
+                            self.command_state.capture.camtrap_dp,
+                            &entity,
+                            Some("capture|--camtrap-dp"),
+                            |view, cx| {
+                                view.command_state.capture.camtrap_dp =
+                                    !view.command_state.capture.camtrap_dp;
+                                cx.notify();
+                            },
+                        )),
                 )
         } else if xmp_selected {
+            let subcommand = self.command_state.xmp.subcommand;
+            let subcommand_chip = |id, label_key, target: XmpSubcommand| {
+                chip(
+                    id,
+                    t(language, label_key),
+                    subcommand == target,
+                    &entity,
+                    None,
+                    move |view, cx| {
+                        view.command_state.xmp.subcommand = target;
+                        view.refresh_command_help(cx);
+                    },
+                )
+            };
             div()
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.xmp_subcommand")))
+                .child(muted_label(language, "label.xmp_subcommand"))
                 .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .gap(px(8.0))
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let active = self.command_state.xmp.subcommand == XmpSubcommand::Copy;
-                            div()
-                                .id("xmp-copy")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.command_state.xmp.subcommand = XmpSubcommand::Copy;
-                                            view.refresh_command_help(cx);
-                                        });
-                                    })
-                                    .child(t(language, "opt.copy"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let active = self.command_state.xmp.subcommand == XmpSubcommand::Init;
-                            div()
-                                .id("xmp-init")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.command_state.xmp.subcommand = XmpSubcommand::Init;
-                                            view.refresh_command_help(cx);
-                                        });
-                                    })
-                                    .child(t(language, "opt.init"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let active = self.command_state.xmp.subcommand == XmpSubcommand::Update;
-                            div()
-                                .id("xmp-update")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.command_state.xmp.subcommand = XmpSubcommand::Update;
-                                            view.refresh_command_help(cx);
-                                        });
-                                    })
-                                    .child(t(language, "opt.update"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let active = self.command_state.xmp.subcommand == XmpSubcommand::Remove;
-                            div()
-                                .id("xmp-remove")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.command_state.xmp.subcommand = XmpSubcommand::Remove;
-                                            view.refresh_command_help(cx);
-                                        });
-                                    })
-                                    .child(t(language, "opt.remove"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let active = self.command_state.xmp.subcommand == XmpSubcommand::Sync;
-                            div()
-                                .id("xmp-sync")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                    .on_click(move |_, _, cx| {
-                                        entity_click.update(cx, |view, cx| {
-                                            view.command_state.xmp.subcommand = XmpSubcommand::Sync;
-                                            view.refresh_command_help(cx);
-                                        });
-                                    })
-                                    .child(t(language, "opt.sync"))
-                        }),
+                    chip_row()
+                        .child(subcommand_chip("xmp-copy", "opt.copy", XmpSubcommand::Copy))
+                        .child(subcommand_chip("xmp-init", "opt.init", XmpSubcommand::Init))
+                        .child(subcommand_chip(
+                            "xmp-update",
+                            "opt.update",
+                            XmpSubcommand::Update,
+                        ))
+                        .child(subcommand_chip(
+                            "xmp-remove",
+                            "opt.remove",
+                            XmpSubcommand::Remove,
+                        ))
+                        .child(subcommand_chip("xmp-sync", "opt.sync", XmpSubcommand::Sync)),
                 )
-                .child(if self.command_state.xmp.subcommand == XmpSubcommand::Copy
-                    || self.command_state.xmp.subcommand == XmpSubcommand::Init
-                    || self.command_state.xmp.subcommand == XmpSubcommand::Remove
-                {
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.0))
-                        .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.source_dir")))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap(px(8.0))
-                                .child(div().flex_grow().child(xmp_source_input.clone()))
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("browse-xmp-source")
-                                        .bg(rgb(0xF3F4F6))
-                                        .text_color(rgb(0x111827))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, window, cx| {
-                                            browse_into_text_input(
-                                                window,
-                                                cx,
-                                                PathPromptOptions {
-                                                    files: false,
-                                                    directories: true,
-                                                    multiple: false,
-                                                    prompt: Some(
-                                                        t(language, "prompt.select_source_directory")
-                                                            .into(),
-                                                    ),
-                                                },
-                                                xmp_source_input.clone(),
-                                                entity.clone(),
-                                                language,
-                                            );
-                                        })
-                                        .child(t(language, "action.browse"))
+                .child(
+                    if subcommand == XmpSubcommand::Copy
+                        || subcommand == XmpSubcommand::Init
+                        || subcommand == XmpSubcommand::Remove
+                    {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .child(muted_label(language, "label.source_dir"))
+                            .child(input_row(
+                                &xmp_source_input,
+                                browse_button(
+                                    "browse-xmp-source",
+                                    &entity,
+                                    language,
+                                    &xmp_source_input,
+                                    true,
+                                    "prompt.select_source_directory",
+                                ),
+                            ))
+                            .child(if subcommand == XmpSubcommand::Copy {
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(8.0))
+                                    .child(muted_label(language, "label.output_dir"))
+                                    .child(input_row(
+                                        &xmp_output_input,
+                                        browse_button(
+                                            "browse-xmp-output",
+                                            &entity,
+                                            language,
+                                            &xmp_output_input,
+                                            true,
+                                            "prompt.select_output_directory",
+                                        ),
+                                    ))
+                            } else if subcommand == XmpSubcommand::Init {
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(8.0))
+                                    .child(muted_label(language, "label.options"))
+                                    .child(chip_row().child(chip(
+                                        "toggle-xmp-init-info",
+                                        t(language, "opt.info"),
+                                        self.command_state.xmp.info,
+                                        &entity,
+                                        Some("xmp-init|--info"),
+                                        |view, cx| {
+                                            view.command_state.xmp.info =
+                                                !view.command_state.xmp.info;
+                                            cx.notify();
+                                        },
+                                    )))
+                            } else {
+                                div()
+                            })
+                    } else if subcommand == XmpSubcommand::Update {
+                        let tag_chip = |id, label_key, tag: &'static str| {
+                            chip(
+                                id,
+                                t(language, label_key),
+                                self.command_state.xmp.tag_type.as_deref() == Some(tag),
+                                &entity,
+                                Some(match tag {
+                                    "species" => "xmp-update|species",
+                                    "individual" => "xmp-update|individual",
+                                    "count" => "xmp-update|count",
+                                    "sex" => "xmp-update|sex",
+                                    _ => "xmp-update|bodypart",
                                 }),
-                        )
-                        .child(if self.command_state.xmp.subcommand == XmpSubcommand::Copy {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(8.0))
-                                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.output_dir")))
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .gap(px(8.0))
-                                        .child(div().flex_grow().child(xmp_output_input.clone()))
-                                        .child({
-                                            let entity = entity.clone();
-                                            div()
-                                                .id("browse-xmp-output")
-                                                .bg(rgb(0xF3F4F6))
-                                                .text_color(rgb(0x111827))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, window, cx| {
-                                                    browse_into_text_input(
-                                                        window,
-                                                        cx,
-                                                        PathPromptOptions {
-                                                            files: false,
-                                                            directories: true,
-                                                            multiple: false,
-                                                            prompt: Some(
-                                                                t(
-                                                                    language,
-                                                                    "prompt.select_output_directory",
-                                                                )
-                                                                .into(),
-                                                            ),
-                                                        },
-                                                        xmp_output_input.clone(),
-                                                        entity.clone(),
-                                                        language,
-                                                    );
-                                                })
-                                                .child(t(language, "action.browse"))
-                                        }),
-                                )
-                        } else if self.command_state.xmp.subcommand == XmpSubcommand::Init {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(8.0))
-                                .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.options")))
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .flex_wrap()
-                                        .gap(px(8.0))
-                                        .child({
-                                            let entity = entity.clone();
-                                            let entity_click = entity.clone();
-                                            let entity_hover = entity.clone();
-                                            let active = self.command_state.xmp.info;
-                                            div()
-                                                .id("toggle-xmp-init-info")
-                                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity_click.update(cx, |view, cx| {
-                                                        view.command_state.xmp.info =
-                                                            !view.command_state.xmp.info;
-                                                        cx.notify();
-                                                    });
-                                                })
-                                                .on_hover(move |hovered, _, cx| {
-                                                    entity_hover.update(cx, |view, cx| {
-                                                        if *hovered {
-                                                            view.set_hover_help_key("xmp-init|--info", cx);
-                                                        } else {
-                                                            view.clear_hover_help_key("xmp-init|--info", cx);
-                                                        }
-                                                    });
-                                                })
-                                                .child(t(language, "opt.info"))
-                                        }),
-                                )
-                        } else {
-                            div()
-                        })
-                } else if self.command_state.xmp.subcommand == XmpSubcommand::Update {
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.0))
-                        .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.csv_path")))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap(px(8.0))
-                                .child(div().flex_grow().child(xmp_csv_input.clone()))
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("browse-xmp-csv")
-                                        .bg(rgb(0xF3F4F6))
-                                        .text_color(rgb(0x111827))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, window, cx| {
-                                            browse_into_text_input(
-                                                window,
-                                                cx,
-                                                PathPromptOptions {
-                                                    files: true,
-                                                    directories: false,
-                                                    multiple: false,
-                                                    prompt: Some(
-                                                        t(language, "prompt.select_csv_path").into(),
-                                                    ),
-                                                },
-                                                xmp_csv_input.clone(),
-                                                entity.clone(),
-                                                language,
-                                            );
-                                        })
-                                        .child(t(language, "action.browse"))
-                                }),
-                        )
-                        .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.options")))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .flex_wrap()
-                                .gap(px(8.0))
-                                .child({
-                                    let entity = entity.clone();
-                                    let entity_click = entity.clone();
-                                    let entity_hover = entity.clone();
-                                    let active = self.command_state.xmp.datetime;
-                                    div()
-                                        .id("xmp-update-datetime")
-                                        .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                        .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity_click.update(cx, |view, cx| {
-                                                view.command_state.xmp.datetime =
-                                                    !view.command_state.xmp.datetime;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .on_hover(move |hovered, _, cx| {
-                                            entity_hover.update(cx, |view, cx| {
-                                                if *hovered {
-                                                    view.set_hover_help_key("xmp-update|--datetime", cx);
-                                                } else {
-                                                    view.clear_hover_help_key("xmp-update|--datetime", cx);
-                                                }
-                                            });
-                                        })
-                                        .child(t(language, "opt.datetime"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    let entity_click = entity.clone();
-                                    let entity_hover = entity.clone();
-                                    let active = self.command_state.xmp.tag_type.as_deref() == Some("species");
-                                    div()
-                                        .id("xmp-tag-species")
-                                        .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                        .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity_click.update(cx, |view, cx| {
-                                                view.command_state.xmp.tag_type = Some("species".to_string());
-                                                view.command_state.xmp.datetime = false;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .on_hover(move |hovered, _, cx| {
-                                            entity_hover.update(cx, |view, cx| {
-                                                if *hovered {
-                                                    view.set_hover_help_key("xmp-update|species", cx);
-                                                } else {
-                                                    view.clear_hover_help_key("xmp-update|species", cx);
-                                                }
-                                            });
-                                        })
-                                        .child(t(language, "opt.species"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    let entity_click = entity.clone();
-                                    let entity_hover = entity.clone();
-                                    let active = self.command_state.xmp.tag_type.as_deref() == Some("individual");
-                                    div().id("xmp-tag-individual")
-                                        .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                        .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                        .p(px(8.0)).cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity_click.update(cx, |view, cx| {
-                                                view.command_state.xmp.tag_type = Some("individual".to_string());
-                                                view.command_state.xmp.datetime = false;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .on_hover(move |hovered, _, cx| {
-                                            entity_hover.update(cx, |view, cx| {
-                                                if *hovered {
-                                                    view.set_hover_help_key("xmp-update|individual", cx);
-                                                } else {
-                                                    view.clear_hover_help_key("xmp-update|individual", cx);
-                                                }
-                                            });
-                                        })
-                                        .child(t(language, "opt.individual"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    let entity_click = entity.clone();
-                                    let entity_hover = entity.clone();
-                                    let active = self.command_state.xmp.tag_type.as_deref() == Some("count");
-                                    div().id("xmp-tag-count")
-                                        .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                        .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                        .p(px(8.0)).cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity_click.update(cx, |view, cx| {
-                                                view.command_state.xmp.tag_type = Some("count".to_string());
-                                                view.command_state.xmp.datetime = false;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .on_hover(move |hovered, _, cx| {
-                                            entity_hover.update(cx, |view, cx| {
-                                                if *hovered {
-                                                    view.set_hover_help_key("xmp-update|count", cx);
-                                                } else {
-                                                    view.clear_hover_help_key("xmp-update|count", cx);
-                                                }
-                                            });
-                                        })
-                                        .child(t(language, "opt.count"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    let entity_click = entity.clone();
-                                    let entity_hover = entity.clone();
-                                    let active = self.command_state.xmp.tag_type.as_deref() == Some("sex");
-                                    div().id("xmp-tag-sex")
-                                        .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                        .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                        .p(px(8.0)).cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity_click.update(cx, |view, cx| {
-                                                view.command_state.xmp.tag_type = Some("sex".to_string());
-                                                view.command_state.xmp.datetime = false;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .on_hover(move |hovered, _, cx| {
-                                            entity_hover.update(cx, |view, cx| {
-                                                if *hovered {
-                                                    view.set_hover_help_key("xmp-update|sex", cx);
-                                                } else {
-                                                    view.clear_hover_help_key("xmp-update|sex", cx);
-                                                }
-                                            });
-                                        })
-                                        .child(t(language, "opt.sex"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    let entity_click = entity.clone();
-                                    let entity_hover = entity.clone();
-                                    let active = self.command_state.xmp.tag_type.as_deref() == Some("bodypart");
-                                    div().id("xmp-tag-bodypart")
-                                        .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                        .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                        .p(px(8.0)).cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity_click.update(cx, |view, cx| {
-                                                view.command_state.xmp.tag_type = Some("bodypart".to_string());
-                                                view.command_state.xmp.datetime = false;
-                                                cx.notify();
-                                            });
-                                        })
-                                        .on_hover(move |hovered, _, cx| {
-                                            entity_hover.update(cx, |view, cx| {
-                                                if *hovered {
-                                                    view.set_hover_help_key("xmp-update|bodypart", cx);
-                                                } else {
-                                                    view.clear_hover_help_key("xmp-update|bodypart", cx);
-                                                }
-                                            });
-                                        })
-                                        .child(t(language, "opt.bodypart"))
-                                }),
-                        )
-                } else {
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.0))
-                        .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.dir_optional")))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap(px(8.0))
-                                .child(div().flex_grow().child(xmp_dir_input.clone()))
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("browse-xmp-dir")
-                                        .bg(rgb(0xF3F4F6))
-                                        .text_color(rgb(0x111827))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, window, cx| {
-                                            browse_into_text_input(
-                                                window,
-                                                cx,
-                                                PathPromptOptions {
-                                                    files: false,
-                                                    directories: true,
-                                                    multiple: false,
-                                                    prompt: Some(
-                                                        t(language, "prompt.select_directory").into(),
-                                                    ),
-                                                },
-                                                xmp_dir_input.clone(),
-                                                entity.clone(),
-                                                language,
-                                            );
-                                        })
-                                        .child(t(language, "action.browse"))
-                                }),
-                        )
-                        .child(div().text_color(rgb(0x6B7280)).child(t(language, "label.csv_path_optional")))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap(px(8.0))
-                                .child(div().flex_grow().child(xmp_csv_input.clone()))
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("browse-xmp-sync-csv")
-                                        .bg(rgb(0xF3F4F6))
-                                        .text_color(rgb(0x111827))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, window, cx| {
-                                            browse_into_text_input(
-                                                window,
-                                                cx,
-                                                PathPromptOptions {
-                                                    files: true,
-                                                    directories: false,
-                                                    multiple: false,
-                                                    prompt: Some(
-                                                        t(language, "prompt.select_csv_path").into(),
-                                                    ),
-                                                },
-                                                xmp_csv_input.clone(),
-                                                entity.clone(),
-                                                language,
-                                            );
-                                        })
-                                        .child(t(language, "action.browse"))
-                                }),
-                        )
-                })
+                                move |view, cx| {
+                                    view.command_state.xmp.tag_type = Some(tag.to_string());
+                                    view.command_state.xmp.datetime = false;
+                                    cx.notify();
+                                },
+                            )
+                        };
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .child(muted_label(language, "label.csv_path"))
+                            .child(input_row(
+                                &xmp_csv_input,
+                                browse_button(
+                                    "browse-xmp-csv",
+                                    &entity,
+                                    language,
+                                    &xmp_csv_input,
+                                    false,
+                                    "prompt.select_csv_path",
+                                ),
+                            ))
+                            .child(muted_label(language, "label.options"))
+                            .child(
+                                chip_row()
+                                    .child(chip(
+                                        "xmp-update-datetime",
+                                        t(language, "opt.datetime"),
+                                        self.command_state.xmp.datetime,
+                                        &entity,
+                                        Some("xmp-update|--datetime"),
+                                        |view, cx| {
+                                            view.command_state.xmp.datetime =
+                                                !view.command_state.xmp.datetime;
+                                            cx.notify();
+                                        },
+                                    ))
+                                    .child(tag_chip("xmp-tag-species", "opt.species", "species"))
+                                    .child(tag_chip(
+                                        "xmp-tag-individual",
+                                        "opt.individual",
+                                        "individual",
+                                    ))
+                                    .child(tag_chip("xmp-tag-count", "opt.count", "count"))
+                                    .child(tag_chip("xmp-tag-sex", "opt.sex", "sex"))
+                                    .child(tag_chip(
+                                        "xmp-tag-bodypart",
+                                        "opt.bodypart",
+                                        "bodypart",
+                                    )),
+                            )
+                    } else {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .child(muted_label(language, "label.dir_optional"))
+                            .child(input_row(
+                                &xmp_dir_input,
+                                browse_button(
+                                    "browse-xmp-dir",
+                                    &entity,
+                                    language,
+                                    &xmp_dir_input,
+                                    true,
+                                    "prompt.select_directory",
+                                ),
+                            ))
+                            .child(muted_label(language, "label.csv_path_optional"))
+                            .child(input_row(
+                                &xmp_csv_input,
+                                browse_button(
+                                    "browse-xmp-sync-csv",
+                                    &entity,
+                                    language,
+                                    &xmp_csv_input,
+                                    false,
+                                    "prompt.select_csv_path",
+                                ),
+                            ))
+                    },
+                )
         } else if extract_selected {
+            let filter_chip = |id, label_key, filter: &'static str| {
+                chip(
+                    id,
+                    t(language, label_key),
+                    self.command_state.extract.filter_type == filter,
+                    &entity,
+                    None,
+                    move |view, cx| {
+                        view.command_state.extract.filter_type = filter.to_string();
+                        cx.notify();
+                    },
+                )
+            };
+            let subdir_chip = |id, label_key, subdir: &'static str| {
+                chip(
+                    id,
+                    t(language, label_key),
+                    self.command_state.extract.subdir_type.as_deref() == Some(subdir),
+                    &entity,
+                    None,
+                    move |view, cx| {
+                        view.command_state.extract.subdir_type = Some(subdir.to_string());
+                        cx.notify();
+                    },
+                )
+            };
             div()
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
+                .child(muted_label(language, "label.csv_path"))
+                .child(input_row(
+                    &extract_csv_input,
+                    browse_button(
+                        "browse-extract-csv",
+                        &entity,
+                        language,
+                        &extract_csv_input,
+                        false,
+                        "prompt.select_tags_csv",
+                    ),
+                ))
+                .child(muted_label(language, "label.filter_type"))
                 .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.csv_path")),
+                    chip_row()
+                        .child(filter_chip(
+                            "extract-filter-species",
+                            "opt.extract_species",
+                            "species",
+                        ))
+                        .child(filter_chip(
+                            "extract-filter-path",
+                            "opt.extract_path",
+                            "path",
+                        ))
+                        .child(filter_chip(
+                            "extract-filter-individual",
+                            "opt.extract_individual",
+                            "individual",
+                        ))
+                        .child(filter_chip(
+                            "extract-filter-rating",
+                            "opt.extract_rating",
+                            "rating",
+                        ))
+                        .child(filter_chip(
+                            "extract-filter-event",
+                            "opt.extract_event",
+                            "event",
+                        ))
+                        .child(filter_chip(
+                            "extract-filter-custom",
+                            "opt.extract_custom",
+                            "custom",
+                        ))
+                        .child(filter_chip(
+                            "extract-filter-advanced",
+                            "opt.extract_advanced",
+                            "advanced",
+                        )),
                 )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(extract_csv_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-extract-csv")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: true,
-                                            directories: false,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_tags_csv").into(),
-                                            ),
-                                        },
-                                        extract_csv_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.filter_type")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .gap(px(8.0))
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "species";
-                            div()
-                                .id("extract-filter-species")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "species".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_species"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "path";
-                            div()
-                                .id("extract-filter-path")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type = "path".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_path"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "individual";
-                            div()
-                                .id("extract-filter-individual")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "individual".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_individual"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "rating";
-                            div()
-                                .id("extract-filter-rating")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "rating".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_rating"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "event";
-                            div()
-                                .id("extract-filter-event")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "event".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_event"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "custom";
-                            div()
-                                .id("extract-filter-custom")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "custom".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_custom"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.filter_type == "advanced";
-                            div()
-                                .id("extract-filter-advanced")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.filter_type =
-                                            "advanced".to_string();
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_advanced"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.value")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(extract_value_input.clone())),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.output_dir")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(extract_output_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-extract-output")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: false,
-                                            directories: true,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_output_directory")
-                                                    .into(),
-                                            ),
-                                        },
-                                        extract_output_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
+                .child(muted_label(language, "label.value"))
+                .child(bare_input_row(&extract_value_input))
+                .child(muted_label(language, "label.output_dir"))
+                .child(input_row(
+                    &extract_output_input,
+                    browse_button(
+                        "browse-extract-output",
+                        &entity,
+                        language,
+                        &extract_output_input,
+                        true,
+                        "prompt.select_output_directory",
+                    ),
+                ))
                 .child(self.render_auto_output_dir_hint())
+                .child(muted_label(language, "label.options"))
                 .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.options")),
+                    chip_row()
+                        .child(chip(
+                            "extract-rename",
+                            t(language, "opt.rename"),
+                            self.command_state.extract.rename,
+                            &entity,
+                            Some("extract|--rename"),
+                            |view, cx| {
+                                view.command_state.extract.rename =
+                                    !view.command_state.extract.rename;
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "extract-skip-existing",
+                            t(language, "opt.skip_existing"),
+                            self.command_state.extract.skip_existing,
+                            &entity,
+                            Some("extract|--skip-existing"),
+                            |view, cx| {
+                                view.command_state.extract.skip_existing =
+                                    !view.command_state.extract.skip_existing;
+                                cx.notify();
+                            },
+                        ))
+                        .child(chip(
+                            "extract-use-subdir",
+                            t(language, "opt.use_subdir"),
+                            self.command_state.extract.use_subdir,
+                            &entity,
+                            Some("extract|--use-subdir"),
+                            |view, cx| {
+                                view.command_state.extract.use_subdir =
+                                    !view.command_state.extract.use_subdir;
+                                cx.notify();
+                            },
+                        )),
                 )
+                .child(muted_label(language, "label.subdir_type"))
                 .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .gap(px(8.0))
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.extract.rename;
-                            div()
-                                .id("extract-rename")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.extract.rename =
-                                            !view.command_state.extract.rename;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("extract|--rename", cx);
-                                        } else {
-                                            view.clear_hover_help_key("extract|--rename", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.rename"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.extract.skip_existing;
-                            div()
-                                .id("extract-skip-existing")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.extract.skip_existing =
-                                            !view.command_state.extract.skip_existing;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("extract|--skip-existing", cx);
-                                        } else {
-                                            view.clear_hover_help_key(
-                                                "extract|--skip-existing",
-                                                cx,
-                                            );
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.skip_existing"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let entity_click = entity.clone();
-                            let entity_hover = entity.clone();
-                            let active = self.command_state.extract.use_subdir;
-                            div()
-                                .id("extract-use-subdir")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity_click.update(cx, |view, cx| {
-                                        view.command_state.extract.use_subdir =
-                                            !view.command_state.extract.use_subdir;
-                                        cx.notify();
-                                    });
-                                })
-                                .on_hover(move |hovered, _, cx| {
-                                    entity_hover.update(cx, |view, cx| {
-                                        if *hovered {
-                                            view.set_hover_help_key("extract|--use-subdir", cx);
-                                        } else {
-                                            view.clear_hover_help_key("extract|--use-subdir", cx);
-                                        }
-                                    });
-                                })
-                                .child(t(language, "opt.use_subdir"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.subdir_type")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .gap(px(8.0))
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.subdir_type.as_deref()
-                                == Some("species");
-                            div()
-                                .id("extract-subdir-species")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type =
-                                            Some("species".to_string());
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_species"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active = self.command_state.extract.subdir_type.as_deref()
-                                == Some("individual");
-                            div()
-                                .id("extract-subdir-individual")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type =
-                                            Some("individual".to_string());
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_individual"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active =
-                                self.command_state.extract.subdir_type.as_deref() == Some("rating");
-                            div()
-                                .id("extract-subdir-rating")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type =
-                                            Some("rating".to_string());
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_rating"))
-                        })
-                        .child({
-                            let entity = entity.clone();
-                            let active =
-                                self.command_state.extract.subdir_type.as_deref() == Some("custom");
-                            div()
-                                .id("extract-subdir-custom")
-                                .bg(rgb(if active { 0x111827 } else { 0xF3F4F6 }))
-                                .text_color(rgb(if active { 0xF9FAFB } else { 0x111827 }))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    entity.update(cx, |view, cx| {
-                                        view.command_state.extract.subdir_type =
-                                            Some("custom".to_string());
-                                        cx.notify();
-                                    });
-                                })
-                                .child(t(language, "opt.extract_custom"))
-                        }),
+                    chip_row()
+                        .child(subdir_chip(
+                            "extract-subdir-species",
+                            "opt.extract_species",
+                            "species",
+                        ))
+                        .child(subdir_chip(
+                            "extract-subdir-individual",
+                            "opt.extract_individual",
+                            "individual",
+                        ))
+                        .child(subdir_chip(
+                            "extract-subdir-rating",
+                            "opt.extract_rating",
+                            "rating",
+                        ))
+                        .child(subdir_chip(
+                            "extract-subdir-custom",
+                            "opt.extract_custom",
+                            "custom",
+                        )),
                 )
         } else {
+            let from_chip = |id, label_key, column: &'static str| {
+                chip(
+                    id,
+                    t(language, label_key),
+                    translate_from_value == column,
+                    &entity,
+                    None,
+                    move |view, cx| {
+                        view.set_translate_from_value(column.to_string(), cx);
+                    },
+                )
+            };
+            let to_chip = |id, label_key, column: &'static str| {
+                chip(
+                    id,
+                    t(language, label_key),
+                    translate_to_value == column,
+                    &entity,
+                    None,
+                    move |view, cx| {
+                        view.set_translate_to_value(column.to_string(), cx);
+                    },
+                )
+            };
             div()
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.csv_path")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(translate_csv_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-translate-csv")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: true,
-                                            directories: false,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_tags_csv").into(),
-                                            ),
-                                        },
-                                        translate_csv_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.taglist_path")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(translate_taglist_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-translate-taglist")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: true,
-                                            directories: false,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_taglist_csv").into(),
-                                            ),
-                                        },
-                                        translate_taglist_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.from")),
-                )
+                .child(muted_label(language, "label.csv_path"))
+                .child(input_row(
+                    &translate_csv_input,
+                    browse_button(
+                        "browse-translate-csv",
+                        &entity,
+                        language,
+                        &translate_csv_input,
+                        false,
+                        "prompt.select_tags_csv",
+                    ),
+                ))
+                .child(muted_label(language, "label.taglist_path"))
+                .child(input_row(
+                    &translate_taglist_input,
+                    browse_button(
+                        "browse-translate-taglist",
+                        &entity,
+                        language,
+                        &translate_taglist_input,
+                        false,
+                        "prompt.select_taglist_csv",
+                    ),
+                ))
+                .child(muted_label(language, "label.from"))
                 .child(
                     div()
                         .flex()
                         .flex_col()
                         .gap(px(8.0))
                         .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .flex_wrap()
-                                .gap(px(8.0))
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-from-tag")
-                                        .bg(rgb(if translate_from_value == "tag" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_from_value == "tag" {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_from_value(
-                                                    "tag".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.tag"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-from-tagcn")
-                                        .bg(rgb(if translate_from_value == "tagCN" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_from_value == "tagCN" {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_from_value(
-                                                    "tagCN".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.tag_cn"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-from-mazenamecn")
-                                        .bg(rgb(if translate_from_value == "mazeNameCN" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_from_value == "mazeNameCN" {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_from_value(
-                                                    "mazeNameCN".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.maze_name_cn"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-from-mazescientificname")
-                                        .bg(rgb(if translate_from_value == "mazeScientificName" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(
-                                            if translate_from_value == "mazeScientificName" {
-                                                0xF9FAFB
-                                            } else {
-                                                0x111827
-                                            },
-                                        ))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_from_value(
-                                                    "mazeScientificName".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.maze_scientific_name"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-from-custom")
-                                        .bg(rgb(if translate_from_custom {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_from_custom {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.activate_translate_from_custom(cx);
-                                            });
-                                        })
-                                        .child(t(language, "action.custom"))
-                                }),
+                            chip_row()
+                                .child(from_chip(
+                                    "translate-from-tag",
+                                    "translate.preset.tag",
+                                    "tag",
+                                ))
+                                .child(from_chip(
+                                    "translate-from-tagcn",
+                                    "translate.preset.tag_cn",
+                                    "tagCN",
+                                ))
+                                .child(from_chip(
+                                    "translate-from-mazenamecn",
+                                    "translate.preset.maze_name_cn",
+                                    "mazeNameCN",
+                                ))
+                                .child(from_chip(
+                                    "translate-from-mazescientificname",
+                                    "translate.preset.maze_scientific_name",
+                                    "mazeScientificName",
+                                ))
+                                .child(chip(
+                                    "translate-from-custom",
+                                    t(language, "action.custom"),
+                                    translate_from_custom,
+                                    &entity,
+                                    None,
+                                    |view, cx| {
+                                        view.activate_translate_from_custom(cx);
+                                    },
+                                )),
                         )
                         .child(if translate_from_custom {
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap(px(8.0))
-                                .child(div().flex_grow().child(translate_from_input.clone()))
+                            bare_input_row(&translate_from_input)
                         } else {
                             div()
                         }),
                 )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.to")),
-                )
+                .child(muted_label(language, "label.to"))
                 .child(
                     div()
                         .flex()
                         .flex_col()
                         .gap(px(8.0))
                         .child(
-                            div()
-                                .flex()
-                                .flex_row()
-                                .flex_wrap()
-                                .gap(px(8.0))
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-to-tag")
-                                        .bg(rgb(if translate_to_value == "tag" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_to_value == "tag" {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_to_value("tag".to_string(), cx);
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.tag"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-to-tagcn")
-                                        .bg(rgb(if translate_to_value == "tagCN" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_to_value == "tagCN" {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_to_value(
-                                                    "tagCN".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.tag_cn"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-to-mazenamecn")
-                                        .bg(rgb(if translate_to_value == "mazeNameCN" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_to_value == "mazeNameCN" {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_to_value(
-                                                    "mazeNameCN".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.maze_name_cn"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-to-mazescientificname")
-                                        .bg(rgb(if translate_to_value == "mazeScientificName" {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(
-                                            if translate_to_value == "mazeScientificName" {
-                                                0xF9FAFB
-                                            } else {
-                                                0x111827
-                                            },
-                                        ))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.set_translate_to_value(
-                                                    "mazeScientificName".to_string(),
-                                                    cx,
-                                                );
-                                            });
-                                        })
-                                        .child(t(language, "translate.preset.maze_scientific_name"))
-                                })
-                                .child({
-                                    let entity = entity.clone();
-                                    div()
-                                        .id("translate-to-custom")
-                                        .bg(rgb(if translate_to_custom {
-                                            0x111827
-                                        } else {
-                                            0xF3F4F6
-                                        }))
-                                        .text_color(rgb(if translate_to_custom {
-                                            0xF9FAFB
-                                        } else {
-                                            0x111827
-                                        }))
-                                        .p(px(8.0))
-                                        .cursor_pointer()
-                                        .on_click(move |_, _, cx| {
-                                            entity.update(cx, |view, cx| {
-                                                view.activate_translate_to_custom(cx);
-                                            });
-                                        })
-                                        .child(t(language, "action.custom"))
-                                }),
+                            chip_row()
+                                .child(to_chip("translate-to-tag", "translate.preset.tag", "tag"))
+                                .child(to_chip(
+                                    "translate-to-tagcn",
+                                    "translate.preset.tag_cn",
+                                    "tagCN",
+                                ))
+                                .child(to_chip(
+                                    "translate-to-mazenamecn",
+                                    "translate.preset.maze_name_cn",
+                                    "mazeNameCN",
+                                ))
+                                .child(to_chip(
+                                    "translate-to-mazescientificname",
+                                    "translate.preset.maze_scientific_name",
+                                    "mazeScientificName",
+                                ))
+                                .child(chip(
+                                    "translate-to-custom",
+                                    t(language, "action.custom"),
+                                    translate_to_custom,
+                                    &entity,
+                                    None,
+                                    |view, cx| {
+                                        view.activate_translate_to_custom(cx);
+                                    },
+                                )),
                         )
                         .child(if translate_to_custom {
-                            div()
-                                .flex()
-                                .flex_row()
-                                .gap(px(8.0))
-                                .child(div().flex_grow().child(translate_to_input.clone()))
+                            bare_input_row(&translate_to_input)
                         } else {
                             div()
                         }),
                 )
-                .child(
-                    div()
-                        .text_color(rgb(0x6B7280))
-                        .child(t(language, "label.output_dir")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap(px(8.0))
-                        .child(div().flex_grow().child(translate_output_input.clone()))
-                        .child({
-                            let entity = entity.clone();
-                            div()
-                                .id("browse-translate-output")
-                                .bg(rgb(0xF3F4F6))
-                                .text_color(rgb(0x111827))
-                                .p(px(8.0))
-                                .cursor_pointer()
-                                .on_click(move |_, window, cx| {
-                                    browse_into_text_input(
-                                        window,
-                                        cx,
-                                        PathPromptOptions {
-                                            files: false,
-                                            directories: true,
-                                            multiple: false,
-                                            prompt: Some(
-                                                t(language, "prompt.select_output_directory")
-                                                    .into(),
-                                            ),
-                                        },
-                                        translate_output_input.clone(),
-                                        entity.clone(),
-                                        language,
-                                    );
-                                })
-                                .child(t(language, "action.browse"))
-                        }),
-                )
+                .child(muted_label(language, "label.output_dir"))
+                .child(input_row(
+                    &translate_output_input,
+                    browse_button(
+                        "browse-translate-output",
+                        &entity,
+                        language,
+                        &translate_output_input,
+                        true,
+                        "prompt.select_output_directory",
+                    ),
+                ))
                 .child(self.render_auto_output_dir_hint())
         };
 
@@ -4156,77 +3060,49 @@ impl Render for RootView {
                                                 .flex_wrap()
                                                 .justify_end()
                                                 .gap(px(8.0))
-                                                .child({
-                                                    let entity_open_input = entity.clone();
-                                                    div()
-                                                        .id("open-input-dir")
-                                                        .bg(rgb(0xF3F4F6))
-                                                        .text_color(rgb(0x111827))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
-                                                        .on_click(move |_, _, cx| {
-                                                            entity_open_input.update(
+                                                .child(chip(
+                                                    "open-input-dir",
+                                                    t(language, "action.open_input_dir"),
+                                                    false,
+                                                    &entity,
+                                                    None,
+                                                    move |view, cx| {
+                                                        if let Some(path) = view.resolve_input_dir()
+                                                        {
+                                                            cx.reveal_path(&path);
+                                                        } else {
+                                                            view.append_output(
+                                                                t(language, "message.no_input_dir"),
                                                                 cx,
-                                                                |view, cx| {
-                                                                    if let Some(path) =
-                                                                        view.resolve_input_dir()
-                                                                    {
-                                                                        cx.reveal_path(&path);
-                                                                    } else {
-                                                                        view.append_output(
-                                                                    t(
-                                                                        language,
-                                                                        "message.no_input_dir",
-                                                                    ),
-                                                                    cx,
-                                                                );
-                                                                    }
-                                                                },
                                                             );
-                                                        })
-                                                        .child(t(language, "action.open_input_dir"))
-                                                })
-                                                .child({
-                                                    let entity_open_output = entity.clone();
-                                                    div()
-                                                        .id("open-output-dir")
-                                                        .bg(rgb(0xF3F4F6))
-                                                        .text_color(rgb(0x111827))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
-                                                        .on_click(move |_, _, cx| {
-                                                            entity_open_output.update(
+                                                        }
+                                                    },
+                                                ))
+                                                .child(chip(
+                                                    "open-output-dir",
+                                                    t(language, "action.open_output_dir"),
+                                                    false,
+                                                    &entity,
+                                                    None,
+                                                    move |view, cx| {
+                                                        if let Some(path) =
+                                                            view.resolve_output_dir()
+                                                        {
+                                                            cx.reveal_path(&path);
+                                                        } else {
+                                                            view.append_output(
+                                                                t(
+                                                                    language,
+                                                                    "message.no_output_dir",
+                                                                ),
                                                                 cx,
-                                                                |view, cx| {
-                                                                    if let Some(path) =
-                                                                        view.resolve_output_dir()
-                                                                    {
-                                                                        cx.reveal_path(&path);
-                                                                    } else {
-                                                                        view.append_output(
-                                                                        t(
-                                                                            language,
-                                                                            "message.no_output_dir",
-                                                                        ),
-                                                                        cx,
-                                                                    );
-                                                                    }
-                                                                },
                                                             );
-                                                        })
-                                                        .child(t(
-                                                            language,
-                                                            "action.open_output_dir",
-                                                        ))
-                                                })
+                                                        }
+                                                    },
+                                                ))
                                                 .child({
                                                     let entity_setup = entity.clone();
-                                                    div()
-                                                        .id("open-setup")
-                                                        .bg(rgb(0xF3F4F6))
-                                                        .text_color(rgb(0x111827))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
+                                                    chip_base("open-setup", false)
                                                         .on_click(move |_, _window, cx| {
                                                             let setup_state = entity_setup.read(cx);
                                                             let current = setup_state
@@ -4268,12 +3144,7 @@ impl Render for RootView {
                                                 })
                                                 .child({
                                                     let entity_about = entity.clone();
-                                                    div()
-                                                        .id("open-about")
-                                                        .bg(rgb(0xF3F4F6))
-                                                        .text_color(rgb(0x111827))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
+                                                    chip_base("open-about", false)
                                                         .on_click(move |_, _window, cx| {
                                                             let language =
                                                                 entity_about.read(cx).language;
@@ -4288,53 +3159,33 @@ impl Render for RootView {
                                                         })
                                                         .child(t(language, "action.about"))
                                                 })
-                                                .child({
-                                                    let entity_helper = entity.clone();
-                                                    div()
-                                                        .id("toggle-helper-mode")
-                                                        .bg(rgb(if helper_mode {
-                                                            0x111827
+                                                .child(chip(
+                                                    "toggle-helper-mode",
+                                                    if helper_mode {
+                                                        t(language, "action.helper_mode_on")
+                                                    } else {
+                                                        t(language, "action.helper_mode_off")
+                                                    },
+                                                    helper_mode,
+                                                    &entity,
+                                                    None,
+                                                    |view, cx| {
+                                                        view.helper_mode = !view.helper_mode;
+                                                        if view.helper_mode {
+                                                            view.command_help_open = true;
+                                                            view.refresh_command_help(cx);
                                                         } else {
-                                                            0xF3F4F6
-                                                        }))
-                                                        .text_color(rgb(if helper_mode {
-                                                            0xF9FAFB
-                                                        } else {
-                                                            0x111827
-                                                        }))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
-                                                        .on_click(move |_, _, cx| {
-                                                            entity_helper.update(cx, |view, cx| {
-                                                                view.helper_mode =
-                                                                    !view.helper_mode;
-                                                                if view.helper_mode {
-                                                                    view.command_help_open = true;
-                                                                    view.refresh_command_help(cx);
-                                                                } else {
-                                                                    view.command_help_open = false;
-                                                                    view.command_help_key = None;
-                                                                    view.hover_help_key = None;
-                                                                    view.option_help_position =
-                                                                        None;
-                                                                    cx.notify();
-                                                                }
-                                                            });
-                                                        })
-                                                        .child(if helper_mode {
-                                                            t(language, "action.helper_mode_on")
-                                                        } else {
-                                                            t(language, "action.helper_mode_off")
-                                                        })
-                                                })
+                                                            view.command_help_open = false;
+                                                            view.command_help_key = None;
+                                                            view.hover_help_key = None;
+                                                            view.option_help_position = None;
+                                                            cx.notify();
+                                                        }
+                                                    },
+                                                ))
                                                 .child({
                                                     let entity_run = entity.clone();
-                                                    div()
-                                                        .id("run-button")
-                                                        .bg(rgb(0x111827))
-                                                        .text_color(rgb(0xF9FAFB))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
+                                                    chip_base("run-button", true)
                                                         .on_click(move |_, window, cx| {
                                                             RootView::handle_run_click(
                                                                 entity_run.clone(),
@@ -4358,145 +3209,45 @@ impl Render for RootView {
                                 .gap(px(8.0))
                                 .bg(rgb(0xFFFFFF))
                                 .p(px(16.0))
-                                .child(
-                                    div()
-                                        .text_color(rgb(0x6B7280))
-                                        .child(t(language, "panel.command")),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_row()
-                                        .flex_wrap()
-                                        .gap(px(8.0))
-                                        .child({
-                                            let entity_click = entity_observe.clone();
-                                            div()
-                                                .id("command-observe")
-                                                .bg(rgb(if observe_selected {
-                                                    0x111827
-                                                } else {
-                                                    0xF3F4F6
-                                                }))
-                                                .text_color(rgb(if observe_selected {
-                                                    0xF9FAFB
-                                                } else {
-                                                    0x111827
-                                                }))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity_click.update(cx, |view, cx| {
-                                                        view.select_command(
-                                                            CommandKind::Observe,
-                                                            cx,
-                                                        );
-                                                    });
-                                                })
-                                                .child(t(language, "cmd.observe"))
-                                        })
-                                        .child({
-                                            let entity_click = entity_capture.clone();
-                                            div()
-                                                .id("command-capture")
-                                                .bg(rgb(if capture_selected {
-                                                    0x111827
-                                                } else {
-                                                    0xF3F4F6
-                                                }))
-                                                .text_color(rgb(if capture_selected {
-                                                    0xF9FAFB
-                                                } else {
-                                                    0x111827
-                                                }))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity_click.update(cx, |view, cx| {
-                                                        view.select_command(
-                                                            CommandKind::Capture,
-                                                            cx,
-                                                        );
-                                                    });
-                                                })
-                                                .child(t(language, "cmd.capture"))
-                                        })
-                                        .child({
-                                            let entity_click = entity_xmp.clone();
-                                            div()
-                                                .id("command-xmp")
-                                                .bg(rgb(if xmp_selected {
-                                                    0x111827
-                                                } else {
-                                                    0xF3F4F6
-                                                }))
-                                                .text_color(rgb(if xmp_selected {
-                                                    0xF9FAFB
-                                                } else {
-                                                    0x111827
-                                                }))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity_click.update(cx, |view, cx| {
-                                                        view.select_command(CommandKind::Xmp, cx);
-                                                    });
-                                                })
-                                                .child(t(language, "cmd.xmp"))
-                                        })
-                                        .child({
-                                            let entity_click = entity_extract.clone();
-                                            div()
-                                                .id("command-extract")
-                                                .bg(rgb(if extract_selected {
-                                                    0x111827
-                                                } else {
-                                                    0xF3F4F6
-                                                }))
-                                                .text_color(rgb(if extract_selected {
-                                                    0xF9FAFB
-                                                } else {
-                                                    0x111827
-                                                }))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity_click.update(cx, |view, cx| {
-                                                        view.select_command(
-                                                            CommandKind::Extract,
-                                                            cx,
-                                                        );
-                                                    });
-                                                })
-                                                .child(t(language, "cmd.extract"))
-                                        })
-                                        .child({
-                                            let entity_click = entity_translate.clone();
-                                            div()
-                                                .id("command-translate")
-                                                .bg(rgb(if translate_selected {
-                                                    0x111827
-                                                } else {
-                                                    0xF3F4F6
-                                                }))
-                                                .text_color(rgb(if translate_selected {
-                                                    0xF9FAFB
-                                                } else {
-                                                    0x111827
-                                                }))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
-                                                .on_click(move |_, _, cx| {
-                                                    entity_click.update(cx, |view, cx| {
-                                                        view.select_command(
-                                                            CommandKind::Translate,
-                                                            cx,
-                                                        );
-                                                    });
-                                                })
-                                                .child(t(language, "cmd.translate"))
-                                        }),
-                                ),
+                                .child(muted_label(language, "panel.command"))
+                                .child({
+                                    let command_chip = |id, label_key, kind: CommandKind| {
+                                        chip(
+                                            id,
+                                            t(language, label_key),
+                                            self.command_state.kind == kind,
+                                            &entity,
+                                            None,
+                                            move |view, cx| view.select_command(kind, cx),
+                                        )
+                                    };
+                                    chip_row()
+                                        .child(command_chip(
+                                            "command-observe",
+                                            "cmd.observe",
+                                            CommandKind::Observe,
+                                        ))
+                                        .child(command_chip(
+                                            "command-capture",
+                                            "cmd.capture",
+                                            CommandKind::Capture,
+                                        ))
+                                        .child(command_chip(
+                                            "command-xmp",
+                                            "cmd.xmp",
+                                            CommandKind::Xmp,
+                                        ))
+                                        .child(command_chip(
+                                            "command-extract",
+                                            "cmd.extract",
+                                            CommandKind::Extract,
+                                        ))
+                                        .child(command_chip(
+                                            "command-translate",
+                                            "cmd.translate",
+                                            CommandKind::Translate,
+                                        ))
+                                }),
                         )
                         .child(
                             div()
@@ -4511,11 +3262,7 @@ impl Render for RootView {
                                         .flex_row()
                                         .justify_between()
                                         .items_center()
-                                        .child(
-                                            div()
-                                                .text_color(rgb(0x6B7280))
-                                                .child(t(language, "panel.inputs")),
-                                        )
+                                        .child(muted_label(language, "panel.inputs"))
                                         .child(
                                             div()
                                                 .flex()
@@ -4571,11 +3318,7 @@ impl Render for RootView {
                                                 cx.notify();
                                             });
                                         })
-                                        .child(
-                                            div()
-                                                .text_color(rgb(0x6B7280))
-                                                .child(t(language, "panel.command_preview")),
-                                        )
+                                        .child(muted_label(language, "panel.command_preview"))
                                         .child(div().text_color(rgb(0x6B7280)).child(
                                             if preview_panel_open {
                                                 t(language, "action.collapse")
@@ -4619,12 +3362,7 @@ impl Render for RootView {
                                             })
                                             .child({
                                                 let entity_run = entity.clone();
-                                                div()
-                                                    .id("run-button-preview-panel")
-                                                    .bg(rgb(0x111827))
-                                                    .text_color(rgb(0xF9FAFB))
-                                                    .p(px(8.0))
-                                                    .cursor_pointer()
+                                                chip_base("run-button-preview-panel", true)
                                                     .on_click(move |_, window, cx| {
                                                         RootView::handle_run_click(
                                                             entity_run.clone(),
@@ -4683,12 +3421,7 @@ impl Render for RootView {
                                                 .gap(px(8.0))
                                                 .child({
                                                     let entity = entity.clone();
-                                                    div()
-                                                        .id("copy-log")
-                                                        .bg(rgb(0x111827))
-                                                        .text_color(rgb(0xF9FAFB))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
+                                                    chip_base("copy-log", true)
                                                         .on_click(move |_, _, cx| {
                                                             entity.update(cx, |view, cx| {
                                                                 view.refresh_output_log();
@@ -4703,12 +3436,7 @@ impl Render for RootView {
                                                 })
                                                 .child({
                                                     let entity = entity.clone();
-                                                    div()
-                                                        .id("clear-log")
-                                                        .bg(rgb(0x111827))
-                                                        .text_color(rgb(0xF9FAFB))
-                                                        .p(px(8.0))
-                                                        .cursor_pointer()
+                                                    chip_base("clear-log", true)
                                                         .on_click(move |_, _, cx| {
                                                             entity.update(cx, |view, cx| {
                                                                 view.clear_output(cx);
@@ -4771,12 +3499,7 @@ impl Render for RootView {
                                         .child(div().flex_grow().child(pty_input.clone()))
                                         .child({
                                             let entity = entity.clone();
-                                            div()
-                                                .id("send-pty")
-                                                .bg(rgb(0x111827))
-                                                .text_color(rgb(0xF9FAFB))
-                                                .p(px(8.0))
-                                                .cursor_pointer()
+                                            chip_base("send-pty", true)
                                                 .on_click(move |_, _, cx| {
                                                     entity.update(cx, |view, cx| {
                                                         view.send_pty_input(cx);
