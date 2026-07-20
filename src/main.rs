@@ -155,6 +155,13 @@ impl RunningProcessHandle {
 /// frame lines to exactly the terminal width and relies on cursor wrapping
 /// (no newlines) to move below printed lines, so buffer and PTY must agree.
 const PTY_COLS: u16 = 512;
+/// Scrollback cap so a chatty process cannot grow the buffer without bound.
+const MAX_BUFFER_LINES: usize = 10_000;
+/// Trim in batches so the front-drain cost stays amortized.
+const BUFFER_TRIM_BATCH: usize = 1_000;
+/// Cap cursor-down moves; a malformed CSI parameter must not allocate
+/// millions of blank lines.
+const MAX_CURSOR_DOWN: usize = 1_000;
 
 struct TerminalBuffer {
     lines: Vec<Vec<char>>,
@@ -196,6 +203,11 @@ impl TerminalBuffer {
     }
 
     fn push_chunk(&mut self, text: &str) {
+        self.push_chunk_inner(text);
+        self.trim_scrollback();
+    }
+
+    fn push_chunk_inner(&mut self, text: &str) {
         // Reassemble escape sequences split across PTY read chunks.
         let text = if self.pending_escape.is_empty() {
             text.to_string()
@@ -334,7 +346,7 @@ impl TerminalBuffer {
                 let n = first_param
                     .and_then(|value| value.parse::<usize>().ok())
                     .unwrap_or(1)
-                    .max(1);
+                    .clamp(1, MAX_CURSOR_DOWN);
                 self.cursor_row += n;
                 self.ensure_line(self.cursor_row);
             }
@@ -399,6 +411,17 @@ impl TerminalBuffer {
         while self.lines.len() <= row {
             self.lines.push(Vec::new());
         }
+    }
+
+    /// Drop the oldest lines once the buffer exceeds its cap, in batches so
+    /// the front-drain cost stays amortized.
+    fn trim_scrollback(&mut self) {
+        if self.lines.len() <= MAX_BUFFER_LINES + BUFFER_TRIM_BATCH {
+            return;
+        }
+        let remove = self.lines.len() - MAX_BUFFER_LINES;
+        self.lines.drain(..remove);
+        self.cursor_row = self.cursor_row.saturating_sub(remove);
     }
 }
 
@@ -1132,14 +1155,28 @@ impl RootView {
         let writer = self.pty_writer.clone();
         if let Some(writer) = writer {
             if let Ok(mut guard) = writer.lock() {
-                let _ = guard.write_all(value.as_bytes());
                 let newline = if cfg!(windows) {
                     b"\r\n".as_slice()
                 } else {
                     b"\n".as_slice()
                 };
-                let _ = guard.write_all(newline);
-                let _ = guard.flush();
+                let mut result = guard.write_all(value.as_bytes());
+                if result.is_ok() {
+                    result = guard.write_all(newline);
+                }
+                if result.is_ok() {
+                    result = guard.flush();
+                }
+                drop(guard);
+
+                if let Err(err) = result {
+                    self.append_output(
+                        format!("{}: {err}", t(self.language, "message.pty_write_error")),
+                        cx,
+                    );
+                    return false;
+                }
+
                 if self.running_interaction_helper
                     && self.interaction_helper.record_submission(value)
                 {
@@ -1505,7 +1542,28 @@ impl RootView {
             .spawn(cx, async move |cx| {
                 let mut finished = false;
                 while !finished {
-                    while let Ok(event) = rx.try_recv() {
+                    loop {
+                        let event = match rx.try_recv() {
+                            Ok(event) => event,
+                            Err(mpsc::TryRecvError::Empty) => break,
+                            Err(mpsc::TryRecvError::Disconnected) => {
+                                // The worker thread died without reporting an
+                                // exit; end the run instead of polling forever.
+                                let _ = cx.update(|_window, app| {
+                                    entity_for_events.update(app, |view, cx| {
+                                        if view.run_state.is_running() {
+                                            view.append_output(
+                                                t(language, "message.process_wait_error"),
+                                                cx,
+                                            );
+                                            view.finish_run(1, cx);
+                                        }
+                                    })
+                                });
+                                finished = true;
+                                break;
+                            }
+                        };
                         let entity = entity_for_events.clone();
                         match event {
                             OutputEvent::Chunk(chunk) => {
@@ -1556,7 +1614,9 @@ impl RootView {
                             }
                         }
                     }
-                    Timer::after(Duration::from_millis(50)).await;
+                    if !finished {
+                        Timer::after(Duration::from_millis(50)).await;
+                    }
                 }
             })
             .detach();
@@ -5060,7 +5120,10 @@ fn about_window_options(cx: &App) -> WindowOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{commands::CommandKind, RootView, TerminalBuffer};
+    use super::{
+        commands::CommandKind, RootView, TerminalBuffer, BUFFER_TRIM_BATCH, MAX_BUFFER_LINES,
+        MAX_CURSOR_DOWN,
+    };
 
     #[test]
     fn carriage_return_overwrites_current_line() {
@@ -5145,6 +5208,23 @@ mod tests {
             buffer.push_chunk(&String::from_utf8_lossy(chunk));
         }
         println!("{}", buffer.render_text());
+    }
+
+    #[test]
+    fn scrollback_is_capped_for_chatty_processes() {
+        let mut buffer = TerminalBuffer::default();
+        for _ in 0..(MAX_BUFFER_LINES + BUFFER_TRIM_BATCH + 10) {
+            buffer.push_chunk("line\n");
+        }
+        assert!(buffer.lines.len() <= MAX_BUFFER_LINES + BUFFER_TRIM_BATCH + 1);
+        assert!(buffer.render_text().ends_with("line\n"));
+    }
+
+    #[test]
+    fn malformed_cursor_down_parameter_is_clamped() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("top\n\u{001b}[999999999Bbottom");
+        assert!(buffer.lines.len() <= MAX_CURSOR_DOWN + 2);
     }
 
     #[test]

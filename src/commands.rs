@@ -10,6 +10,12 @@ pub const DEFAULT_TRANSLATE_FROM: &str = "tag";
 pub const DEFAULT_TRANSLATE_TO: &str = "tagCN";
 
 fn is_shell_safe_char(ch: char) -> bool {
+    if ch == '\\' {
+        // Backslash is a path separator on Windows but an escape
+        // character in POSIX shells, where it must trigger quoting.
+        return cfg!(windows);
+    }
+
     matches!(
         ch,
         'a'..='z'
@@ -19,7 +25,6 @@ fn is_shell_safe_char(ch: char) -> bool {
             | '-'
             | '.'
             | '/'
-            | '\\'
             | ':'
             | '@'
             | '%'
@@ -34,21 +39,36 @@ fn shell_quote_arg(arg: &str) -> String {
         return arg.to_string();
     }
 
-    let mut quoted = String::with_capacity(arg.len() + 2);
-    quoted.push('"');
-    for ch in arg.chars() {
-        match ch {
-            '"' | '$' | '`' => {
-                quoted.push('\\');
-                quoted.push(ch);
+    if cfg!(windows) {
+        let mut quoted = String::with_capacity(arg.len() + 2);
+        quoted.push('"');
+        for ch in arg.chars() {
+            match ch {
+                '"' | '$' | '`' => {
+                    quoted.push('\\');
+                    quoted.push(ch);
+                }
+                '\n' => quoted.push_str("\\n"),
+                '\r' => quoted.push_str("\\r"),
+                _ => quoted.push(ch),
             }
-            '\n' => quoted.push_str("\\n"),
-            '\r' => quoted.push_str("\\r"),
-            _ => quoted.push(ch),
         }
+        quoted.push('"');
+        quoted
+    } else {
+        // Single quotes keep every character literal (including \, $, `
+        // and !); only embedded quotes need the '\'' dance.
+        format!("'{}'", arg.replace('\'', r"'\''"))
     }
-    quoted.push('"');
-    quoted
+}
+
+/// Push a positional argument, inserting a `--` separator first when the
+/// value would otherwise be parsed as a flag.
+fn push_positional(parts: &mut Vec<String>, value: String) {
+    if value.starts_with('-') && !parts.iter().any(|part| part == "--") {
+        parts.push("--".to_string());
+    }
+    parts.push(value);
 }
 
 pub fn format_shell_command(program: &str, args: &[String]) -> String {
@@ -356,7 +376,7 @@ fn preview_observe_args(input: &ObserveInput) -> Vec<String> {
     } else {
         input.media_dir.as_str()
     };
-    parts.push(media_dir.to_string());
+    push_positional(&mut parts, media_dir.to_string());
     parts
 }
 
@@ -382,7 +402,7 @@ fn preview_capture_args(input: &CaptureInput) -> Vec<String> {
     } else {
         input.csv_path.as_str()
     };
-    parts.push(csv_path.to_string());
+    push_positional(&mut parts, csv_path.to_string());
     parts
 }
 
@@ -392,35 +412,47 @@ fn preview_xmp_args(input: &XmpInput) -> Vec<String> {
     match input.subcommand {
         XmpSubcommand::Copy => {
             parts.push("copy".to_string());
-            parts.push(if input.source_dir.is_empty() {
-                "<SOURCE_DIR>".to_string()
-            } else {
-                input.source_dir.clone()
-            });
-            parts.push(if input.output_dir.is_empty() {
-                "<OUTPUT_DIR>".to_string()
-            } else {
-                input.output_dir.clone()
-            });
+            push_positional(
+                &mut parts,
+                if input.source_dir.is_empty() {
+                    "<SOURCE_DIR>".to_string()
+                } else {
+                    input.source_dir.clone()
+                },
+            );
+            push_positional(
+                &mut parts,
+                if input.output_dir.is_empty() {
+                    "<OUTPUT_DIR>".to_string()
+                } else {
+                    input.output_dir.clone()
+                },
+            );
         }
         XmpSubcommand::Init => {
             parts.push("init".to_string());
             if input.info {
                 parts.push("--info".to_string());
             }
-            parts.push(if input.source_dir.is_empty() {
-                "<SOURCE_DIR>".to_string()
-            } else {
-                input.source_dir.clone()
-            });
+            push_positional(
+                &mut parts,
+                if input.source_dir.is_empty() {
+                    "<SOURCE_DIR>".to_string()
+                } else {
+                    input.source_dir.clone()
+                },
+            );
         }
         XmpSubcommand::Remove => {
             parts.push("remove".to_string());
-            parts.push(if input.source_dir.is_empty() {
-                "<SOURCE_DIR>".to_string()
-            } else {
-                input.source_dir.clone()
-            });
+            push_positional(
+                &mut parts,
+                if input.source_dir.is_empty() {
+                    "<SOURCE_DIR>".to_string()
+                } else {
+                    input.source_dir.clone()
+                },
+            );
         }
         XmpSubcommand::Update => {
             parts.push("update".to_string());
@@ -430,11 +462,14 @@ fn preview_xmp_args(input: &XmpInput) -> Vec<String> {
                 parts.push("--tag-type".to_string());
                 parts.push(tag_type.clone());
             }
-            parts.push(if input.csv_path.is_empty() {
-                "<CSV_PATH>".to_string()
-            } else {
-                input.csv_path.clone()
-            });
+            push_positional(
+                &mut parts,
+                if input.csv_path.is_empty() {
+                    "<CSV_PATH>".to_string()
+                } else {
+                    input.csv_path.clone()
+                },
+            );
         }
         XmpSubcommand::Sync => {
             parts.push("sync".to_string());
@@ -443,7 +478,7 @@ fn preview_xmp_args(input: &XmpInput) -> Vec<String> {
                 parts.push(input.csv_path.clone());
             }
             if !input.dir.is_empty() {
-                parts.push(input.dir.clone());
+                push_positional(&mut parts, input.dir.clone());
             }
         }
     }
@@ -478,11 +513,14 @@ fn preview_extract_args(input: &ExtractInput) -> Vec<String> {
         parts.push("-o".to_string());
         parts.push(output_dir);
     }
-    parts.push(if input.csv_path.is_empty() {
-        "<CSV_PATH>".to_string()
-    } else {
-        input.csv_path.clone()
-    });
+    push_positional(
+        &mut parts,
+        if input.csv_path.is_empty() {
+            "<CSV_PATH>".to_string()
+        } else {
+            input.csv_path.clone()
+        },
+    );
     parts
 }
 
@@ -510,11 +548,14 @@ fn preview_translate_args(input: &TranslateInput) -> Vec<String> {
         parts.push("-o".to_string());
         parts.push(output_dir);
     }
-    parts.push(if input.csv_path.is_empty() {
-        "<CSV_PATH>".to_string()
-    } else {
-        input.csv_path.clone()
-    });
+    push_positional(
+        &mut parts,
+        if input.csv_path.is_empty() {
+            "<CSV_PATH>".to_string()
+        } else {
+            input.csv_path.clone()
+        },
+    );
     parts
 }
 
@@ -542,7 +583,7 @@ fn build_observe(input: &ObserveInput) -> Result<Vec<String>, String> {
         args.push("--debug".to_string());
     }
 
-    args.push(input.media_dir.clone());
+    push_positional(&mut args, input.media_dir.clone());
 
     Ok(args)
 }
@@ -568,7 +609,7 @@ fn build_capture(input: &CaptureInput) -> Result<Vec<String>, String> {
         args.push(output);
     }
 
-    args.push(input.csv_path.clone());
+    push_positional(&mut args, input.csv_path.clone());
 
     Ok(args)
 }
@@ -585,8 +626,8 @@ fn build_xmp(input: &XmpInput) -> Result<Vec<String>, String> {
                 return Err("XMP copy requires OUTPUT_DIR.".to_string());
             }
             args.push("copy".to_string());
-            args.push(input.source_dir.clone());
-            args.push(input.output_dir.clone());
+            push_positional(&mut args, input.source_dir.clone());
+            push_positional(&mut args, input.output_dir.clone());
         }
         XmpSubcommand::Init => {
             if input.source_dir.trim().is_empty() {
@@ -596,14 +637,14 @@ fn build_xmp(input: &XmpInput) -> Result<Vec<String>, String> {
             if input.info {
                 args.push("--info".to_string());
             }
-            args.push(input.source_dir.clone());
+            push_positional(&mut args, input.source_dir.clone());
         }
         XmpSubcommand::Remove => {
             if input.source_dir.trim().is_empty() {
                 return Err("XMP remove requires SOURCE_DIR.".to_string());
             }
             args.push("remove".to_string());
-            args.push(input.source_dir.clone());
+            push_positional(&mut args, input.source_dir.clone());
         }
         XmpSubcommand::Update => {
             if input.csv_path.trim().is_empty() {
@@ -619,7 +660,7 @@ fn build_xmp(input: &XmpInput) -> Result<Vec<String>, String> {
                 args.push("--tag-type".to_string());
                 args.push(tag_type.clone());
             }
-            args.push(input.csv_path.clone());
+            push_positional(&mut args, input.csv_path.clone());
         }
         XmpSubcommand::Sync => {
             args.push("sync".to_string());
@@ -628,7 +669,7 @@ fn build_xmp(input: &XmpInput) -> Result<Vec<String>, String> {
                 args.push(input.csv_path.clone());
             }
             if !input.dir.trim().is_empty() {
-                args.push(input.dir.clone());
+                push_positional(&mut args, input.dir.clone());
             }
         }
     }
@@ -672,7 +713,7 @@ fn build_extract(input: &ExtractInput) -> Result<Vec<String>, String> {
         args.push("-o".to_string());
         args.push(output_dir);
     }
-    args.push(input.csv_path.clone());
+    push_positional(&mut args, input.csv_path.clone());
 
     Ok(args)
 }
@@ -706,7 +747,7 @@ fn build_translate(input: &TranslateInput) -> Result<Vec<String>, String> {
         args.push(output_dir);
     }
 
-    args.push(input.csv_path.clone());
+    push_positional(&mut args, input.csv_path.clone());
 
     Ok(args)
 }
@@ -721,6 +762,11 @@ mod tests {
 
     #[test]
     fn shell_command_quotes_spaced_arguments() {
+        let expected = if cfg!(windows) {
+            r#"serval extract --value "Snow leopard""#
+        } else {
+            "serval extract --value 'Snow leopard'"
+        };
         assert_eq!(
             format_shell_command(
                 "serval",
@@ -730,19 +776,35 @@ mod tests {
                     "Snow leopard".to_string(),
                 ]
             ),
-            r#"serval extract --value "Snow leopard""#
+            expected
         );
     }
 
     #[test]
     fn shell_command_quotes_program_paths_and_placeholder_tokens() {
+        let expected = if cfg!(windows) {
+            r#""/tmp/serval bin" capture "<CSV_PATH>""#
+        } else {
+            "'/tmp/serval bin' capture '<CSV_PATH>'"
+        };
         assert_eq!(
             format_shell_command(
                 "/tmp/serval bin",
                 &["capture".to_string(), "<CSV_PATH>".to_string()]
             ),
-            r#""/tmp/serval bin" capture "<CSV_PATH>""#
+            expected
         );
+    }
+
+    #[test]
+    fn shell_command_keeps_trailing_backslash_arguments_intact() {
+        let quoted = format_shell_command("serval", &["a value \\".to_string()]);
+        if cfg!(windows) {
+            assert_eq!(quoted, r#"serval "a value \""#);
+        } else {
+            // A trailing backslash must not escape the closing quote.
+            assert_eq!(quoted, r"serval 'a value \'");
+        }
     }
 
     #[test]
@@ -758,9 +820,32 @@ mod tests {
             ..CommandState::default()
         };
 
-        assert_eq!(
-            state.preview_with_program("serval"),
+        let expected = if cfg!(windows) {
             r#"serval extract --filter-type species --value "Snow leopard" -o /tmp/serval_output/serval_extract /tmp/records.csv"#
+        } else {
+            "serval extract --filter-type species --value 'Snow leopard' -o /tmp/serval_output/serval_extract /tmp/records.csv"
+        };
+        assert_eq!(state.preview_with_program("serval"), expected);
+    }
+
+    #[test]
+    fn positional_args_starting_with_dash_get_a_separator() {
+        let input = ObserveInput {
+            media_dir: "-media".to_string(),
+            ..ObserveInput::default()
+        };
+
+        let args = super::build_observe(&input).expect("observe command should build");
+
+        assert_eq!(
+            args,
+            vec![
+                "observe",
+                "-o",
+                "-media/serval_output/serval_observe",
+                "--",
+                "-media",
+            ]
         );
     }
 

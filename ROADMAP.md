@@ -102,6 +102,7 @@ Rules:
 - [x] Stop showing the interaction helper for free-text prompts that already use the PTY input field.
 - [x] Auto-scroll the page when a clickable interaction helper appears.
 - [x] Clean up clippy warnings and dead code across the codebase (derived Defaults, dead program tuple in command builders, platform-gated pid fields).
+- [x] Harden process/output handling: stop the output pump spinning when a worker thread dies, cap terminal scrollback and CSI cursor-down moves, bound the interaction-helper scan buffer, report PTY write failures, fix POSIX quoting of backslash/`!` args, and guard positional args starting with `-` behind `--`.
 
 ---
 

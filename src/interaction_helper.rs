@@ -11,6 +11,10 @@ pub struct InteractionHelperPrompt {
     pub options: Vec<InteractionHelperOption>,
 }
 
+/// Cap on the accumulated output scanned for prompts. Prompts always sit at
+/// the tail of the stream, so older output can be dropped.
+const MAX_BUFFER_BYTES: usize = 64 * 1024;
+
 #[derive(Clone, Debug, Default)]
 pub struct InteractionHelperModel {
     buffer: String,
@@ -34,6 +38,7 @@ impl InteractionHelperModel {
         }
 
         self.buffer.push_str(text);
+        self.trim_buffer();
         if let Some(prompt) = detect_prompt(&self.buffer) {
             let changed = self.prompt.as_ref() != Some(&prompt) || self.last_submission.is_some();
             self.prompt = Some(prompt);
@@ -51,6 +56,23 @@ impl InteractionHelperModel {
         self.prompt = None;
         self.buffer.clear();
         changed
+    }
+
+    /// Keep only a tail window of the stream, dropping whole lines from the
+    /// front so line-based prompt detection never sees a partial first line.
+    fn trim_buffer(&mut self) {
+        if self.buffer.len() <= MAX_BUFFER_BYTES {
+            return;
+        }
+
+        let mut cut = self.buffer.len() - MAX_BUFFER_BYTES / 2;
+        while !self.buffer.is_char_boundary(cut) {
+            cut += 1;
+        }
+        if let Some(newline) = self.buffer[cut..].find('\n') {
+            cut += newline + 1;
+        }
+        self.buffer.replace_range(..cut, "");
     }
 
     pub fn prompt(&self) -> Option<&InteractionHelperPrompt> {

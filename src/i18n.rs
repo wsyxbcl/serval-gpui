@@ -95,6 +95,7 @@ fn en(key: &str) -> &'static str {
         "message.failed_start_pty" => "Failed to start PTY process",
         "message.failed_read_pty_output" => "Failed to read PTY output",
         "message.pty_read_error" => "PTY read error",
+        "message.pty_write_error" => "PTY write error",
         "message.failed_start_process" => "Failed to start process",
         "message.process_wait_error" => "Process wait error",
         "message.stdout_error" => "stdout error",
