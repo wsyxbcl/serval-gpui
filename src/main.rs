@@ -169,6 +169,9 @@ struct TerminalBuffer {
     cursor_col: usize,
     cols: usize,
     pending_escape: String,
+    /// Per-line render cache; entries below `dirty_from` are up to date.
+    rendered_lines: Vec<String>,
+    dirty_from: usize,
 }
 
 impl Default for TerminalBuffer {
@@ -179,6 +182,8 @@ impl Default for TerminalBuffer {
             cursor_col: 0,
             cols: PTY_COLS as usize,
             pending_escape: String::new(),
+            rendered_lines: Vec::new(),
+            dirty_from: 0,
         }
     }
 }
@@ -287,17 +292,24 @@ impl TerminalBuffer {
         }
     }
 
-    fn render_text(&self) -> String {
-        self.lines
-            .iter()
-            .map(|line| {
-                // Trim the padding indicatif's {wide_msg} adds to fill the
-                // (wide) PTY line.
-                let text: String = line.iter().collect();
-                text.trim_end().to_string()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+    fn render_text(&mut self) -> String {
+        let from = self
+            .dirty_from
+            .min(self.lines.len())
+            .min(self.rendered_lines.len());
+        self.rendered_lines.truncate(from);
+        for line in &self.lines[from..] {
+            // Trim the padding indicatif's {wide_msg} adds to fill the
+            // (wide) PTY line.
+            let text: String = line.iter().collect();
+            self.rendered_lines.push(text.trim_end().to_string());
+        }
+        self.dirty_from = self.lines.len();
+        self.rendered_lines.join("\n")
+    }
+
+    fn mark_dirty(&mut self, row: usize) {
+        self.dirty_from = self.dirty_from.min(row);
     }
 
     fn clear(&mut self) {
@@ -305,6 +317,8 @@ impl TerminalBuffer {
         self.cursor_row = 0;
         self.cursor_col = 0;
         self.pending_escape.clear();
+        self.rendered_lines.clear();
+        self.dirty_from = 0;
     }
 
     fn apply_csi(&mut self, params: &str, command: char) {
@@ -315,6 +329,7 @@ impl TerminalBuffer {
                 "0" => {
                     self.ensure_line(self.cursor_row);
                     self.lines[self.cursor_row].truncate(self.cursor_col);
+                    self.mark_dirty(self.cursor_row);
                 }
                 "1" => {
                     self.ensure_line(self.cursor_row);
@@ -323,11 +338,13 @@ impl TerminalBuffer {
                     for ch in &mut line[..end] {
                         *ch = ' ';
                     }
+                    self.mark_dirty(self.cursor_row);
                 }
                 "2" => {
                     self.ensure_line(self.cursor_row);
                     self.lines[self.cursor_row].clear();
                     self.cursor_col = 0;
+                    self.mark_dirty(self.cursor_row);
                 }
                 _ => {}
             },
@@ -356,6 +373,7 @@ impl TerminalBuffer {
                     self.ensure_line(self.cursor_row);
                     self.lines[self.cursor_row].truncate(self.cursor_col);
                     self.lines.truncate(self.cursor_row + 1);
+                    self.mark_dirty(self.cursor_row);
                 }
             }
             // Cursor forward/back within the line (rustyline prompt redraws).
@@ -394,6 +412,7 @@ impl TerminalBuffer {
             line.push(ch);
         }
         self.cursor_col += 1;
+        self.mark_dirty(self.cursor_row);
     }
 
     fn new_line(&mut self) {
@@ -408,8 +427,11 @@ impl TerminalBuffer {
     }
 
     fn ensure_line(&mut self, row: usize) {
-        while self.lines.len() <= row {
-            self.lines.push(Vec::new());
+        if self.lines.len() <= row {
+            self.mark_dirty(self.lines.len());
+            while self.lines.len() <= row {
+                self.lines.push(Vec::new());
+            }
         }
     }
 
@@ -422,6 +444,12 @@ impl TerminalBuffer {
         let remove = self.lines.len() - MAX_BUFFER_LINES;
         self.lines.drain(..remove);
         self.cursor_row = self.cursor_row.saturating_sub(remove);
+        if self.rendered_lines.len() >= remove {
+            self.rendered_lines.drain(..remove);
+        } else {
+            self.rendered_lines.clear();
+        }
+        self.dirty_from = self.dirty_from.saturating_sub(remove);
     }
 }
 
@@ -449,6 +477,7 @@ struct RootView {
     pty_input: Entity<TextInput>,
     terminal_buffer: TerminalBuffer,
     output_log: String,
+    output_dirty: bool,
     run_state: RunState,
     cancel_requested: bool,
     running_command_kind: Option<CommandKind>,
@@ -1032,9 +1061,12 @@ impl RootView {
     }
 
     fn append_output(&mut self, line: impl AsRef<str>, cx: &mut Context<Self>) {
+        let follow = self.output_follows_tail();
         self.terminal_buffer.append_log_line(line.as_ref());
-        self.output_log = self.terminal_buffer.render_text();
-        self.output_scroll_handle.scroll_to_bottom();
+        self.output_dirty = true;
+        if follow {
+            self.output_scroll_handle.scroll_to_bottom();
+        }
         cx.notify();
     }
 
@@ -1043,15 +1075,39 @@ impl RootView {
             return;
         }
 
+        let follow = self.output_follows_tail();
         self.terminal_buffer.push_chunk(chunk.as_ref());
-        self.output_log = self.terminal_buffer.render_text();
-        self.output_scroll_handle.scroll_to_bottom();
+        self.output_dirty = true;
+        if follow {
+            self.output_scroll_handle.scroll_to_bottom();
+        }
         cx.notify();
+    }
+
+    /// Sticky scroll: only keep following the stream while the user has not
+    /// scrolled up to read older output.
+    fn output_follows_tail(&self) -> bool {
+        let max_offset = self.output_scroll_handle.max_offset().height;
+        if max_offset <= px(0.0) {
+            return true;
+        }
+        // offset.y runs from 0 at the top to -max_offset at the bottom.
+        self.output_scroll_handle.offset().y - px(8.0) <= -max_offset
+    }
+
+    /// Rebuild the displayed log lazily, coalescing all chunks that arrived
+    /// since the last frame into one render pass.
+    fn refresh_output_log(&mut self) {
+        if self.output_dirty {
+            self.output_log = self.terminal_buffer.render_text();
+            self.output_dirty = false;
+        }
     }
 
     fn clear_output(&mut self, cx: &mut Context<Self>) {
         self.terminal_buffer.clear();
         self.output_log.clear();
+        self.output_dirty = false;
         cx.notify();
     }
 
@@ -2158,6 +2214,8 @@ impl Render for RootView {
         {
             self.queue_serval_version_status_refresh_in(window, cx);
         }
+
+        self.refresh_output_log();
 
         let entity = cx.entity();
         let entity_observe = entity.clone();
@@ -4633,6 +4691,7 @@ impl Render for RootView {
                                                         .cursor_pointer()
                                                         .on_click(move |_, _, cx| {
                                                             entity.update(cx, |view, cx| {
+                                                                view.refresh_output_log();
                                                                 cx.write_to_clipboard(
                                                                     ClipboardItem::new_string(
                                                                         view.output_log.clone(),
@@ -5059,6 +5118,7 @@ fn main() {
                     pty_input,
                     terminal_buffer: TerminalBuffer::default(),
                     output_log: String::new(),
+                    output_dirty: false,
                     run_state: RunState::Idle,
                     cancel_requested: false,
                     running_command_kind: None,
@@ -5208,6 +5268,19 @@ mod tests {
             buffer.push_chunk(&String::from_utf8_lossy(chunk));
         }
         println!("{}", buffer.render_text());
+    }
+
+    #[test]
+    fn cached_render_tracks_interleaved_overwrites() {
+        let mut buffer = TerminalBuffer::default();
+        buffer.push_chunk("intro\nProgress 1");
+        assert_eq!(buffer.render_text(), "intro\nProgress 1");
+        buffer.push_chunk("\r\u{001b}[2KProgress 2");
+        assert_eq!(buffer.render_text(), "intro\nProgress 2");
+        buffer.push_chunk("\nDone");
+        assert_eq!(buffer.render_text(), "intro\nProgress 2\nDone");
+        buffer.clear();
+        assert_eq!(buffer.render_text(), "");
     }
 
     #[test]
