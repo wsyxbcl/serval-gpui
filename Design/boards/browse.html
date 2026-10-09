@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Waxbill · Browse and pick</title>
+<link rel="stylesheet" href="components.css">
+</head>
+<body>
+<h1 class="board">Browse and pick</h1>
+<p class="board-note">Rules: <code>spec/browse.md</code>. Open a tags table, filter across all deployments, look at the images, rate 1–5 and fix species. Labels come from the table, so nothing is scanned to start; thumbnails load only for what is on screen. Edits are written to XMP in the background through Serval.</p>
+
+<!-- ① grid -->
+<div class="state" data-state="browse-grid">
+  <div class="state-label">① browse-grid <code>按部署、物种、评分筛选，跨文件夹浏览；只为屏幕上的图片生成缩略图</code></div>
+  <div class="window" data-active="browse">
+    <div class="main wide">
+      <div class="scroll">
+        <div class="filters">
+          <h4>来源</h4>
+          <div class="segmented" style="font-size:12px;margin-bottom:6px"><span class="on">表格</span><span>文件夹</span></div>
+          <div style="font-size:12px;color:var(--muted-foreground)">tags_DQ202509-202512_filled.csv<br>14,106 行 <span class="link">更换</span></div>
+          <h4>物种</h4>
+          <div class="opt on"><span class="check on"></span>雪豹<span class="count">1,212</span></div>
+          <div class="opt"><span class="check"></span>岩羊<span class="count">2,031</span></div>
+          <div class="opt"><span class="check"></span>赤狐<span class="count">644</span></div>
+          <div style="color:var(--muted-foreground);padding:2px 4px">… 另外 28 个</div>
+          <h4>评分 <span style="font-weight:400">· 快选</span> <span class="link" style="font-weight:400">全部 ≥3 ≥4 5</span></h4>
+          <div class="opt on"><span class="check on"></span>未评分<span class="count">960</span></div>
+          <div class="opt on"><span class="check on"></span><span style="color:var(--warning)">★</span><span class="count">41</span></div>
+          <div class="opt"><span class="check"></span><span style="color:var(--warning)">★★</span><span class="count">52</span></div>
+          <div class="opt"><span class="check"></span><span style="color:var(--warning)">★★★</span><span class="count">49</span></div>
+          <div class="opt"><span class="check"></span><span style="color:var(--warning)">★★★★</span><span class="count">70</span></div>
+          <div class="opt"><span class="check"></span><span style="color:var(--warning)">★★★★★</span><span class="count">40</span></div>
+          <h4>部署 <span style="font-weight:400">· 路径第 4 层</span> <span class="link" style="font-weight:400">更改</span></h4>
+          <div class="opt on"><span class="check on"></span>全部 42 个<span class="count">1,212</span></div>
+          <div class="opt"><span class="check"></span>DQ01<span class="count">312</span></div>
+          <h4>文件夹</h4>
+          <div class="opt"><span class="check"></span>DQ01/100MEDIA<span class="count">298</span></div>
+          <h4>日期</h4>
+          <div class="input" style="height:30px;font-size:12px"><span class="value">2025-09-03 – 2025-12-18</span></div>
+        </div>
+        <div class="pane">
+          <div class="toolbar">
+            <span class="shown"><b>1,001</b> / 14,106 张</span>
+            <span class="btn ghost">按时间 ▾</span>
+            <span class="spacer"></span>
+            <span class="saved">✓ 已保存</span>
+            <span class="btn">写入文件…</span>
+          </div>
+          <div class="tiles">
+            <div class="tile focus"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL01</span><span>DQ01</span><span class="stars">★</span></div></div>
+            <div class="tile"><div class="img night"></div><div class="meta"><span class="sp">雪豹</span><span>DQ01</span><span class="stars"></span></div></div>
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL03</span><span>DQ04</span><span class="stars"></span></div></div>
+            <div class="tile"><div class="img video">▶</div><div class="meta"><span class="sp">雪豹</span><span>DQ04</span><span class="stars"></span></div></div>
+            <div class="tile"><div class="img night"></div><div class="meta"><span class="sp">雪豹+岩羊</span><span>DQ07</span><span class="stars">★</span></div></div>
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹</span><span>DQ07</span><span class="stars"></span></div></div>
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL01</span><span>DQ09</span><span class="stars"></span></div></div>
+            <div class="tile"><div class="img night"></div><div class="meta"><span class="sp">雪豹</span><span>DQ09</span><span class="stars">★</span></div></div>
+            <div class="tile"><div class="img loading"></div><div class="meta"><span class="sp">雪豹</span><span>DQ12</span></div></div>
+            <div class="tile"><div class="img loading"></div><div class="meta"><span class="sp">雪豹</span><span>DQ12</span></div></div>
+            <div class="tile"><div class="img loading"></div><div class="meta"><span class="sp">雪豹 · SL07</span><span>DQ15</span></div></div>
+            <div class="tile"><div class="img loading"></div><div class="meta"><span class="sp">雪豹</span><span>DQ15</span></div></div>
+          </div>
+          <div class="actionbar"><span style="color:var(--muted-foreground)">空格或双击打开 · 1–5 评分 · 0 清除评分 · ⇧ 点击多选</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">Counts in the filter lists are faceted (each list counts under the other filters). "写入文件…" writes the table's labels into the sidecars (state ④); it is needed only once, for a table filled by the labellers.</div>
+</div>
+
+<!-- ② viewer -->
+<div class="state" data-state="browse-viewer">
+  <div class="state-label">② browse-viewer <code>单张查看：评分按 1–5，物种可改；修改立即显示，几秒内写入 XMP</code></div>
+  <div class="window" data-active="browse">
+    <div class="main wide">
+      <div class="scroll" style="flex-direction:column">
+        <div class="toolbar">
+          <span class="btn ghost">← 网格</span>
+          <span class="shown"><b>42</b> / 1,212</span>
+          <span class="spacer"></span>
+          <span class="saved"><span class="dot run"></span>正在写入 1 项…</span>
+          <span class="btn ghost">在文件夹中显示</span>
+          <span class="btn ghost">用默认程序打开</span>
+        </div>
+        <div class="viewer">
+          <div class="photo"><span class="nav-l">‹</span><div class="frame"></div><span class="nav-r">›</span><span class="pos">IMG_0042.JPG · 4608 × 2592</span></div>
+          <div class="info">
+            <div class="fname">IMG_0042.JPG</div>
+            <div class="sub">DQ01/100MEDIA/IMG_0042.JPG</div>
+            <dl>
+              <dt>评分</dt><dd><span class="stars-lg">★★★★<span class="off">★</span></span></dd>
+              <dt>物种</dt><dd><span class="tag">雪豹 <span class="x">✕</span></span><span class="btn ghost" style="height:26px;padding:0 6px">＋ 添加</span></dd>
+              <dt>个体</dt><dd><span class="tag">SL01 <span class="x">✕</span></span><span class="btn ghost" style="height:26px;padding:0 6px">＋</span></dd>
+              <dt>时间</dt><dd>2025-10-03 06:12:44</dd>
+              <dt>部署</dt><dd>DQ01</dd>
+            </dl>
+            <div class="keys"><span class="kbd">←</span><span class="kbd">→</span>上一张 / 下一张<br><span class="kbd">1</span>–<span class="kbd">5</span>评分 · <span class="kbd">0</span>清除<br><span class="kbd">S</span>改物种 · <span class="kbd">I</span>改个体<br><span class="kbd">Ctrl+Z</span>撤销 · <span class="kbd">Esc</span>回到网格</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">The image is decoded at screen size in the background; the next and previous images are prepared ahead. The save indicator returns to "✓ 已保存" when Serval confirms the write.</div>
+</div>
+
+<!-- ③ stale after edit -->
+<div class="state" data-state="browse-stale">
+  <div class="state-label">③ browse-stale <code>改了评分后不再符合筛选：先变暗留在原处，刷新后才消失</code></div>
+  <div class="window compact" data-active="browse">
+    <div class="main wide">
+      <div class="scroll">
+        <div class="filters">
+          <h4>物种</h4>
+          <div class="opt on"><span class="check on"></span>雪豹<span class="count">1,212</span></div>
+          <h4>评分</h4>
+          <div class="segmented" style="font-size:12px"><span>全部</span><span>未评</span><span>≥3</span><span class="on">≥4</span><span>5</span></div>
+        </div>
+        <div class="pane">
+          <div class="toolbar">
+            <span class="shown"><b>310</b> / 14,106 张</span>
+            <span class="chip">2 张已不符合筛选 · 刷新</span>
+            <span class="spacer"></span>
+            <span class="saved">✓ 已保存</span>
+          </div>
+          <div class="tiles">
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL01</span><span class="stars">★★★★</span></div></div>
+            <div class="tile stale"><span class="badge">不符合筛选</span><div class="img night"></div><div class="meta"><span class="sp">雪豹</span><span class="stars">★★</span></div></div>
+            <div class="tile focus"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL03</span><span class="stars">★★★★★</span></div></div>
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹</span><span class="stars">★★★★</span></div></div>
+            <div class="tile stale"><span class="badge">不符合筛选</span><div class="img"></div><div class="meta"><span class="sp">雪豹</span><span class="stars">★</span></div></div>
+            <div class="tile"><div class="img night"></div><div class="meta"><span class="sp">雪豹+岩羊</span><span class="stars">★★★★</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">The count already reflects the new ratings (310); the dimmed tiles leave on "刷新" or when the filter changes, so the grid does not jump while rating.</div>
+</div>
+
+<!-- ④ write table -->
+<div class="state" data-state="browse-write-table">
+  <div class="state-label">④ browse-write-table <code>把标注人员填好的表写入文件：先检查（--dry-run），说明会改什么</code></div>
+  <div class="dialog-host" style="width:960px">
+    <div class="scrim">
+      <div class="window compact" data-active="browse">
+        <div class="main wide"><div class="scroll"><div class="pane"><div class="toolbar"><span class="shown"><b>14,106</b> 张</span><span class="spacer"></span><span class="btn">写入文件…</span></div><div class="tiles"></div></div></div></div>
+      </div>
+    </div>
+    <div class="dialog">
+      <h2>把表格中的标签写入 XMP</h2>
+      <p>已检查 14,106 个文件。表格中的值会覆盖文件里的值；空白的单元格不会改动文件。</p>
+      <table class="table">
+        <tr><th>字段</th><th style="text-align:right">将修改的文件</th></tr>
+        <tr><td>物种</td><td class="num">4,210</td></tr>
+        <tr><td>个体</td><td class="num">233</td></tr>
+        <tr><td>评分</td><td class="num">0</td></tr>
+        <tr><td>时间</td><td class="num">0</td></tr>
+        <tr class="flag"><td>其中会移除表中没有的物种</td><td class="num">12</td></tr>
+        <tr><td><b>共计（不重复）</b></td><td class="num"><b>4,301</b></td></tr>
+      </table>
+      <p style="margin-top:12px">还有 318 个文件没有 XMP 旁注文件，将从媒体文件创建。每个文件保留一份原始备份。</p>
+      <div class="footer"><span class="btn ghost">查看 12 个文件</span><span style="flex:1"></span><span class="btn">取消</span><span class="btn primary">写入 4,301 个文件</span></div>
+    </div>
+  </div>
+  <div class="state-note">Runs <code>serval xmp write --dry-run</code> to fill this dialog, then <code>serval xmp write --create-missing</code> with progress in the toolbar. Only needed for tables whose labels are not in the files yet.</div>
+</div>
+
+<!-- ⑤ selection -->
+<div class="state" data-state="browse-selection">
+  <div class="state-label">⑤ browse-selection <code>多选后的操作：复制、在文件夹中显示、批量评分</code></div>
+  <div class="window compact" data-active="browse">
+    <div class="main wide">
+      <div class="scroll">
+        <div class="pane">
+          <div class="toolbar"><span class="shown"><b>310</b> / 14,106 张</span><span class="spacer"></span><span class="saved">✓ 已保存</span></div>
+          <div class="tiles">
+            <div class="tile sel"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL01</span><span class="stars">★★★★★</span></div></div>
+            <div class="tile sel"><div class="img night"></div><div class="meta"><span class="sp">雪豹</span><span class="stars">★★★★★</span></div></div>
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹 · SL03</span><span class="stars">★★★★</span></div></div>
+            <div class="tile sel"><div class="img"></div><div class="meta"><span class="sp">雪豹</span><span class="stars">★★★★★</span></div></div>
+            <div class="tile"><div class="img"></div><div class="meta"><span class="sp">雪豹</span><span class="stars">★★★★</span></div></div>
+            <div class="tile sel"><div class="img night"></div><div class="meta"><span class="sp">雪豹+岩羊</span><span class="stars">★★★★★</span></div></div>
+          </div>
+          <div class="actionbar"><b>已选 24 张</b><span class="btn">复制到…</span><span class="btn ghost">在文件夹中显示</span><span class="btn ghost">设为 ★ ▾</span><span class="spacer"></span><span class="btn ghost">取消选择</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">"复制到…" copies media with their sidecars by writing the selected rows to a subset table and running <code>serval extract &lt;subset&gt; -f path -v ALL_VALUES</code> (pairs kept, interrupted copies resume, conflicts asked once). "在文件夹中显示" opens the file manager at the first selected file.</div>
+</div>
+
+<script src="components.js"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Waxbill · Shell</title>
+<link rel="stylesheet" href="components.css">
+</head>
+<body>
+<h1 class="board">Shell: window, sidebar, one task per screen</h1>
+<p class="board-note">Rules: <code>spec/shell.md</code>. One primary button per screen, in the run bar. The form only holds what this command needs; the exact Serval command stays visible in the run bar.</p>
+
+<div class="state" data-state="observe-ready">
+  <div class="state-label">① observe-ready <code>标签获取，表单已填好</code></div>
+  <div class="window" data-active="observe" data-serval="ok">
+    <div class="main">
+      <div class="scroll"><div class="content">
+        <h2 class="screen-title">标签获取</h2>
+        <p class="screen-sub">读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。 <a>帮助</a></p>
+
+        <div class="card">
+          <div class="field">
+            <label>媒体文件夹</label>
+            <div class="path-input"><div class="input"><span class="value">/data/2024_spring</span></div><span class="btn">选择…</span></div>
+            <div class="help">找到 12,480 张图片、1,302 个视频</div>
+          </div>
+          <div class="field">
+            <label>读取来源</label>
+            <div class="choice-row"><span class="radio on">媒体文件</span><span class="radio">XMP 旁注文件</span></div>
+          </div>
+          <div class="field">
+            <label>媒体类型</label>
+            <div class="choice-row"><span class="check on">图片</span><span class="check on">视频</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="field">
+            <label>输出位置</label>
+            <div class="path-input"><div class="input"><span class="value">/data/2024_spring_serval_output</span><span class="suffix">默认</span></div><span class="btn">更改…</span></div>
+            <div class="help">默认放在输入文件夹旁边，不会混进媒体文件夹。</div>
+          </div>
+          <div class="disclosure">▸ 高级选项</div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status">
+          <div class="line"><span class="dot"></span><b>就绪</b>· 将读取 13,782 个文件</div>
+          <div class="cmd">serval observe --progress json -o /data/2024_spring_serval_output/serval_observe /data/2024_spring</div>
+        </div>
+        <span class="btn ghost">复制命令</span>
+        <span class="btn primary wide">运行 <span class="kbd">Ctrl+Enter</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="state" data-state="dark-observe-ready" data-appearance="dark">
+  <div class="state-label">② dark-observe-ready <code>同一状态的深色外观</code></div>
+  <div class="window" data-active="observe" data-serval="ok">
+    <div class="main">
+      <div class="scroll"><div class="content">
+        <h2 class="screen-title">标签获取</h2>
+        <p class="screen-sub">读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。 <a>帮助</a></p>
+        <div class="card">
+          <div class="field">
+            <label>媒体文件夹</label>
+            <div class="path-input"><div class="input"><span class="value">/data/2024_spring</span></div><span class="btn">选择…</span></div>
+            <div class="help">找到 12,480 张图片、1,302 个视频</div>
+          </div>
+          <div class="field">
+            <label>读取来源</label>
+            <div class="choice-row"><span class="radio on">媒体文件</span><span class="radio">XMP 旁注文件</span></div>
+          </div>
+          <div class="field">
+            <label>媒体类型</label>
+            <div class="choice-row"><span class="check on">图片</span><span class="check on">视频</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="field">
+            <label>输出位置</label>
+            <div class="path-input"><div class="input"><span class="value">/data/2024_spring_serval_output</span><span class="suffix">默认</span></div><span class="btn">更改…</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status">
+          <div class="line"><span class="dot"></span><b>就绪</b>· 将读取 13,782 个文件</div>
+          <div class="cmd">serval observe --progress json -o /data/2024_spring_serval_output/serval_observe /data/2024_spring</div>
+        </div>
+        <span class="btn ghost">复制命令</span>
+        <span class="btn primary wide">运行 <span class="kbd">Ctrl+Enter</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="state" data-state="first-run">
+  <div class="state-label">③ first-run <code>首次启动：没有找到 Serval</code></div>
+  <div class="window" data-active="observe" data-serval="missing">
+    <div class="main">
+      <div class="scroll"><div class="content">
+        <h2 class="screen-title">欢迎使用 Waxbill</h2>
+        <p class="screen-sub">Waxbill 是 Serval 的图形界面。开始之前需要一个 Serval 程序。</p>
+        <div class="card">
+          <div class="card-title">SERVAL</div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div style="flex:1">
+              <div style="font-weight:600">选择 Serval 程序</div>
+              <div style="font-size:13px;color:var(--muted-foreground)">Serval 程序由项目组提供（serval.exe / serval）。选择后 Waxbill 会检查版本并记住它。</div>
+            </div>
+            <span class="btn">选择…</span>
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:var(--muted-foreground)">需要 Serval 0.8 或以上。</div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot err"></span><b>需要 Serval</b>· 选择程序后即可运行</div></div>
+        <span class="btn primary wide disabled">运行</span>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">Run stays visible but disabled, with the reason next to it. Downloading Serval comes later, from the project's own server (GitHub is often unreachable for users).</div>
+</div>
+
+<script src="components.js"></script>
+</body>
+</html>

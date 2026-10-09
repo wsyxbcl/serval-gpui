@@ -1,0 +1,43 @@
+# Decisions
+
+Numbered proposals and their status. Confirmed items are implemented through the topic specs; proposals are
+not implemented before they are confirmed. When an item is confirmed, its topic spec and board are updated in
+place and the status changes here.
+
+| No. | Topic | Status | Where |
+| --- | --- | --- | --- |
+| W01 | Move to `gpui-kit` 0.7 (gpui-pre + gpui-component), pinned to an exact version | Confirmed 2026-10-08 | [appearance](appearance.md) |
+| W02 | Default output next to the input, not inside it | Confirmed 2026-10-08 | [run](run.md#output-location) |
+| W03 | Waxbill passes every answer as a flag; Serval prompts only remain for the terminal; no two-way protocol | Confirmed 2026-10-08 | [serval-protocol](serval-protocol.md), [questions](questions.md) |
+| W04 | Redesign, with this directory as the source | Confirmed 2026-10-08 | this directory |
+| W05 | Sidebar groups 数据整理 / 数据分析 / 工具 (names in shell §2); one task per screen | Confirmed 2026-10-09 | [shell](shell.md) |
+| W06 | Sticky run bar with one button; results first, log collapsed | Confirmed 2026-10-09 | [run](run.md) |
+| W07 | Path levels picked on a sample path (also in browse); capture interval shown on a timeline of real records; conflicts as a dialog after Serval stops with the list | Confirmed 2026-10-09 | [questions](questions.md) |
+| W08 | Serval chosen by the user (provided by the project); not bundled, not linked; no GitHub access. Download and update later, from the project's own server | Confirmed 2026-10-08 | [settings](settings.md) |
+| W09 | Palette and type from the brand (paper, teal ink, coral bill), light and dark | Confirmed 2026-10-09 | [appearance](appearance.md) |
+| W10 | Settings as a screen in the main window instead of a separate window; how help looks is decided later | Confirmed 2026-10-09 | [settings](settings.md) |
+| W11 | Waxbill is the GUI for Serval's wrangling, preparing data towards CamtrapDP; CamtrapDP import/export and xlsx support come in Serval 0.9; Biowatch stays the tool for maps, analysis and AI | Confirmed 2026-10-09 | Serval 0.9 (not yet specified) |
+| W12 | Read the input before the run: choices from real values, table check and repair, previews of what the run will do | Confirmed 2026-10-08 (direction); details proposed | [data](data.md) |
+| W13 | Identified species asked after the observe scan, from the real species, only when needed; remembered per folder | Confirmed 2026-10-08 | [questions §4](questions.md#4-identified-species) |
+| W15 | Writing labels: CLI gains only `xmp write` (overwrite from CSV, all fields in one pass, empty cells unchanged); per-file `xmp get`/`xmp set` exist only for Waxbill (hidden, JSON) | Confirmed 2026-10-09 | [serval-protocol §5](serval-protocol.md#5-writing-labels) |
+| W16 | Browse and pick in Waxbill: open a table or a folder, filter across deployments and folders, grid and viewer, rating 1–5 and species edits written to XMP in the background; no database | Confirmed 2026-10-09 | [browse](browse.md) |
+| W17 | Details: background writing; edited items stay dimmed until refresh; `--backup first`; output `<input>_serval_output/`; table repair as a copy; Waxbill requires Serval ≥ 0.8.0; no `--select` (Waxbill writes a subset table); thumbnails as JPEG, 1 GB cache; video frame previews later | Confirmed 2026-10-09 (thumbnail format proposed) | [browse](browse.md), [data](data.md), [run](run.md) |
+| W14 | Further GUI features: next steps, result tables, quick look, correction loop, project memory | For discussion | [data §5](data.md#5-further-gui-features-for-discussion) |
+
+## Common direction
+
+- Waxbill is a light front end for Serval: forms in, files out. It does not reimplement Serval.
+- Every screen says what will happen, what is happening, or what happened, and what to do next.
+- The exact Serval command stays visible and copyable; Waxbill never does anything the command line cannot.
+- Plain words over technical detail; the raw log is always one click away.
+
+## W03 Flags instead of prompts: confirmed
+
+Everything Serval asks while running falls into three kinds (inventory in
+[serval-protocol §1](serval-protocol.md#1-what-serval-asks-today)): plain parameters, path-level choices, and
+decisions that depend on what the run finds. All of them can be answered before the run or by a rerun, so
+Waxbill runs Serval as a plain process with a complete set of flags: no PTY, no reading prompt text. The CLI
+keeps prompting when a flag is missing, so typing users see no change.
+
+Cost: Serval needs the flags, a progress output and a structured result (one Serval release). Conflicts cost
+a second planning pass (no copying) when they occur.

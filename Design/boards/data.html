@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Waxbill · Working from the user's data</title>
+<link rel="stylesheet" href="components.css">
+<style>.mini-form .field { margin-bottom: 14px; }</style>
+</head>
+<body>
+<h1 class="board">Working from the user's data</h1>
+<p class="board-note">Rules: <code>spec/data.md</code>. Waxbill reads the input before the run and builds the choices from real values, with counts, and shows what the run will do. This is what the command line cannot do.</p>
+
+<div class="state" data-state="extract-from-data">
+  <div class="state-label">① extract-from-data <code>媒体提取：从表里的真实值中选择，即时显示匹配数量、大小与样例</code></div>
+  <div class="window" data-active="extract">
+    <div class="main">
+      <div class="scroll"><div class="content mini-form">
+        <h2 class="screen-title">媒体提取</h2>
+        <p class="screen-sub">按标签筛选，把照片、视频和 XMP 一起复制到新文件夹。</p>
+        <div class="card">
+          <div class="field"><label>标签表</label>
+            <div class="path-input"><div class="input"><span class="value">/data/2024_spring_serval_output/serval_observe/tags_2024_spring.csv</span></div><span class="btn">选择…</span></div>
+            <div class="help">14,106 行 · 31 个物种 · 42 个部署 · 2024-03-02 至 2024-06-28</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">选择要提取的记录</div>
+          <div class="grid2">
+            <div class="values">
+              <div class="search">⌕ 搜索物种</div>
+              <div class="item"><span class="check on"></span>雪豹<span class="count">1,212</span><span class="bar"><i style="width:60%"></i></span></div>
+              <div class="item"><span class="check on"></span>兔狲<span class="count">288</span><span class="bar"><i style="width:15%"></i></span></div>
+              <div class="item"><span class="check"></span>岩羊<span class="count">2,031</span><span class="bar"><i style="width:100%"></i></span></div>
+              <div class="item"><span class="check"></span>赤狐<span class="count">644</span><span class="bar"><i style="width:32%"></i></span></div>
+              <div class="item dim"><span class="check"></span>（无物种标签）<span class="count">5,880</span><span class="bar"><i style="width:0"></i></span></div>
+              <div class="item dim">… 另外 26 个</div>
+            </div>
+            <div>
+              <div class="field"><label>评分</label><span class="segmented"><span class="on">全部</span><span>≥ 3</span><span>≥ 4</span><span>5</span></span></div>
+              <div class="field"><label>部署</label><div class="input"><span class="value">全部 42 个</span><span class="suffix">▾</span></div></div>
+              <div class="field"><label>日期</label><div class="input"><span class="value">2024-03-02 – 2024-06-28</span><span class="suffix">▾</span></div></div>
+            </div>
+          </div>
+          <div class="summary" style="margin-top:16px"><span><b>1,412</b>个文件</span><span><b>1,500</b>条记录</span><span><b>8.3</b>GB</span><span>来自 18 个部署</span></div>
+          <div class="thumbs" style="margin-top:12px"><span data-label="IMG_0042"></span><span data-label="IMG_0043"></span><span data-label="IMG_0108"></span><span data-label="MOV_0012"></span><span data-label="IMG_0311"></span><span data-label="IMG_0412"></span></div>
+          <div class="help" style="margin-top:6px">匹配记录中的样例 · 点击可放大 · <span class="link">换一批</span></div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot"></span><b>就绪</b>· 1,412 个文件，约 8.3 GB，输出磁盘剩余 412 GB</div>
+          <div class="cmd">serval extract -f advanced -v "sp:雪豹 or sp:兔狲" --keep-dirs 2 --progress json -o …/serval_extract …/tags_2024_spring.csv</div></div>
+        <span class="btn ghost">复制命令</span>
+        <span class="btn primary wide">运行 <span class="kbd">Ctrl+Enter</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">Choices on species, individual, rating, event and custom become Serval's own filter expression. Choosing deployments or a date range writes the chosen rows to a subset table in the output folder and runs <code>serval extract &lt;subset&gt; -f path -v ALL_VALUES</code>; no Serval change is needed. Counts, size and free space are computed in the background as the selection changes.</div>
+</div>
+
+<div class="state" data-state="csv-check-repair">
+  <div class="state-label">② csv-check-repair <code>表格体检：被 Excel/WPS 改过的表格，运行前发现并修复为副本</code></div>
+  <div class="window compact" data-active="capture">
+    <div class="main">
+      <div class="scroll"><div class="content mini-form">
+        <h2 class="screen-title">独立捕获</h2>
+        <p class="screen-sub">按时间间隔把连续拍到的记录合并为独立捕获，统计每个部署、每个物种的捕获次数。</p>
+        <div class="card">
+          <div class="field"><label>标签表</label>
+            <div class="path-input"><div class="input"><span class="value">D:\玛多数据处理\tags_玛多_改.csv</span></div><span class="btn">选择…</span></div></div>
+          <div class="banner warn" style="margin:0"><div style="flex:1"><div class="title">这个表格需要修复后才能运行</div>
+            <div>· 编码是 GBK，Serval 需要 UTF-8</div>
+            <div>· 1,204 行的时间格式被改动，例如 <span class="mono">2023/10/5 06:09</span> → <span class="mono">2023-10-05 06:09:00</span>（缺少的秒数补为 00）</div>
+            <div>· “individual” 列像是被当成了数字（如 <span class="mono">1</span>），原来的前导零无法恢复，请检查</div>
+            <div style="margin-top:6px;color:var(--muted-foreground)">修复后另存为 tags_玛多_改.utf8.csv，原文件不变。</div></div>
+            <div class="actions"><span class="btn">生成修复后的副本</span></div></div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot warn"></span><b>还不能运行</b>· 表格的编码和时间格式需要修复</div></div>
+        <span class="btn primary wide disabled">运行</span>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">Blocking problems (encoding, unparseable times, missing required columns) disable Run with the reason; non-blocking ones (IDs that look numeric) are warnings. After repair the field points to the copy.</div>
+</div>
+
+<div class="state" data-state="translate-coverage">
+  <div class="state-label">③ translate-coverage <code>物种名替换：列名来自标签表的表头，运行前就看到哪些物种翻译不了</code></div>
+  <div class="window compact" data-active="translate">
+    <div class="main">
+      <div class="scroll"><div class="content mini-form">
+        <h2 class="screen-title">物种名替换</h2>
+        <p class="screen-sub">按标签表把物种名换成另一种写法（例如中文名、学名）。</p>
+        <div class="card">
+          <div class="field"><label>要替换的表</label><div class="path-input"><div class="input"><span class="value">…/tags_2024_spring.csv</span></div><span class="btn">选择…</span></div></div>
+          <div class="field"><label>标签表</label><div class="path-input"><div class="input"><span class="value">/data/taglist_maze.csv</span></div><span class="btn">选择…</span></div></div>
+          <div class="field"><label>替换</label><div style="display:flex;gap:8px;align-items:center"><div class="input" style="max-width:180px"><span class="value">tag</span><span class="suffix">▾</span></div>→<div class="input" style="max-width:180px"><span class="value">tagCN</span><span class="suffix">▾</span></div></div></div>
+          <div class="banner warn" style="margin:0"><div><div class="title">31 个物种中有 2 个不在标签表里</div>Wolf（12 行）、Pika spp.（3 行）。可以在标签表里补上后重新检查。</div><div class="actions"><span class="btn">重新检查</span></div></div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot warn"></span><b>还不能运行</b>· 2 个物种无法翻译</div></div>
+        <span class="btn primary wide disabled">运行</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="state" data-state="update-preview">
+  <div class="state-label">④ update-preview <code>元数据更新：运行前列出将要做的修改，问题行直接标出</code></div>
+  <div class="window compact" data-active="update">
+    <div class="main">
+      <div class="scroll"><div class="content mini-form">
+        <h2 class="screen-title">元数据更新</h2>
+        <p class="screen-sub">按表中的 xmp_update 列修改 XMP 里的标签；每个文件只写一次，并保留备份。</p>
+        <div class="card">
+          <div class="field"><label>修改表</label><div class="path-input"><div class="input"><span class="value">…/tags_2024_spring.csv</span></div><span class="btn">选择…</span></div></div>
+          <div class="field"><label>修改内容</label><span class="segmented"><span class="on">物种</span><span>个体</span><span>评分</span><span>时间</span></span></div>
+          <table class="table">
+            <tr><th>原值</th><th>新值</th><th style="text-align:right">文件数</th></tr>
+            <tr><td>Fox</td><td>Red fox</td><td class="num">210</td></tr>
+            <tr><td>（新增）</td><td>Deer</td><td class="num">3</td></tr>
+            <tr class="flag"><td>Fox</td><td>Vulpes · 与上一行冲突</td><td class="num">1</td></tr>
+          </table>
+          <div class="help">将修改 213 个 XMP 文件；1 个文件的修改互相冲突（第 88、89 行），需要先在表里改好。</div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot warn"></span><b>还不能运行</b>· 1 个冲突</div></div>
+        <span class="btn ghost">打开表格</span>
+        <span class="btn primary wide disabled">运行</span>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">The preview groups rows the way Serval applies them (per file, against the file's tags); it is a reading of the CSV only. Serval still checks every file before writing.</div>
+</div>
+
+<script src="components.js"></script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+/* Waxbill design tokens: the single source for colours, type, spacing, radii and motion.
+ * Colour names follow gpui-component's theme keys (background, foreground, primary, muted,
+ * border, sidebar, ...) so the app theme can mirror this file one to one.
+ * :root is the light appearance; [data-appearance="dark"] the dark one. */
+
+:root {
+  /* Brand (from the app icon): plumage greys, the coral-red bill, the teal-ink wordmark. */
+  --brand-ink: #183030;
+  --brand-bill: #e35d5b;
+
+  /* Surfaces */
+  --background: #f7f4ef;          /* window: warm paper */
+  --surface: #ffffff;             /* cards, forms, dialogs */
+  --sidebar: #efebe4;
+  --sidebar-foreground: #3d3a35;
+  --sidebar-active: #ffffff;
+  --overlay: rgba(24, 48, 48, 0.32);
+
+  /* Text */
+  --foreground: #1c2626;
+  --muted-foreground: #6e6a64;
+  --subtle-foreground: #9a958d;   /* placeholders, disabled */
+
+  /* Lines and fills */
+  --border: #e2ddd5;
+  --input-border: #d6d0c6;
+  --muted: #f1ede6;               /* quiet fills: chips, code, table head */
+  --ring: #2f6b68;                /* keyboard focus */
+
+  /* Actions */
+  --primary: #1f4a48;             /* the one primary button per screen */
+  --primary-hover: #183b39;
+  --primary-foreground: #ffffff;
+  --accent: var(--brand-bill);    /* selected navigation marker, links in text */
+
+  /* Status */
+  --success: #2f7d4f;
+  --success-soft: #e6f2ea;
+  --warning: #a86512;
+  --warning-soft: #fbf0dc;
+  --danger: #b42318;
+  --danger-soft: #fbe8e6;
+  --info-soft: #e7eff0;
+
+  /* Progress */
+  --progress-track: #e6e1d9;
+  --progress-bar: var(--primary);
+
+  /* Type: system UI faces; CJK falls back to the platform's Chinese UI font. */
+  --font-ui: "Inter", "Segoe UI", "SF Pro Text", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Mono", "Noto Sans Mono CJK SC", ui-monospace, monospace;
+  --text-xs: 12px;   /* captions, table meta */
+  --text-sm: 13px;   /* body in dense areas, field help */
+  --text-md: 14px;   /* body, fields, buttons */
+  --text-lg: 16px;   /* section titles */
+  --text-xl: 20px;   /* screen titles */
+  --leading: 1.5;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Radii */
+  --radius-sm: 6px;   /* fields, buttons, chips */
+  --radius-md: 8px;   /* cards */
+  --radius-lg: 12px;  /* dialogs */
+
+  /* Layout */
+  --window-default-w: 1200px;
+  --window-default-h: 780px;
+  --window-min-w: 900px;
+  --window-min-h: 600px;
+  --sidebar-w: 224px;
+  --content-max-w: 840px;
+  --titlebar-h: 44px;
+  --runbar-h: 64px;
+  --field-h: 34px;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(24, 48, 48, 0.06);
+  --shadow-dialog: 0 12px 32px rgba(24, 48, 48, 0.18);
+
+  /* Motion */
+  --motion-fast-ms: 120ms;     /* hover, press */
+  --motion-panel-ms: 160ms;    /* expand/collapse, dialog in */
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-appearance="dark"] {
+  --background: #141a1a;
+  --surface: #1b2323;
+  --sidebar: #111717;
+  --sidebar-foreground: #c9d1cf;
+  --sidebar-active: #222c2c;
+  --overlay: rgba(0, 0, 0, 0.5);
+
+  --foreground: #e7ecea;
+  --muted-foreground: #9aa5a2;
+  --subtle-foreground: #6c7775;
+
+  --border: #2a3434;
+  --input-border: #354141;
+  --muted: #212a2a;
+  --ring: #7fc4be;
+
+  --primary: #7fc4be;
+  --primary-hover: #95d3cd;
+  --primary-foreground: #0f1717;
+  --accent: #f07a73;
+
+  --success: #6fbf8b;
+  --success-soft: #1d2e24;
+  --warning: #e0a050;
+  --warning-soft: #33291a;
+  --danger: #f08070;
+  --danger-soft: #3a1f1c;
+  --info-soft: #1f2b2c;
+
+  --progress-track: #2a3434;
+  --progress-bar: var(--primary);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-dialog: 0 12px 32px rgba(0, 0, 0, 0.5);
+}

@@ -106,6 +106,9 @@ Rules:
 - [x] Make the output pane scale to long runs: per-line render cache with lazy per-frame rebuild instead of re-rendering the whole buffer on every PTY chunk, and sticky auto-scroll that stops following the tail while the user has scrolled up.
 - [x] Refactor `RootView::render` to extract shared `chip`/`chip_base`/`input_row`/`browse_button`/`muted_label` helpers and centralize the chip color palette, cutting `main.rs` from ~5150 to ~4030 lines with no behavior change.
 - [x] Add a CI workflow that runs `cargo test` and `cargo clippy -D warnings` on push/PR (no prior workflow verified the codebase before release).
+- [x] Review the app against the current Serval (findings G1–G12 in the 2026-10-08 review) and start the redesign: `Design/` with specs, boards, tokens and the decision log (see `Design/spec/decisions.md` for what is confirmed).
+- [ ] Serval side: flags, `--progress json` events and exit codes from `Design/spec/serval-protocol.md` (Serval repository).
+- [ ] Implement the redesign on `gpui-kit` 0.7 once the remaining proposals in `Design/spec/decisions.md` are confirmed.
 
 ---
 

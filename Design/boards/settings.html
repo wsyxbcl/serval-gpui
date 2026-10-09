@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Waxbill · Settings</title>
+<link rel="stylesheet" href="components.css">
+<style>
+  .setting { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .setting:last-child { border-bottom: none; }
+  .setting .what { flex: 1; }
+  .setting .what .name { font-weight: 500; }
+  .setting .what .desc { font-size: 13px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<h1 class="board">Settings: Serval, language, appearance</h1>
+<p class="board-note">Rules: <code>spec/settings.md</code>, <code>spec/serval-delivery.md</code>. Settings is a screen in the main window (sidebar bottom), not a separate window. Serval's state is one of: ready, missing, unsupported version. Download and update checks come later, from the project's own server.</p>
+
+<div class="state" data-state="settings-ready">
+  <div class="state-label">① settings-ready <code>Serval 正常</code></div>
+  <div class="window compact" data-active="settings" data-serval="ok">
+    <div class="main">
+      <div class="scroll"><div class="content">
+        <h2 class="screen-title">设置</h2>
+        <p class="screen-sub">修改会立即生效并保存。</p>
+        <div class="card">
+          <div class="card-title">SERVAL</div>
+          <div class="setting"><div class="what"><div class="name">Serval 0.8.0 <span class="dot ok" style="display:inline-block;margin-left:6px"></span></div><div class="desc"><span class="mono">C:\Program Files\Serval\serval.exe</span> · 兼容</div></div><span class="btn">更换程序…</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">界面</div>
+          <div class="setting"><div class="what"><div class="name">语言</div></div><span class="segmented"><span class="on">中文</span><span>English</span></span></div>
+          <div class="setting"><div class="what"><div class="name">外观</div></div><span class="segmented"><span class="on">跟随系统</span><span>浅色</span><span>深色</span></span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<div class="state" data-state="settings-unsupported">
+  <div class="state-label">② settings-unsupported <code>选了不兼容的 Serval：说明原因和办法</code></div>
+  <div class="window compact" data-active="settings" data-serval="old">
+    <div class="main">
+      <div class="scroll"><div class="content">
+        <h2 class="screen-title">设置</h2>
+        <p class="screen-sub">修改会立即生效并保存。</p>
+        <div class="card">
+          <div class="card-title">SERVAL</div>
+          <div class="banner err" style="margin:0 0 8px"><div><div class="title">这个 Serval 版本太旧（0.6.7）</div>Waxbill 需要 Serval 0.8 或以上，否则无法传入运行参数。请向项目组获取新版本。</div><div class="actions"><span class="btn">选择其他程序…</span></div></div>
+          <div class="setting"><div class="what"><div class="name">/usr/local/bin/serval</div><div class="desc">自定义程序</div></div><span class="btn">选择…</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<script src="components.js"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Waxbill · Questions as fields</title>
+<link rel="stylesheet" href="components.css">
+<style>
+  .mini-form .field { margin-bottom: 14px; }
+  .suggest { position: relative; }
+  .suggest .menu { position: absolute; top: 38px; left: 0; width: 260px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-dialog); padding: 4px; z-index: 3; font-size: var(--text-sm); }
+  .suggest .menu div { padding: 5px 10px; border-radius: 4px; display: flex; }
+  .suggest .menu div span { margin-left: auto; color: var(--muted-foreground); }
+  .suggest .menu div.hl { background: var(--muted); }
+</style>
+</head>
+<body>
+<h1 class="board">Questions become fields</h1>
+<p class="board-note">Rules: <code>spec/questions.md</code>, <code>spec/serval-protocol.md</code>. Everything Serval used to ask while running is answered in the form before Run and passed as flags, except the two questions that depend on what the run finds: conflicts (in <code>run-states</code>) and identified species (③). Path levels are chosen on a real sample path read from the input; Serval's own guess is preselected.</p>
+
+<div class="state" data-state="capture-ready">
+  <div class="state-label">① capture-ready <code>独立捕获：部署层级在样例路径上点选；参数都是普通字段</code></div>
+  <div class="window" data-active="capture">
+    <div class="main">
+      <div class="scroll"><div class="content mini-form">
+        <h2 class="screen-title">独立捕获</h2>
+        <p class="screen-sub">按时间间隔把连续拍到的记录合并为独立捕获，统计每个部署、每个物种的捕获次数。 <a>帮助</a></p>
+        <div class="card">
+          <div class="field"><label>标签表</label>
+            <div class="path-input"><div class="input"><span class="value">/data/2024_spring_serval_output/serval_observe/tags_2024_spring.csv</span></div><span class="btn">选择…</span></div>
+            <div class="help">14,106 行 · 也可以选择 Camtrap DP 的 observations.csv</div></div>
+          <div class="field"><label>部署所在的文件夹层级</label>
+            <div class="pathbar"><span class="seg pick">data</span><span class="sep">/</span><span class="seg pick">2024_spring</span><span class="sep">/</span><span class="seg pick">col_a</span><span class="sep">/</span><span class="seg on">dep01_col_a</span><span class="sep">/</span><span class="seg pick">100MEDIA</span><span class="sep">/</span><span class="seg file">IMG_0001.JPG</span></div>
+            <div class="picked-note">点选路径中代表部署的一层。已选 <b>dep01_col_a</b>（自动识别）· 表中共有 <b>42</b> 个部署</div></div>
+        </div>
+        <div class="card">
+          <div class="field"><label>独立性间隔</label>
+            <div style="display:flex;gap:8px;align-items:center"><div class="input small"><span class="value">30</span><span class="suffix">分钟</span></div><span class="help" style="margin:0">同一部署、同一物种两条记录相隔不少于此时间，才算两次独立捕获。</span></div>
+            <div class="timeline"><span class="band" style="left:5%;width:11.7%"></span><span class="band" style="left:37.5%;width:4.6%"></span><span class="band" style="left:72.9%;width:10.4%"></span><span class="tick" style="left:5%"></span><span class="tick" style="left:6.25%"></span><span class="tick" style="left:12.9%"></span><span class="tick" style="left:16.7%"></span><span class="tick" style="left:37.5%"></span><span class="tick" style="left:42.1%"></span><span class="tick" style="left:72.9%"></span><span class="tick" style="left:75.8%"></span><span class="tick" style="left:83.3%"></span><span class="hour" style="left:0%">06:00</span><span class="hour" style="left:25%">07:00</span><span class="hour" style="left:50%">08:00</span><span class="hour" style="left:75%">09:00</span><span class="hour" style="left:100%">10:00</span></div>
+            <div class="timeline-note">例：DQ07 · 雪豹 · 2025-10-03。按 30 分钟：这一天 <b>9</b> 条记录 → <b>3</b> 次独立捕获（相隔 50、74 分钟处分开）</div></div>
+          <div class="field"><label>间隔从哪条记录算起</label>
+            <div><span class="radio on">上一条记录</span><div class="choice-help">每条记录都重新计时（默认）</div></div>
+            <div style="margin-top:6px"><span class="radio">上一条独立记录</span><div class="choice-help">只在已计为独立的记录处重新计时</div></div></div>
+          <div class="field"><label>分析对象</label><span class="segmented"><span class="on">物种</span><span>个体</span></span></div>
+          <div class="field"><label>选项</label>
+            <div class="choice-row"><span class="check on">生成事件编号</span><span class="check on">排除空拍等默认标签</span></div>
+            <div class="help">默认排除：空标签、Blank、Useless data、Unidentified、Unknown、Blur</div></div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot"></span><b>就绪</b>· 42 个部署 · 30 分钟 · 按物种</div>
+          <div class="cmd">serval capture --min-gap 30 --measure-from last-record --by species --deployment-level 4 --event --progress json -o …/serval_capture …/tags_2024_spring.csv</div></div>
+        <span class="btn ghost">复制命令</span>
+        <span class="btn primary wide">运行 <span class="kbd">Ctrl+Enter</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="state-note">The sample is the first path in the CSV. Level numbering follows Serval's rule (components counted from the root, as <code>--deployment-level</code> expects); Waxbill counts the distinct values at that level to confirm the choice.</div>
+</div>
+
+<div class="state" data-state="extract-keep-dirs">
+  <div class="state-label">② extract-keep-dirs <code>媒体提取：保留哪些文件夹，在样例路径上点选起点，下方即时显示结果路径</code></div>
+  <div class="window compact" data-active="extract">
+    <div class="main">
+      <div class="scroll"><div class="content mini-form">
+        <h2 class="screen-title">媒体提取</h2>
+        <p class="screen-sub">按标签筛选，把照片、视频和 XMP 一起复制到新文件夹。</p>
+        <div class="card">
+          <div class="field"><label>保留的文件夹</label>
+            <div class="pathbar"><span class="seg pick">只要文件</span><span class="sep">│</span><span class="seg pick">data</span><span class="sep">/</span><span class="seg pick">2024_spring</span><span class="sep">/</span><span class="seg pick">col_a</span><span class="sep">/</span><span class="seg on">dep01_col_a</span><span class="sep">/</span><span class="seg kept">100MEDIA</span><span class="sep">/</span><span class="seg file">IMG_0001.JPG</span></div>
+            <div class="picked-note">从 <b>dep01_col_a</b> 开始保留 2 层。输出示例：<br><span style="font-family:var(--font-mono)">…/serval_extract/20261008101530_雪豹/<b>dep01_col_a/100MEDIA</b>/雪豹__SL01__IMG_0001.JPG</span></div></div>
+          <div class="field"><label>整理方式</label>
+            <div class="choice-row"><span class="check">按物种分子文件夹</span><span class="check on">文件名加上标签</span></div>
+            <div class="help">文件名格式：物种__个体__原文件名，多个值用 + 连接，例如 雪豹+岩羊__SL01__IMG_0001.JPG</div></div>
+        </div>
+      </div></div>
+      <div class="runbar">
+        <div class="status"><div class="line"><span class="dot"></span><b>就绪</b>· 1,500 条记录</div>
+          <div class="cmd">serval extract -f species -v 雪豹 --keep-dirs 2 --rename --progress json -o …/serval_extract …/tags_2024_spring.csv</div></div>
+        <span class="btn ghost">复制命令</span>
+        <span class="btn primary wide">运行 <span class="kbd">Ctrl+Enter</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="state-note"><code>--keep-dirs N</code> counts folders upward from the file (0 = file only), matching how extract builds paths today.</div>
+</div>
+
+<div class="state" data-state="observe-id-species-after-scan">
+  <div class="state-label">③ observe-id-species-after-scan <code>标签获取：只在扫描发现无法判断的图片时询问，选项来自扫描到的真实物种</code></div>
+  <div class="dialog-host" style="width:960px">
+    <div class="scrim">
+      <div class="window compact" data-active="observe">
+        <div class="main">
+          <div class="scroll"><div class="content mini-form">
+            <h2 class="screen-title">标签获取</h2>
+            <p class="screen-sub">读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。</p>
+            <div class="banner ok"><div><div class="title">完成 · 读取了 13,782 个文件</div>记录 14,106 行，31 个物种</div></div>
+          </div></div>
+          <div class="runbar"><div class="status"><div class="line"><span class="dot warn"></span><b>完成，有 1 条提示</b></div></div><span class="btn primary wide">再次运行</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog">
+      <h2>6 张图片的个体编号归属不明确</h2>
+      <p>这些图片里同时有多个物种和个体编号，XMP 没有记录编号属于哪个物种。勾选做了个体识别的物种，编号就会归到它们。</p>
+      <div class="values" style="margin-bottom:8px">
+        <div class="item"><span class="check on"></span>雪豹<span class="count">6 张 · SL01、SL03 等 4 个编号</span></div>
+        <div class="item"><span class="check"></span>岩羊<span class="count">5 张</span></div>
+        <div class="item"><span class="check"></span>赤狐<span class="count">1 张</span></div>
+      </div>
+      <p style="margin:0">选择会记住，下次处理这个文件夹时直接使用。</p>
+      <div class="footer"><span class="btn">先不处理</span><span class="btn primary">重新运行（约 2 分钟）</span></div>
+    </div>
+  </div>
+  <div class="state-note">Shown only when Serval reports unresolved images (the <code>unresolved</code> event carries the species involved, with counts and the individual IDs seen). The rerun repeats the scan, so the button shows the last run's duration. "先不处理" keeps the result as it is (every individual paired with every species in those 6 images) with the banner from <code>run-states</code> ⑧.</div>
+</div>
+
+<script src="components.js"></script>
+</body>
+</html>

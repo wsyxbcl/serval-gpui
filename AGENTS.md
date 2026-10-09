@@ -24,6 +24,15 @@ The current preferred direction is:
 - use PTY-backed execution for interactive commands such as `capture`
 - show the exact command being run and stream output in an integrated pane
 
+## Design comes first
+
+- `Design/` is the first source for how Waxbill looks and behaves (rules in `Design/spec/*.md`, states in
+  `Design/boards/*.html`, tokens in `Design/boards/tokens.css`). A change to behaviour or appearance edits the
+  spec and the board in the same change as the code; replace outdated rules in place, never keep versioned copies.
+- Proposals are tracked in `Design/spec/decisions.md`; do not implement a proposal before it is confirmed.
+- After editing a board, render it with `scripts/render-design.sh <board>.html`.
+- Pull requests that change the UI include before and after screenshots of the real app.
+
 ## Primary operating rules
 
 1. Maintain `ROADMAP.md` continuously until the planned work is complete.
