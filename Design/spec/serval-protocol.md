@@ -18,7 +18,7 @@ Every place the current Serval stops for input (branch `fix/review-2026-09`):
 | 6 | `extract` | top folder to keep | input paths (before the run) | `--keep-dirs <N>` |
 | 7 | `observe` | individually identified species | what the scan finds | `--id-species <NAME>` (repeatable) |
 | 8 | `extract`, `align`, `xmp copy` | skip / replace / new name for differing targets | what the plan finds | `--on-existing <skip\|replace\|rename>` |
-| 9 | `serval-check` | save the list of untagged files | nothing | `--save-untagged` (not used by Waxbill) |
+| 9 | `serval-check` | save the list of untagged files | nothing | none: a separate volunteer tool, always run in a terminal |
 
 Kinds: 1–3 and 9 are plain parameters; 4–6 depend only on the input paths, which exist before the run; 7–8 are
 the only true runtime decisions.
@@ -62,17 +62,27 @@ they can be told apart from ordinary messages. Progress bars are not drawn in th
 {"serval":"progress","phase":"plan","done":800,"total":1500}
 {"serval":"progress","phase":"copy","done":1204,"total":1500}
 {"serval":"warning","message":"Missing XMP file","path":"/data/…/MOV_0012.MP4"}
-{"serval":"needs","kind":"conflicts","count":37,"ready":1463,"items":[{"target":"…/IMG_0042.JPG","reason":"sidecar-differs"}]}
+{"serval":"needs","kind":"conflicts","count":37,"ready":1463,"already":0,"items":[{"target":"…/IMG_0042.JPG","reasons":["sidecar-differs"]}]}
 {"serval":"unresolved","kind":"id-species","count":6,"species":[{"name":"雪豹","images":6,"individuals":["SL01","SL03"]},{"name":"岩羊","images":5}],"paths":["…"]}
 {"serval":"output","kind":"csv","path":"…/tags_2024_spring_media_20261008.csv","rows":14106}
 {"serval":"summary","written":1463,"already":0,"skipped":37,"replaced":0,"failed":0}
+{"serval":"error","path":"…/IMG_0042.JPG.xmp","message":"Tag mismatch: expected …"}
+{"serval":"error","message":"1 file(s) cannot be updated, no file was changed."}
 ```
 
-- `phase` names: `scan`, `read`, `plan`, `copy`, `move`, `write`, `analyse`. `total` is omitted when unknown
-  (Waxbill shows an indeterminate bar with `done`).
+- `phase` names: `scan`, `read`, `plan`, `copy`, `move`, `write`, `remove`, `analyse`. `total` is omitted when
+  unknown (Waxbill shows an indeterminate bar with `done`). The last position of a phase is always reported before
+  the next phase, a result or the end of the run.
 - Progress is throttled to about 10 events per second.
-- `needs.items` lists at most 200 entries; `count` is the full number. Reasons: `file-differs`,
-  `sidecar-differs`, `unrelated-sidecar`.
+- `needs.items` lists at most 200 entries; `count` is the full number; `ready` and `already` are the targets that
+  can be written directly and those already in place. Each item has `reasons`: `file-differs`, `sidecar-differs`,
+  `unrelated-sidecar`.
+- `summary` fields depend on the command: transfers (`written`, `already`, `skipped`, `replaced`, `failed`; with
+  `dry_run`: `to_write`, `already`, `conflicting`), updates (`updated`, `already`, `failed`), init (`created`,
+  `existing`, `failed`), sync/remove (`done`, `skipped`, `failed`).
+- `error` with a `path` is one file's problem (e.g. an update row that does not match); `error` without a path is
+  the run's failure, emitted last.
+- `--progress` is a global option (`serval --progress json …` or after the subcommand).
 - `output` is emitted for every file or folder a run produces (`csv`, `folder`, `log`); it replaces parsing
   "Saved to …".
 - Exit codes: `0` success (possibly with warnings), `1` failed (some or all files), `2` usage error, `3` stopped
