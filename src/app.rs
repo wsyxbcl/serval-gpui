@@ -55,6 +55,8 @@ pub const DESIGN_STATES: &[&str] = &[
     "extract-keep-dirs",
     "extract-conflicts",
     "observe-id-species-after-scan",
+    "browse-grid",
+    "browse-viewer",
 ];
 
 /// What the command line asks for at launch.
@@ -77,6 +79,7 @@ pub struct Waxbill {
     /// Screens that are only paths, checkboxes and choices.
     simple: HashMap<ScreenId, Entity<SimpleForm>>,
     translate: Entity<TranslateForm>,
+    browse: Entity<crate::browse::Browse>,
     update: Entity<UpdateForm>,
     /// The choice in the conflicts dialog: skip, replace or rename (questions.md §3).
     pub(crate) conflict_choice: usize,
@@ -100,6 +103,7 @@ impl Waxbill {
         let capture = cx.new(|cx| CaptureForm::new(window, cx));
         let extract = cx.new(|cx| ExtractForm::new(window, cx));
         let translate = cx.new(|cx| TranslateForm::new(window, cx));
+        let browse = cx.new(crate::browse::Browse::new);
         let update = cx.new(|cx| UpdateForm::new(window, cx));
         let simple: HashMap<ScreenId, Entity<SimpleForm>> = [
             (ScreenId::XmpInit, &simple::XMP_INIT),
@@ -121,6 +125,7 @@ impl Waxbill {
             extract,
             simple,
             translate,
+            browse,
             update,
             conflict_choice: 0,
             id_species: None,
@@ -169,6 +174,16 @@ impl Waxbill {
                     .insert(ScreenId::Observe, Run::example_unresolved());
                 app.ask_id_species(cx);
             }
+            // Browse states open the table remembered in the settings (real data, not the board's samples).
+            Some(state @ ("browse-grid" | "browse-viewer")) => {
+                app.screen = ScreenId::Browse;
+                let program = cx.default_global::<Settings>().serval.clone();
+                app.detect_serval(program, false, cx);
+                app.browse.update(cx, |browse, cx| {
+                    browse.open_viewer_when_read = state == "browse-viewer";
+                    browse.restore(cx);
+                });
+            }
             Some("capture-ready") => {
                 app.serval = example_serval("0.8.0", "serval");
                 app.screen = ScreenId::Capture;
@@ -208,6 +223,7 @@ impl Waxbill {
                 app.translate
                     .update(cx, |form, cx| form.restore(window, cx));
                 app.update.update(cx, |form, cx| form.restore(window, cx));
+                app.browse.update(cx, |browse, cx| browse.restore(cx));
                 for form in app.simple.values() {
                     form.update(cx, |form, cx| form.restore(window, cx));
                 }
@@ -253,6 +269,9 @@ impl Waxbill {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                cx.set_global(crate::browse::ServalProgram(
+                    status.program().map(Into::into),
+                ));
                 this.serval = status;
                 cx.notify();
             });
@@ -742,7 +761,16 @@ impl Waxbill {
             )
     }
 
-    fn render_screen(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_screen(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.screen == ScreenId::Browse {
+            // Browse fills the content area: filters, grid and viewer, no form or run bar.
+            return div()
+                .flex_1()
+                .min_w_0()
+                .h_full()
+                .child(self.browse.clone())
+                .into_any_element();
+        }
         let tokens = cx.tokens().clone();
         let form = self.form();
         let content = if self.screen == ScreenId::Settings {
@@ -785,9 +813,15 @@ impl Waxbill {
                     .child(content),
             );
         let bar = form.as_ref().map(|form| self.bar(form, cx));
-        v_flex().flex_1().min_w_0().h_full().child(body).children(
-            bar.map(|bar| run_bar(bar, cx.listener(|this, _, _, cx| this.run_or_stop(cx)), cx)),
-        )
+        v_flex()
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .child(body)
+            .children(
+                bar.map(|bar| run_bar(bar, cx.listener(|this, _, _, cx| this.run_or_stop(cx)), cx)),
+            )
+            .into_any_element()
     }
 }
 
