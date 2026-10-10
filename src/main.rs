@@ -7,7 +7,6 @@ mod conflicts;
 mod i18n;
 mod id_species;
 mod output;
-mod protocol;
 mod results;
 mod run;
 mod run_bar;

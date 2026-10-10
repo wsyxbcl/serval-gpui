@@ -8,8 +8,9 @@ use crate::i18n::{Language, count, language, t};
 use crate::table::Csv;
 use crate::theme::TokensExt;
 use gpui_kit::component::button::Button;
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{ActiveTheme, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme, Sizable as _, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::collections::{BTreeMap, BTreeSet};
@@ -133,10 +134,34 @@ fn is_datetime(text: &str) -> bool {
         })
 }
 
+/// The write preview: `serval xmp write --dry-run` on the table (board browse.html browse-write-table).
+enum WriteCheck {
+    Idle,
+    Checking,
+    Done {
+        summary: serde_json::Map<String, serde_json::Value>,
+        problems: Vec<String>,
+    },
+    Failed(String),
+}
+
+const FIELDS: [(&str, &str, &str); 4] = [
+    ("species", "物种", "Species"),
+    ("individual", "个体", "Individual"),
+    ("rating", "评分", "Rating"),
+    ("datetime", "时间", "Time"),
+];
+
 pub struct UpdateForm {
     csv: Entity<InputState>,
     mode: usize,
     table: Option<Result<Csv, String>>,
+    /// Write the whole table as it is (`xmp write`) instead of the xmp_update column.
+    write: bool,
+    fields: [bool; 4],
+    create_missing: bool,
+    check: WriteCheck,
+    check_generation: usize,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -157,6 +182,11 @@ impl UpdateForm {
             csv,
             mode: 0,
             table: None,
+            write: false,
+            fields: [true; 4],
+            create_missing: true,
+            check: WriteCheck::Idle,
+            check_generation: 0,
             _subscriptions: vec![subscription],
         }
     }
@@ -172,7 +202,85 @@ impl UpdateForm {
             .csv_path(cx)
             .filter(|p| p.is_file())
             .map(|p| Csv::read(&p));
+        self.recheck(cx);
         cx.notify();
+    }
+
+    /// Open a table in the write mode (from 浏览与精选's 应用表格到文件).
+    pub fn apply_table(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.write = true;
+        self.csv
+            .update(cx, |input, cx| input.set_value(path, window, cx));
+        self.read(cx);
+    }
+
+    fn write_args(&self, csv: &Path, dry_run: bool) -> Vec<String> {
+        let mut args = vec!["xmp".to_string(), "write".into()];
+        if self.fields.iter().any(|f| !f) {
+            let fields: Vec<&str> = FIELDS
+                .iter()
+                .zip(self.fields)
+                .filter(|(_, on)| *on)
+                .map(|((name, ..), _)| *name)
+                .collect();
+            args.extend(["--fields".into(), fields.join(",")]);
+        }
+        if self.create_missing {
+            args.push("--create-missing".into());
+        }
+        if dry_run {
+            args.push("--dry-run".into());
+        }
+        args.extend([
+            "--progress".into(),
+            "json".into(),
+            csv.to_string_lossy().into(),
+        ]);
+        args
+    }
+
+    /// Run the dry run again a moment after the table or the options change.
+    pub fn recheck(&mut self, cx: &mut Context<Self>) {
+        self.check_generation += 1;
+        let generation = self.check_generation;
+        let program = cx
+            .try_global::<crate::serval::ServalProgram>()
+            .and_then(|p| p.0.clone());
+        let csv = self.csv_path(cx).filter(|p| p.is_file());
+        let (Some(program), Some(csv), true, true) =
+            (program, csv, self.write, self.fields.iter().any(|f| *f))
+        else {
+            self.check = WriteCheck::Idle;
+            return;
+        };
+        self.check = WriteCheck::Checking;
+        let args = self.write_args(&csv, true);
+        let cwd = csv
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(std::env::temp_dir);
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(300))
+                .await;
+            if this
+                .update(cx, |this, _| this.check_generation != generation)
+                .unwrap_or(true)
+            {
+                return;
+            }
+            let check = cx
+                .background_executor()
+                .spawn(async move { dry_run(&program, &args, &cwd) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if this.check_generation == generation {
+                    this.check = check;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     fn preview(&self) -> Option<Preview> {
@@ -200,6 +308,9 @@ impl UpdateForm {
     }
 
     pub fn plan(&self, cx: &App) -> Plan {
+        if self.write {
+            return self.write_plan(cx);
+        }
         let csv = self.csv_path(cx);
         let mut args = vec!["xmp".to_string(), "update".into()];
         match MODES[self.mode] {
@@ -254,10 +365,66 @@ impl UpdateForm {
         Plan { args, cwd, ready }
     }
 
+    fn write_plan(&self, cx: &App) -> Plan {
+        let csv = self.csv_path(cx);
+        let args = match &csv {
+            Some(csv) => self.write_args(csv, false),
+            None => vec!["xmp".into(), "write".into()],
+        };
+        let changed = |summary: &serde_json::Map<String, serde_json::Value>| {
+            summary.get("changed").and_then(|v| v.as_u64()).unwrap_or(0)
+        };
+        let ready = match (&csv, &self.check) {
+            (None, _) => Err(t("选择要写入的表", "choose the table to write").to_string()),
+            (Some(p), _) if !p.is_file() => {
+                Err(t("找不到这个表格", "the table does not exist").to_string())
+            }
+            _ if !self.fields.iter().any(|f| *f) => {
+                Err(t("至少选择一个字段", "choose at least one field").to_string())
+            }
+            (_, WriteCheck::Idle) => {
+                Err(t("需要 Serval 才能检查", "Serval is needed to check").to_string())
+            }
+            (_, WriteCheck::Checking) => Err(t("正在检查…", "checking…").to_string()),
+            (_, WriteCheck::Failed(err)) => Err(err.clone()),
+            (_, WriteCheck::Done { problems, .. }) if !problems.is_empty() => {
+                Err(match language() {
+                    Language::Chinese => format!("{} 个文件有问题", count(problems.len())),
+                    Language::English => format!("{} files have problems", count(problems.len())),
+                })
+            }
+            (_, WriteCheck::Done { summary, .. }) if changed(summary) == 0 => {
+                Err(t("文件已与表格一致", "the files already match the table").to_string())
+            }
+            (_, WriteCheck::Done { summary, .. }) => Ok(match language() {
+                Language::Chinese => format!("将写入 {} 个文件", count(changed(summary) as usize)),
+                Language::English => {
+                    format!("{} files will be written", count(changed(summary) as usize))
+                }
+            }),
+        };
+        let cwd = csv
+            .as_ref()
+            .and_then(|p| p.parent().map(Path::to_path_buf))
+            .filter(|p| p.is_dir())
+            .unwrap_or_else(std::env::temp_dir);
+        Plan { args, cwd, ready }
+    }
+
     pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
+        let flag = |b: bool| if b { "1" } else { "0" }.to_string();
         vec![
             ("csv", self.csv.read(cx).value().to_string()),
             ("mode", self.mode.to_string()),
+            ("write", flag(self.write)),
+            (
+                "fields",
+                self.fields
+                    .iter()
+                    .map(|f| if *f { '1' } else { '0' })
+                    .collect(),
+            ),
+            ("create_missing", flag(self.create_missing)),
         ]
     }
 
@@ -268,6 +435,16 @@ impl UpdateForm {
             .and_then(|m| m.parse().ok())
             .filter(|&m| m < MODES.len())
             .unwrap_or(0);
+        self.write = settings.form_value("xmp_update", "write") == Some("1");
+        self.create_missing = settings.form_value("xmp_update", "create_missing") != Some("0");
+        if let Some(fields) = settings
+            .form_value("xmp_update", "fields")
+            .filter(|f| f.len() == 4)
+        {
+            for (i, c) in fields.chars().enumerate() {
+                self.fields[i] = c == '1';
+            }
+        }
         if let Some(csv) = settings
             .form_value("xmp_update", "csv")
             .filter(|v| !v.is_empty())
@@ -441,14 +618,48 @@ impl Render for UpdateForm {
                         ))),
                 )
                 .child(help_line(
-                    t(
-                        "在 xmp_update 列填新值（时间填 xmp_update_datetime 列）；原值为空的行表示新增。要把整张表写入文件，请用浏览与精选。",
-                        "Fill new values in xmp_update (times in xmp_update_datetime); rows with an empty old value add a tag. To write a whole table into the files, use Browse and pick.",
-                    ),
+                    if self.write {
+                        t(
+                            "标注员填好的表，或从 Caracal 导出的表：表中的标签原样写入 XMP；空白的单元格不会改动文件。",
+                            "A table filled in by labellers, or exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged.",
+                        )
+                    } else {
+                        t(
+                            "在 xmp_update 列填新值（时间填 xmp_update_datetime 列）；原值为空的行表示新增。",
+                            "Fill new values in xmp_update (times in xmp_update_datetime); rows with an empty old value add a tag.",
+                        )
+                    },
                     Tone::Quiet,
                     cx,
                 )),
         );
+        let way = {
+            let this = cx.entity().downgrade();
+            card(cx).child(
+                field(t("写入方式", "How"), cx).child(h_flex().child(segmented(
+                    "update-way",
+                    &[
+                        t("按 xmp_update 列修改", "Change by the xmp_update column"),
+                        t("整表写入", "Write the whole table"),
+                    ],
+                    self.write as usize,
+                    move |index, _, cx| {
+                        let _ = this.update(cx, |this, cx| {
+                            this.write = index == 1;
+                            this.recheck(cx);
+                            cx.notify();
+                        });
+                    },
+                ))),
+            )
+        };
+        if self.write {
+            return v_flex()
+                .gap(tokens.px("space-4"))
+                .child(input)
+                .child(way)
+                .child(self.render_write(cx));
+        }
         let this = cx.entity().downgrade();
         let changes = card(cx)
             .child(
@@ -494,7 +705,202 @@ impl Render for UpdateForm {
         v_flex()
             .gap(tokens.px("space-4"))
             .child(input)
+            .child(way)
             .child(changes)
+    }
+}
+
+impl UpdateForm {
+    fn render_write(&self, cx: &mut Context<Self>) -> Div {
+        let tokens = cx.tokens().clone();
+        let muted = cx.theme().muted_foreground;
+        let fields = h_flex()
+            .gap(tokens.px("space-5"))
+            .children(FIELDS.iter().enumerate().map(|(i, (_, zh, en))| {
+                Checkbox::new(("write-field", i))
+                    .label(t(zh, en))
+                    .checked(self.fields[i])
+                    .on_click(cx.listener(move |this, on: &bool, _, cx| {
+                        this.fields[i] = *on;
+                        this.recheck(cx);
+                        cx.notify();
+                    }))
+            }));
+        let create = Checkbox::new("create-missing")
+            .label(t(
+                "没有 XMP 的媒体文件，从媒体文件创建",
+                "Create missing XMP files from the media files",
+            ))
+            .checked(self.create_missing)
+            .on_click(cx.listener(|this, on: &bool, _, cx| {
+                this.create_missing = *on;
+                this.recheck(cx);
+                cx.notify();
+            }));
+        let number = |summary: &serde_json::Map<String, serde_json::Value>, key: &str| {
+            summary.get(key).and_then(|v| v.as_u64()).unwrap_or(0) as usize
+        };
+        let preview: Div = match &self.check {
+            WriteCheck::Idle => help_line(
+                t(
+                    "选择表格后自动检查（--dry-run，不写入）。",
+                    "Checked automatically once a table is chosen (--dry-run, nothing written).",
+                ),
+                Tone::Quiet,
+                cx,
+            ),
+            WriteCheck::Checking => help_line(
+                t("正在检查每个文件…", "Checking every file…"),
+                Tone::Quiet,
+                cx,
+            ),
+            WriteCheck::Failed(err) => help_line(err.clone(), Tone::Danger, cx),
+            WriteCheck::Done { summary, problems } => {
+                let row = |label: String, value: usize, strong: bool| {
+                    h_flex()
+                        .justify_between()
+                        .px(tokens.px("space-3"))
+                        .py(px(5.))
+                        .border_t_1()
+                        .border_color(cx.theme().border)
+                        .when(strong, |r| r.font_semibold())
+                        .child(label)
+                        .child(count(value))
+                };
+                let fields = summary
+                    .get("fields")
+                    .and_then(|f| f.as_object())
+                    .cloned()
+                    .unwrap_or_default();
+                let mut table = v_flex()
+                    .rounded(tokens.px("radius-sm"))
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .bg(tokens.color("surface"))
+                    .child(
+                        h_flex()
+                            .justify_between()
+                            .px(tokens.px("space-3"))
+                            .py(px(5.))
+                            .text_size(tokens.px("text-sm"))
+                            .text_color(muted)
+                            .child(t("字段", "Field"))
+                            .child(t("将修改的文件", "Files to change")),
+                    );
+                for (i, (key, zh, en)) in FIELDS.iter().enumerate() {
+                    if self.fields[i] {
+                        table = table.child(row(
+                            t(zh, en).to_string(),
+                            fields.get(*key).and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+                            false,
+                        ));
+                    }
+                }
+                table = table
+                    .child(row(
+                        t(
+                            "其中会移除表中没有的值",
+                            "of which lose values not in the table",
+                        )
+                        .to_string(),
+                        number(summary, "removed_values"),
+                        false,
+                    ))
+                    .child(row(
+                        t("共计（不重复）", "In all (distinct)").to_string(),
+                        number(summary, "changed"),
+                        true,
+                    ));
+                let mut notes = Vec::new();
+                notes.push(match language() {
+                    Language::Chinese => format!(
+                        "已检查 {} 个文件，{} 个已经与表格一致。表格中的值会覆盖文件里的值；空白的单元格不会改动文件。每个文件保留一份原始备份。",
+                        count(number(summary, "changed") + number(summary, "already")),
+                        count(number(summary, "already"))
+                    ),
+                    Language::English => format!(
+                        "Checked {} files; {} already match. The table's values replace the files' values; empty cells change nothing. Each file keeps one backup of its original.",
+                        count(number(summary, "changed") + number(summary, "already")),
+                        count(number(summary, "already"))
+                    ),
+                });
+                if number(summary, "created_sidecars") > 0 {
+                    notes.push(match language() {
+                        Language::Chinese => format!("还有 {} 个文件没有 XMP 旁注文件，将从媒体文件创建。", count(number(summary, "created_sidecars"))),
+                        Language::English => format!("{} files have no XMP sidecar yet; they are created from the media files.", count(number(summary, "created_sidecars"))),
+                    });
+                }
+                v_flex()
+                    .gap(tokens.px("space-2"))
+                    .child(table)
+                    .children(notes.into_iter().map(|n| help_line(n, Tone::Quiet, cx)))
+                    .when(!problems.is_empty(), |col| {
+                        col.child(help_line(
+                            t(
+                                "这些文件需要先在表里改好：",
+                                "Fix these in the table first:",
+                            ),
+                            Tone::Danger,
+                            cx,
+                        ))
+                        .children(
+                            problems
+                                .iter()
+                                .take(50)
+                                .map(|p| help_line(p.clone(), Tone::Danger, cx)),
+                        )
+                    })
+            }
+        };
+        card(cx)
+            .child(
+                field(t("写入的字段", "Fields to write"), cx)
+                    .child(fields)
+                    .child(create),
+            )
+            .child(field(t("将要做的修改", "What will change"), cx).child(preview))
+    }
+}
+
+/// `serval xmp write --dry-run`: the summary, and each file's problem (conflicting or invalid cells, a missing
+/// sidecar) as "path (rows …): message".
+fn dry_run(program: &Path, args: &[String], cwd: &Path) -> WriteCheck {
+    use crate::runner::Event;
+    let output = match crate::runner::background_command(program)
+        .args(args)
+        .current_dir(cwd)
+        .stdin(std::process::Stdio::null())
+        .output()
+    {
+        Ok(output) => output,
+        Err(err) => return WriteCheck::Failed(format!("{}: {err}", program.display())),
+    };
+    let mut summary = None;
+    let mut problems = Vec::new();
+    let mut failure = None;
+    for line in String::from_utf8_lossy(&output.stderr).lines() {
+        match serde_json::from_str::<Event>(line) {
+            Ok(Event::Summary(map)) => summary = Some(map),
+            Ok(Event::Error {
+                message,
+                path: Some(path),
+            }) => problems.push(format!("{path}: {message}")),
+            Ok(Event::Error {
+                message,
+                path: None,
+            }) => failure = Some(message),
+            _ => {}
+        }
+    }
+    match (summary, problems.is_empty()) {
+        (Some(summary), _) => WriteCheck::Done { summary, problems },
+        (None, false) => WriteCheck::Done {
+            summary: Default::default(),
+            problems,
+        },
+        (None, true) => WriteCheck::Failed(
+            failure.unwrap_or_else(|| t("检查失败", "the check failed").to_string()),
+        ),
     }
 }
 

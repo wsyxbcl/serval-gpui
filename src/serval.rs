@@ -1,6 +1,7 @@
 //! Finding the Serval program and its version (Design/spec/settings.md §1). Waxbill needs Serval 0.8.0 or later,
 //! the first release with flags for every question and `--progress json`.
 
+use gpui_kit::Global;
 use std::path::{Path, PathBuf};
 
 pub const MIN_VERSION: (u32, u32, u32) = (0, 8, 0);
@@ -67,3 +68,8 @@ fn parse_version(version: &str) -> Option<(u32, u32, u32)> {
     let mut parts = version.split(['.', '-']).map(|p| p.parse::<u32>().ok());
     Some((parts.next()??, parts.next()??, parts.next()??))
 }
+
+/// The Serval program in use, for work started outside a run (the write preview), set when Serval is found.
+pub struct ServalProgram(pub Option<PathBuf>);
+
+impl Global for ServalProgram {}

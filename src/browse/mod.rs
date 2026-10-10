@@ -1,794 +1,586 @@
-//! 浏览与精选 Browse and pick (Design/spec/browse.md, board browse.html): open a tags table, filter across
-//! deployments and folders, and look at the images. Nothing is scanned to start: the labels come from the table and
-//! thumbnails are made only for what is on screen.
+//! 浏览与精选 Browse and pick (Design/spec/browse.md, W16): Waxbill chooses, other tools show. A tags table is
+//! opened and narrowed by species and rating; the choice is then looked at in Caracal (in the browser, where it can
+//! also be edited and exported), in the file manager (a review folder of hard links), or copied with extract; an
+//! edited table comes back through 应用表格到文件 (`xmp write`).
 
 pub mod records;
-pub mod thumbs;
-mod viewer;
-pub mod writer;
+mod review;
 
 use crate::i18n::{Language, count, language, t};
-use crate::screens::form::{Tone, help_line, level_picker};
-use crate::table::{Csv, detect_level};
+use crate::output;
+use crate::screens::form::{Tone, card, field, help_line, segmented};
+use crate::table::{Csv, date_of, detect_level};
 use crate::theme::TokensExt;
-use gpui_kit::assets::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::{ActiveTheme, Icon, StyledExt, h_flex, v_flex};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::{ActiveTheme, Disableable as _, Sizable as _, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use records::{Counts, Filters, Records};
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-use thumbs::{Thumb, Thumbnails};
-use writer::{Queue, SaveState};
+use records::{Filters, Records};
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 
-/// The Serval program in use, for writing edits (set by the shell when Serval is found).
-pub struct ServalProgram(pub Option<PathBuf>);
+pub const CARACAL_URL: &str = "https://caracal.hinature.cn";
+const LISTED: usize = 10;
+/// Rating choices, as in extract: all, ≥ 3, ≥ 4, 5.
+const RATINGS: [&[u8]; 4] = [&[], &[3, 4, 5], &[4, 5], &[5]];
 
-impl Global for ServalProgram {}
+/// What the shell does for this screen.
+pub enum BrowseEvent {
+    /// Open the table in 元数据更新, writing the whole table.
+    ApplyTable(PathBuf),
+    /// Copy the choice with 媒体提取.
+    Extract {
+        csv: PathBuf,
+        species: BTreeSet<String>,
+        rating: usize,
+    },
+}
 
-const TILE_MIN_W: f32 = 200.;
-const TILE_IMAGE_H: f32 = 130.;
-const ROW_H: f32 = 180.;
-const LISTED: usize = 8;
+impl EventEmitter<BrowseEvent> for Browse {}
 
-enum Source {
-    Nothing,
-    Reading(PathBuf),
-    Read { path: PathBuf, csv: Arc<Csv> },
-    Failed(PathBuf, String),
+enum Review {
+    None,
+    Making,
+    Made(PathBuf, usize),
+    CannotLink,
+    Failed(String),
 }
 
 pub struct Browse {
-    source: Source,
-    level: Option<usize>,
-    choosing_level: bool,
+    csv: Entity<InputState>,
+    table: Option<Result<Csv, String>>,
     records: Records,
-    /// Record index by sidecar, to apply what Serval reports after a write.
-    by_sidecar: HashMap<PathBuf, usize>,
-    filters: Filters,
-    visible: Vec<usize>,
-    counts: Counts,
-    expanded: HashSet<&'static str>,
-    focused: Option<usize>,
-    thumbs: Arc<Thumbnails>,
-    scroll: UniformListScrollHandle,
-    /// The viewer is open on the focused record.
-    viewer: bool,
-    /// Edited records that no longer match the filters: they stay, dimmed, until 刷新 (browse.md §3).
-    stale: HashSet<usize>,
-    queue: Queue,
-    save: SaveState,
-    focus: FocusHandle,
-    /// Columns of the last drawn grid, for arrow keys.
-    columns: usize,
-    /// Open the viewer on the first record once the table is read (the browse-viewer design state).
-    pub(crate) open_viewer_when_read: bool,
-    pub(crate) adding: Option<(
-        writer::Field,
-        Entity<gpui_kit::component::input::InputState>,
-    )>,
+    species: BTreeSet<String>,
+    rating: usize,
+    show_all: bool,
+    review: Review,
+    copied: bool,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl Browse {
-    pub fn new(cx: &mut Context<Self>) -> Self {
-        // Redraw when thumbnails finish.
-        cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(150))
-                    .await;
-                let alive = this
-                    .update(cx, |this, cx| {
-                        if this.thumbs.take_fresh() {
-                            cx.notify();
-                        }
-                        if this.queue.idle() {
-                            this.flush(cx);
-                        }
-                    })
-                    .is_ok();
-                if !alive {
-                    break;
-                }
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let csv = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t("选择 tags.csv", "Choose tags.csv"))
+        });
+        let subscription = cx.subscribe_in(&csv, window, |this, _, event: &InputEvent, _, cx| {
+            if matches!(event, InputEvent::Change) {
+                this.read(cx);
             }
-        })
-        .detach();
+        });
         Browse {
-            source: Source::Nothing,
-            level: None,
-            choosing_level: false,
+            csv,
+            table: None,
             records: Records { all: Vec::new() },
-            by_sidecar: HashMap::new(),
-            filters: Filters::default(),
-            visible: Vec::new(),
-            counts: Counts::default(),
-            expanded: HashSet::new(),
-            focused: None,
-            thumbs: Arc::new(Thumbnails::new()),
-            scroll: UniformListScrollHandle::new(),
-            viewer: false,
-            stale: HashSet::new(),
-            queue: Queue::default(),
-            save: SaveState::Saved,
-            focus: cx.focus_handle(),
-            columns: 1,
-            open_viewer_when_read: false,
-            adding: None,
+            species: BTreeSet::new(),
+            rating: 0,
+            show_all: false,
+            review: Review::None,
+            copied: false,
+            _subscriptions: vec![subscription],
         }
     }
 
-    pub fn open(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        crate::settings::Settings::update(cx, |s| {
-            s.set_form_value("browse", "table", path.to_string_lossy())
-        });
-        self.source = Source::Reading(path.clone());
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            let read = cx.background_executor().spawn({
-                let path = path.clone();
-                async move { Csv::read(&path) }
-            });
-            let read = read.await;
-            let _ = this.update(cx, |this, cx| {
-                match read {
-                    Ok(csv) => {
-                        let column = csv.column("path");
-                        let paths: Vec<&str> =
-                            csv.rows.iter().map(|r| csv.cell(r, column)).collect();
-                        this.level = detect_level(paths.iter().copied());
-                        this.source = Source::Read {
-                            path,
-                            csv: Arc::new(csv),
-                        };
-                        this.filters = Filters::default();
-                        this.rebuild(cx);
-                        if std::mem::take(&mut this.open_viewer_when_read)
-                            && !this.visible.is_empty()
-                        {
-                            this.focused = Some(0);
-                            this.viewer = true;
-                        }
-                    }
-                    Err(err) => this.source = Source::Failed(path, err),
-                }
-                cx.notify();
-            });
-        })
-        .detach();
+    fn csv_path(&self, cx: &App) -> Option<PathBuf> {
+        let value = self.csv.read(cx).value();
+        let value = value.trim();
+        (!value.is_empty()).then(|| PathBuf::from(value))
     }
 
-    pub fn restore(&mut self, cx: &mut Context<Self>) {
+    fn read(&mut self, cx: &mut Context<Self>) {
+        let path = self.csv_path(cx).filter(|p| p.is_file());
+        if let Some(path) = &path {
+            let value = path.to_string_lossy().into_owned();
+            crate::settings::Settings::update(cx, |s| s.set_form_value("browse", "table", value));
+        }
+        self.table = path.map(|p| Csv::read(&p));
+        self.records = match &self.table {
+            Some(Ok(csv)) => {
+                let column = csv.column("path");
+                let level = detect_level(csv.rows.iter().map(|r| csv.cell(r, column)));
+                Records::from_csv(csv, level)
+            }
+            _ => Records { all: Vec::new() },
+        };
+        let records = &self.records;
+        self.species
+            .retain(|s| records.all.iter().any(|r| r.species.contains(s)));
+        self.review = Review::None;
+        cx.notify();
+    }
+
+    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let table = cx
             .default_global::<crate::settings::Settings>()
             .form_value("browse", "table")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from);
-        if let Some(table) = table.filter(|p| p.is_file()) {
-            self.open(table, cx);
+            .map(str::to_string);
+        if let Some(table) = table.filter(|t| !t.is_empty()) {
+            self.csv
+                .update(cx, |input, cx| input.set_value(table, window, cx));
+            self.read(cx);
         }
     }
 
-    /// Records from the table at the current deployment level.
-    fn rebuild(&mut self, cx: &mut Context<Self>) {
-        if let Source::Read { csv, .. } = &self.source {
-            self.records = Records::from_csv(csv, self.level);
-            self.by_sidecar = self
-                .records
-                .all
-                .iter()
-                .enumerate()
-                .map(|(i, r)| (r.sidecar.clone(), i))
-                .collect();
+    fn filters(&self) -> Filters {
+        Filters {
+            species: self.species.clone(),
+            ratings: RATINGS[self.rating].iter().copied().collect(),
+            ..Default::default()
         }
-        self.refilter(cx);
     }
 
-    fn refilter(&mut self, cx: &mut Context<Self>) {
-        self.visible = self.records.filter(&self.filters);
-        self.counts = self.records.counts(&self.filters);
-        self.stale.clear();
-        self.focused = None;
-        self.viewer = false;
-        cx.notify();
+    fn chosen(&self) -> Vec<usize> {
+        if self.species.is_empty() && self.rating == 0 {
+            return Vec::new();
+        }
+        self.records.filter(&self.filters())
     }
 
-    fn choose_table(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let paths = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: None,
-        });
-        cx.spawn_in(window, async move |this, cx| {
-            if let Ok(Ok(Some(paths))) = paths.await
-                && let Some(path) = paths.into_iter().next()
-            {
-                let _ = this.update(cx, |this, cx| this.open(path, cx));
+    /// Build the review folder next to the data and open it in the file manager.
+    fn make_review(&mut self, cx: &mut Context<Self>) {
+        let chosen = self.chosen();
+        let Some(first) = chosen.first().map(|&i| &self.records.all[i]) else {
+            return;
+        };
+        let data = first
+            .media
+            .parent()
+            .and_then(Path::parent)
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let label = self
+            .species
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("+");
+        let folder_name = format!(
+            "{}_{}",
+            date_of(stamp).replace('-', ""),
+            if label.is_empty() {
+                "review".to_string()
+            } else {
+                safe(&label)
             }
+        );
+        let folder = output::command_dir(&output::default_root(&data), "review").join(folder_name);
+        let files: Vec<(PathBuf, PathBuf, String)> = chosen
+            .iter()
+            .map(|&i| {
+                let r = &self.records.all[i];
+                let mut prefix = safe(&r.species.join("+"));
+                if !r.deployment.is_empty() {
+                    prefix = format!("{prefix}__{}", safe(&r.deployment));
+                }
+                (r.media.clone(), r.sidecar.clone(), prefix)
+            })
+            .collect();
+        self.review = Review::Making;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move { review::make(&folder, &files) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.review = match outcome {
+                    review::Outcome::Made { folder, files } => {
+                        cx.open_with_system(&folder);
+                        Review::Made(folder, files)
+                    }
+                    review::Outcome::CannotLink => Review::CannotLink,
+                    review::Outcome::Failed(err) => Review::Failed(err),
+                };
+                cx.notify();
+            });
         })
         .detach();
     }
 
-    fn columns(window: &Window, cx: &App) -> usize {
-        let tokens = cx.tokens();
-        let width = window.viewport_size().width - tokens.px("sidebar-w") - px(230.) - px(48.);
-        (((width + px(12.)) / px(TILE_MIN_W + 12.)).floor() as usize).max(1)
-    }
-
-    fn toggle<T: Ord + Clone>(set: &mut std::collections::BTreeSet<T>, value: &T, on: bool) {
-        if on {
-            set.insert(value.clone());
-        } else {
-            set.remove(value);
-        }
-    }
-
-    fn section(&self, title: impl Into<SharedString>, cx: &App) -> Div {
-        let tokens = cx.tokens();
-        div()
-            .pt(tokens.px("space-4"))
-            .pb(tokens.px("space-1"))
-            .text_size(tokens.px("text-sm"))
-            .font_medium()
-            .text_color(cx.theme().muted_foreground)
-            .child(title.into())
-    }
-
-    fn facet_row(&self, checkbox: Checkbox, n: usize, checked: bool, cx: &App) -> Div {
-        let tokens = cx.tokens();
-        h_flex()
-            .justify_between()
-            .px(tokens.px("space-2"))
-            .py(px(3.))
-            .rounded(tokens.px("radius-sm"))
-            .gap(tokens.px("space-2"))
-            .when(checked, |row| row.bg(cx.theme().muted))
-            .child(div().flex_1().min_w_0().overflow_hidden().child(checkbox))
-            .child(
-                div()
-                    .flex_shrink_0()
-                    .text_size(tokens.px("text-sm"))
-                    .text_color(cx.theme().muted_foreground)
-                    .child(count(n)),
-            )
-    }
-
-    fn more(
-        &self,
-        key: &'static str,
-        hidden: usize,
-        cx: &mut Context<Self>,
-    ) -> Option<Stateful<Div>> {
-        (hidden > 0).then(|| {
-            div()
-                .id(key)
-                .px(tokens_space(cx))
-                .py(px(3.))
-                .cursor_pointer()
-                .text_size(cx.tokens().px("text-sm"))
-                .text_color(cx.theme().muted_foreground)
-                .child(match language() {
-                    Language::Chinese => format!("… 另外 {hidden} 个"),
-                    Language::English => format!("… {hidden} more"),
-                })
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.expanded.insert(key);
-                    cx.notify();
-                }))
-        })
-    }
-
-    fn render_filters(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_choice(&self, cx: &mut Context<Self>) -> Div {
         let tokens = cx.tokens().clone();
-        let mut panel = v_flex()
-            .id("browse-filters")
-            .w(px(230.))
-            .flex_shrink_0()
-            .h_full()
-            .overflow_y_scroll()
-            .px(tokens.px("space-3"))
-            .pb(tokens.px("space-5"))
-            .border_r_1()
-            .border_color(cx.theme().border)
-            .bg(tokens.color("background"));
-
-        // Source
-        panel = panel.child(self.section(t("来源", "Source"), cx));
-        let (name, detail) = match &self.source {
-            Source::Nothing => (
-                t("还没有打开表格", "No table open").to_string(),
-                String::new(),
-            ),
-            Source::Reading(path) => (file_name(path), t("正在读取…", "Reading…").to_string()),
-            Source::Failed(path, err) => (file_name(path), err.clone()),
-            Source::Read { path, csv } => (
-                file_name(path),
-                match language() {
-                    Language::Chinese => format!("{} 行", count(csv.rows.len())),
-                    Language::English => format!("{} rows", count(csv.rows.len())),
-                },
-            ),
-        };
-        panel =
-            panel.child(
-                v_flex()
-                    .gap(px(2.))
-                    .text_size(tokens.px("text-sm"))
-                    .child(div().truncate().child(name))
-                    .child(
-                        h_flex()
-                            .gap(tokens.px("space-2"))
-                            .text_color(cx.theme().muted_foreground)
-                            .child(detail)
-                            .child(
-                                div()
-                                    .id("choose-table")
-                                    .cursor_pointer()
-                                    .text_color(tokens.color("accent"))
-                                    .child(if matches!(self.source, Source::Nothing) {
-                                        t("打开表格…", "Open a table…")
-                                    } else {
-                                        t("更换", "Change")
-                                    })
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.choose_table(window, cx)
-                                    })),
-                            ),
-                    ),
-            );
-        if !matches!(self.source, Source::Read { .. }) {
-            return panel;
-        }
-
-        // Species
-        panel = panel.child(self.section(t("物种", "Species"), cx));
-        let all_species = self.expanded.contains("species");
-        let hidden = if all_species {
-            0
-        } else {
-            self.counts.species.len().saturating_sub(LISTED)
-        };
-        for (i, (name, n)) in self
-            .counts
+        let counts = self.records.counts(&self.filters());
+        let species: Vec<&(String, usize)> = counts
             .species
             .iter()
-            .take(if all_species { usize::MAX } else { LISTED })
-            .enumerate()
-        {
-            let checked = self.filters.species.contains(name);
-            let value = name.clone();
-            let label = if name.is_empty() {
-                t("（无物种标签）", "(no species)").to_string()
-            } else {
-                name.clone()
-            };
-            let checkbox = Checkbox::new(("sp", i))
-                .label(label)
-                .checked(checked)
-                .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                    Self::toggle(&mut this.filters.species, &value, *on);
-                    this.refilter(cx);
-                }));
-            panel = panel.child(self.facet_row(checkbox, *n, checked, cx));
-        }
-        panel = panel.children(self.more("species", hidden, cx));
-
-        // Rating, with shortcuts
-        let shortcut = |id: &'static str,
-                        label: &'static str,
-                        ratings: &'static [u8],
-                        cx: &mut Context<Self>| {
-            div()
-                .id(id)
-                .cursor_pointer()
-                .text_color(tokens.color("accent"))
-                .child(label)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.filters.ratings = ratings.iter().copied().collect();
-                    this.refilter(cx);
-                }))
-        };
-        panel = panel.child(
-            h_flex()
-                .gap(tokens.px("space-2"))
-                .child(self.section(t("评分", "Rating"), cx))
-                .child(
-                    h_flex()
-                        .pt(tokens.px("space-4"))
-                        .pb(tokens.px("space-1"))
-                        .gap(tokens.px("space-2"))
-                        .text_size(tokens.px("text-sm"))
-                        .child(shortcut("r-all", t("全部", "All"), &[], cx))
-                        .child(shortcut("r-3", "≥3", &[3, 4, 5], cx))
-                        .child(shortcut("r-4", "≥4", &[4, 5], cx))
-                        .child(shortcut("r-5", "5", &[5], cx)),
-                ),
-        );
-        for rating in 0..=5u8 {
-            let checked = self.filters.ratings.contains(&rating);
-            let label = if rating == 0 {
-                t("未评分", "Unrated").to_string()
-            } else {
-                "★".repeat(rating as usize)
-            };
-            let checkbox = Checkbox::new(("rating", rating as usize))
-                .label(label)
-                .checked(checked)
-                .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                    Self::toggle(&mut this.filters.ratings, &rating, *on);
-                    this.refilter(cx);
-                }));
-            panel = panel.child(self.facet_row(
-                checkbox,
-                self.counts.ratings[rating as usize],
-                checked,
-                cx,
-            ));
-        }
-
-        // Deployment, with the path level it comes from
-        let level_line = match (self.level, language()) {
-            (Some(l), Language::Chinese) => format!("部署 · 路径第 {l} 层"),
-            (Some(l), Language::English) => format!("Deployment · path level {l}"),
-            (None, Language::Chinese) => "部署 · 未选择层级".to_string(),
-            (None, Language::English) => "Deployment · no level chosen".to_string(),
-        };
-        panel = panel.child(
-            h_flex()
-                .gap(tokens.px("space-2"))
-                .child(self.section(level_line, cx))
-                .child(
-                    div()
-                        .id("change-level")
-                        .pt(tokens.px("space-4"))
-                        .pb(tokens.px("space-1"))
-                        .cursor_pointer()
-                        .text_size(tokens.px("text-sm"))
-                        .text_color(tokens.color("accent"))
-                        .child(t("更改", "Change"))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.choosing_level = !this.choosing_level;
-                            cx.notify();
-                        })),
-                ),
-        );
-        if self.choosing_level
-            && let Some(sample) = self
-                .records
-                .all
-                .first()
-                .map(|r| r.media.to_string_lossy().into_owned())
-        {
-            panel = panel.child(level_picker(
-                &sample,
-                self.level,
-                cx,
-                |this: &mut Self, level, cx| {
-                    this.level = Some(level);
-                    this.choosing_level = false;
-                    this.filters.deployments.clear();
-                    this.rebuild(cx);
-                },
-            ));
-        }
-        if self.level.is_some() {
-            let all = self.expanded.contains("deployments");
-            let hidden = if all {
-                0
-            } else {
-                self.counts.deployments.len().saturating_sub(LISTED)
-            };
-            for (i, (name, n)) in self
-                .counts
-                .deployments
-                .iter()
-                .take(if all { usize::MAX } else { LISTED })
-                .enumerate()
-            {
-                let checked = self.filters.deployments.contains(name);
-                let value = name.clone();
-                let checkbox = Checkbox::new(("dep", i))
-                    .label(name.clone())
-                    .checked(checked)
-                    .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                        Self::toggle(&mut this.filters.deployments, &value, *on);
-                        this.refilter(cx);
-                    }));
-                panel = panel.child(self.facet_row(checkbox, *n, checked, cx));
-            }
-            panel = panel.children(self.more("deployments", hidden, cx));
-        }
-
-        // Folder
-        panel = panel.child(self.section(t("文件夹", "Folder"), cx));
-        let all = self.expanded.contains("folders");
-        let hidden = if all {
+            .filter(|(s, _)| !s.is_empty())
+            .collect();
+        let hidden = if self.show_all {
             0
         } else {
-            self.counts.folders.len().saturating_sub(LISTED)
+            species.len().saturating_sub(LISTED)
         };
-        for (i, (name, n)) in self
-            .counts
-            .folders
-            .iter()
-            .take(if all { usize::MAX } else { LISTED })
-            .enumerate()
-        {
-            let checked = self.filters.folders.contains(name);
+        let mut list = v_flex().gap(px(2.));
+        for (i, (name, n)) in species.iter().take(species.len() - hidden).enumerate() {
+            let checked = self.species.contains(name);
             let value = name.clone();
-            let checkbox = Checkbox::new(("folder", i))
-                .label(name.clone())
-                .checked(checked)
-                .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                    Self::toggle(&mut this.filters.folders, &value, *on);
-                    this.refilter(cx);
-                }));
-            panel = panel.child(self.facet_row(checkbox, *n, checked, cx));
-        }
-        panel.children(self.more("folders", hidden, cx))
-    }
-
-    fn render_tile(&self, position: usize, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let tokens = cx.tokens().clone();
-        let record = &self.records.all[self.visible[position]];
-        let image: AnyElement = if record.video {
-            div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .bg(rgb(0x2a3434))
-                .child(
-                    Icon::new(IconName::Play)
-                        .size(px(28.))
-                        .text_color(gpui_kit::white()),
-                )
-                .into_any_element()
-        } else {
-            match self.thumbs.get(&record.media) {
-                Some(Thumb::Ready(path)) => img(path)
-                    .size_full()
-                    .object_fit(ObjectFit::Cover)
-                    .into_any_element(),
-                Some(Thumb::None) => div()
-                    .size_full()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .bg(cx.theme().muted)
-                    .text_size(tokens.px("text-xs"))
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t("无法预览", "No preview"))
-                    .into_any_element(),
-                None => div().size_full().bg(cx.theme().muted).into_any_element(),
-            }
-        };
-        let mut caption = record.species.join("+");
-        if caption.is_empty() {
-            caption = t("（无物种）", "(no species)").to_string();
-        }
-        if !record.individuals.is_empty() {
-            caption.push_str(&format!(" · {}", record.individuals.join("+")));
-        }
-        let focused = self.focused == Some(position);
-        let stale = self.stale.contains(&self.visible[position]);
-        v_flex()
-            .id(("tile", position))
-            .flex_1()
-            .min_w_0()
-            .rounded(tokens.px("radius-md"))
-            .overflow_hidden()
-            .bg(tokens.color("surface"))
-            .border_2()
-            .border_color(if focused {
-                tokens.color("primary")
-            } else {
-                cx.theme().border
-            })
-            .cursor_pointer()
-            .child(
-                div()
-                    .relative()
-                    .h(px(TILE_IMAGE_H))
-                    .w_full()
-                    .overflow_hidden()
-                    .child(div().absolute().inset_0().child(image)),
-            )
-            .child(
+            list = list.child(
                 h_flex()
-                    .px(tokens.px("space-2"))
-                    .py(tokens.px("space-1"))
+                    .justify_between()
                     .gap(tokens.px("space-2"))
-                    .text_size(tokens.px("text-sm"))
-                    .child(div().flex_1().min_w_0().truncate().child(caption))
+                    .px(tokens.px("space-2"))
+                    .py(px(3.))
+                    .rounded(tokens.px("radius-sm"))
+                    .when(checked, |row| row.bg(cx.theme().muted))
+                    .child(
+                        div().flex_1().min_w_0().overflow_hidden().child(
+                            Checkbox::new(("species", i))
+                                .label(name.clone())
+                                .checked(checked)
+                                .on_click(cx.listener(move |this, on: &bool, _, cx| {
+                                    if *on {
+                                        this.species.insert(value.clone());
+                                    } else {
+                                        this.species.remove(&value);
+                                    }
+                                    this.review = Review::None;
+                                    cx.notify();
+                                })),
+                        ),
+                    )
                     .child(
                         div()
+                            .text_size(tokens.px("text-sm"))
                             .text_color(cx.theme().muted_foreground)
-                            .child(record.deployment.clone()),
-                    )
-                    .when(record.rating > 0, |row| {
-                        row.child(
-                            div()
-                                .text_color(tokens.color("warning"))
-                                .child("★".repeat(record.rating as usize)),
-                        )
-                    }),
-            )
-            .when(stale, |tile| tile.opacity(0.45))
-            .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
-                this.focused = Some(position);
-                window.focus(&this.focus, cx);
-                if event.click_count() >= 2 {
-                    this.open_viewer(cx);
-                }
-                cx.notify();
-            }))
-    }
-
-    fn render_grid(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let tokens = cx.tokens().clone();
-        let columns = Self::columns(window, cx);
-        let rows = self.visible.len().div_ceil(columns);
-        let header = h_flex()
-            .h(px(52.))
-            .px(tokens.px("space-4"))
-            .gap(tokens.px("space-4"))
-            .border_b_1()
-            .border_color(cx.theme().border)
+                            .child(count(*n)),
+                    ),
+            );
+        }
+        if hidden > 0 {
+            list = list.child(
+                div()
+                    .id("more-species")
+                    .px(tokens.px("space-2"))
+                    .cursor_pointer()
+                    .text_size(tokens.px("text-sm"))
+                    .text_color(cx.theme().muted_foreground)
+                    .child(match language() {
+                        Language::Chinese => format!("… 另外 {hidden} 个"),
+                        Language::English => format!("… {hidden} more"),
+                    })
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.show_all = true;
+                        cx.notify();
+                    })),
+            );
+        }
+        let this = cx.entity().downgrade();
+        let rating = segmented(
+            "browse-rating",
+            &[t("全部", "All"), "≥ 3", "≥ 4", "5"],
+            self.rating,
+            move |index, _, cx| {
+                let _ = this.update(cx, |this, cx| {
+                    this.rating = index;
+                    this.review = Review::None;
+                    cx.notify();
+                });
+            },
+        );
+        let chosen = self.chosen();
+        let videos = chosen
+            .iter()
+            .filter(|&&i| self.records.all[i].video)
+            .count();
+        card(cx)
             .child(
                 h_flex()
-                    .gap(tokens.px("space-1"))
-                    .items_baseline()
-                    .child(div().font_semibold().child(count(self.visible.len())))
+                    .items_start()
+                    .gap(tokens.px("space-5"))
+                    .child(field(t("物种", "Species"), cx).flex_1().child(list))
                     .child(
-                        div()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(match language() {
-                                Language::Chinese => {
-                                    format!("/ {} 张", count(self.records.all.len()))
-                                }
-                                Language::English => format!("/ {}", count(self.records.all.len())),
-                            }),
+                        field(t("评分", "Rating"), cx)
+                            .w(px(240.))
+                            .child(h_flex().child(rating)),
                     ),
             )
-            .child(
-                div()
-                    .text_size(tokens.px("text-sm"))
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t("按时间", "By time")),
-            )
-            .children((!self.stale.is_empty()).then(|| {
-                div()
-                    .id("refresh")
-                    .px(tokens.px("space-2"))
-                    .py(px(2.))
-                    .rounded(tokens.px("radius-sm"))
-                    .bg(tokens.color("warning-soft"))
-                    .text_size(tokens.px("text-sm"))
-                    .text_color(tokens.color("warning"))
-                    .cursor_pointer()
-                    .child(match language() {
-                        Language::Chinese => format!("{} 张已不符合筛选 · 刷新", self.stale.len()),
-                        Language::English => {
-                            format!("{} no longer match · Refresh", self.stale.len())
-                        }
-                    })
-                    .on_click(cx.listener(|this, _, _, cx| this.refilter(cx)))
-            }))
-            .child(div().flex_1())
-            .child(self.save_indicator(cx));
-        let grid = uniform_list(
-            "browse-grid",
-            rows,
-            cx.processor(move |this, range: std::ops::Range<usize>, _window, cx| {
-                // Only what is on screen (plus one row) asks for thumbnails.
-                let mut wanted = HashSet::new();
-                for row in range.start..(range.end + 1).min(rows) {
-                    for col in 0..columns {
-                        if let Some(&i) = this.visible.get(row * columns + col) {
-                            wanted.insert(this.records.all[i].media.clone());
-                        }
+            .child(help_line(
+                if chosen.is_empty() {
+                    t("选择物种或评分。", "Choose species or a rating.").to_string()
+                } else {
+                    match language() {
+                        Language::Chinese => format!(
+                            "已选 {} 个文件（其中 {} 个视频）",
+                            count(chosen.len()),
+                            count(videos)
+                        ),
+                        Language::English => format!(
+                            "{} files chosen ({} videos)",
+                            count(chosen.len()),
+                            count(videos)
+                        ),
                     }
-                }
-                this.thumbs.keep_only(&wanted);
-                this.columns = columns;
-                range
-                    .map(|row| {
-                        let tokens = cx.tokens().clone();
-                        let mut line = h_flex()
-                            .w_full()
-                            .h(px(ROW_H))
-                            .gap(px(12.))
-                            .px(tokens.px("space-4"))
-                            .pt(px(12.));
-                        for col in 0..columns {
-                            let position = row * columns + col;
-                            line = if position < this.visible.len() {
-                                line.child(this.render_tile(position, cx).into_any_element())
-                            } else {
-                                // Keeps the last row's tiles the same width as the others.
-                                line.child(div().flex_1().into_any_element())
-                            };
-                        }
-                        line
-                    })
-                    .collect()
-            }),
-        )
-        .track_scroll(&self.scroll)
-        .w_full()
-        .flex_1();
-        let empty =
-            (self.visible.is_empty() && matches!(self.source, Source::Read { .. })).then(|| {
-                div().p(tokens.px("space-6")).child(help_line(
-                    t("没有符合筛选的图片。", "Nothing matches the filters."),
-                    Tone::Quiet,
-                    cx,
-                ))
-            });
-        let hint = h_flex()
-            .h(px(36.))
-            .px(tokens.px("space-4"))
-            .border_t_1()
-            .border_color(cx.theme().border)
-            .text_size(tokens.px("text-sm"))
-            .text_color(cx.theme().muted_foreground)
-            .child(t(
-                "空格或双击打开 · 1–5 评分 · 0 清除评分 · ⇧ 点击多选",
-                "Space or double-click opens · 1–5 rates · 0 clears · ⇧ click selects",
-            ));
-        v_flex()
-            .flex_1()
-            .min_w_0()
-            .h_full()
-            .track_focus(&self.focus)
-            .on_key_down(
-                cx.listener(|this, event: &KeyDownEvent, window, cx| this.key(event, window, cx)),
+                },
+                Tone::Quiet,
+                cx,
+            ))
+    }
+
+    fn action(
+        &self,
+        title: &'static str,
+        body: &'static str,
+        button: AnyElement,
+        extra: Option<Div>,
+        cx: &App,
+    ) -> Div {
+        let tokens = cx.tokens();
+        card(cx)
+            .gap(tokens.px("space-2"))
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap(tokens.px("space-4"))
+                    .child(
+                        v_flex()
+                            .gap(tokens.px("space-1"))
+                            .flex_1()
+                            .min_w_0()
+                            .child(div().font_semibold().child(title))
+                            .child(help_line(body, Tone::Quiet, cx)),
+                    )
+                    .child(div().flex_shrink_0().child(button)),
             )
-            .child(header)
-            .children(empty)
-            .child(grid)
-            .child(hint)
+            .children(extra)
     }
 }
 
-fn tokens_space(cx: &App) -> Pixels {
-    cx.tokens().px("space-2")
-}
-
-fn file_name(path: &std::path::Path) -> String {
-    path.file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default()
+/// A tag as part of a file name.
+fn safe(text: &str) -> String {
+    text.chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 impl Render for Browse {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if matches!(self.source, Source::Nothing) {
-            let tokens = cx.tokens().clone();
-            return h_flex()
-                .size_full()
-                .child(self.render_filters(cx))
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let tokens = cx.tokens().clone();
+        let csv = self.csv_path(cx);
+        let summary = match &self.table {
+            None if csv.is_some() => help_line(
+                t("找不到这个表格", "This table does not exist"),
+                Tone::Danger,
+                cx,
+            ),
+            None => help_line(
+                t(
+                    "标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表",
+                    "A tags.csv from 标签获取, a table filled in by labellers, or one exported from Caracal",
+                ),
+                Tone::Quiet,
+                cx,
+            ),
+            Some(Err(err)) => help_line(
+                format!("{} {err}", t("无法读取：", "Cannot read:")),
+                Tone::Danger,
+                cx,
+            ),
+            Some(Ok(table)) => {
+                let species: BTreeSet<&String> =
+                    self.records.all.iter().flat_map(|r| &r.species).collect();
+                let times: Vec<&String> = self
+                    .records
+                    .all
+                    .iter()
+                    .map(|r| &r.datetime)
+                    .filter(|d| !d.is_empty())
+                    .collect();
+                let mut text = match language() {
+                    Language::Chinese => format!(
+                        "{} 行 · {} 个文件 · {} 个物种",
+                        count(table.rows.len()),
+                        count(self.records.all.len()),
+                        count(species.len())
+                    ),
+                    Language::English => format!(
+                        "{} rows · {} files · {} species",
+                        count(table.rows.len()),
+                        count(self.records.all.len()),
+                        count(species.len())
+                    ),
+                };
+                if let (Some(first), Some(last)) = (times.iter().min(), times.iter().max()) {
+                    text.push_str(&format!(
+                        " · {} {} {}",
+                        &first[..first.len().min(10)],
+                        t("至", "to"),
+                        &last[..last.len().min(10)]
+                    ));
+                }
+                help_line(text, Tone::Quiet, cx)
+            }
+        };
+        let table_card = card(cx).child(
+            field(t("标签表", "Tags table"), cx)
                 .child(
-                    v_flex().flex_1().p(tokens.px("space-6")).gap(tokens.px("space-2")).child(help_line(
-                        t(
-                            "打开标签获取生成的 tags.csv，或标注员填好的表格：按物种、评分、部署和文件夹筛选，跨部署浏览。",
-                            "Open the tags.csv from 标签获取, or a table filled in by labellers, to filter by species, rating, deployment and folder across deployments.",
+                    h_flex()
+                        .gap(tokens.px("space-2"))
+                        .child(
+                            div()
+                                .flex_1()
+                                .child(Input::new(&self.csv).large().bg(tokens.color("surface"))),
+                        )
+                        .child(
+                            Button::new("choose-csv")
+                                .label(t("选择…", "Choose…"))
+                                .outline()
+                                .large()
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    let paths = cx.prompt_for_paths(PathPromptOptions {
+                                        files: true,
+                                        directories: false,
+                                        multiple: false,
+                                        prompt: None,
+                                    });
+                                    let input = this.csv.clone();
+                                    cx.spawn_in(window, async move |_, cx| {
+                                        if let Ok(Ok(Some(paths))) = paths.await
+                                            && let Some(path) = paths.into_iter().next()
+                                        {
+                                            let _ = input.update_in(cx, |input, window, cx| {
+                                                input.set_value(
+                                                    path.to_string_lossy().to_string(),
+                                                    window,
+                                                    cx,
+                                                );
+                                                cx.emit(InputEvent::Change);
+                                            });
+                                        }
+                                    })
+                                    .detach();
+                                })),
                         ),
-                        Tone::Quiet,
+                )
+                .child(summary),
+        );
+        let Some(path) = csv.filter(|_| matches!(self.table, Some(Ok(_)))) else {
+            return v_flex().gap(tokens.px("space-4")).child(table_card);
+        };
+        let chosen = self.chosen().len();
+
+        let caracal = {
+            let path = path.clone();
+            self.action(
+                t("在 Caracal 中查看和编辑", "View and edit in Caracal"),
+                t(
+                    "在浏览器中打开 Caracal，选择这张表和媒体所在的文件夹；查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。表格的位置会复制到剪贴板。",
+                    "Opens Caracal in the browser: choose this table and the media folder there; view, rate and fix species, export tags.csv, then come back to 应用表格到文件. The table's path is copied to the clipboard.",
+                ),
+                Button::new("open-caracal")
+                    .outline()
+                    .label(if self.copied { t("已打开 · 路径已复制", "Opened · path copied") } else { t("打开 Caracal", "Open Caracal") })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(path.to_string_lossy().into_owned()));
+                        cx.open_url(CARACAL_URL);
+                        this.copied = true;
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+                None,
+                cx,
+            )
+        };
+
+        let review_status: Option<Div> = match &self.review {
+            Review::None => None,
+            Review::Making => Some(help_line(t("正在建立…", "Making it…"), Tone::Quiet, cx)),
+            Review::Made(folder, n) => {
+                let folder = folder.clone();
+                Some(
+                    h_flex()
+                        .gap(tokens.px("space-2"))
+                        .child(help_line(
+                            match language() {
+                                Language::Chinese => {
+                                    format!("已建立 {} 个文件的查看文件夹（硬链接，不占额外空间），已在资源管理器中打开。", count(*n))
+                                }
+                                Language::English => format!("Made a review folder of {} files (hard links, no extra space) and opened it.", count(*n)),
+                            },
+                            Tone::Quiet,
+                            cx,
+                        ))
+                        .child(
+                            Button::new("open-review")
+                                .ghost()
+                                .compact()
+                                .label(t("再次打开", "Open again"))
+                                .on_click(move |_, _, cx| cx.open_with_system(&folder)),
+                        ),
+                )
+            }
+            Review::CannotLink => Some(
+                h_flex()
+                    .gap(tokens.px("space-2"))
+                    .child(help_line(
+                        t(
+                            "媒体在另一个磁盘或网络位置，不能建立链接。可以用媒体提取复制这些文件。",
+                            "The media are on another drive or a network share, where links cannot be made. Copy them with 媒体提取 instead.",
+                        ),
+                        Tone::Danger,
                         cx,
-                    )),
-                );
-        }
-        if self.viewer && self.focused.is_some() {
-            return h_flex().size_full().child(self.render_viewer(window, cx));
-        }
-        h_flex()
-            .size_full()
-            .child(self.render_filters(cx))
-            .child(self.render_grid(window, cx))
+                    ))
+                    .child({
+                        let (csv, species, rating) = (path.clone(), self.species.clone(), self.rating);
+                        Button::new("to-extract").outline().compact().label(t("用媒体提取复制", "Copy with 媒体提取")).on_click(
+                            cx.listener(move |_, _, _, cx| {
+                                cx.emit(BrowseEvent::Extract { csv: csv.clone(), species: species.clone(), rating })
+                            }),
+                        )
+                    }),
+            ),
+            Review::Failed(err) => Some(help_line(err.clone(), Tone::Danger, cx)),
+        };
+        let explorer = self.action(
+            t("在资源管理器中查看所选", "Look at the choice in the file manager"),
+            t(
+                "把选中的照片和视频（连同 XMP）以硬链接放进一个查看文件夹并打开：缩略图、照片应用和系统播放器都可直接使用，复制出去的是原文件。",
+                "Puts the chosen photos and videos (with their XMP) into a review folder as hard links and opens it: thumbnails, the Photos app and the system player work as usual, and copying out copies the real files.",
+            ),
+            Button::new("make-review")
+                .outline()
+                .label(t("建立查看文件夹", "Make a review folder"))
+                .disabled(chosen == 0 || matches!(self.review, Review::Making))
+                .on_click(cx.listener(|this, _, _, cx| this.make_review(cx)))
+                .into_any_element(),
+            review_status,
+            cx,
+        );
+        let apply = {
+            let path = path.clone();
+            self.action(
+                t("应用表格到文件", "Write the table into the files"),
+                t(
+                    "把这张表（例如从 Caracal 导出的）原样写入 XMP：先检查会改什么，再写入。",
+                    "Writes this table (for example one exported from Caracal) into the XMP files as it is: first a check of what will change, then the write.",
+                ),
+                Button::new("apply-table")
+                    .outline()
+                    .label(t("检查并写入…", "Check and write…"))
+                    .on_click(cx.listener(move |_, _, _, cx| cx.emit(BrowseEvent::ApplyTable(path.clone()))))
+                    .into_any_element(),
+                None,
+                cx,
+            )
+        };
+        v_flex()
+            .gap(tokens.px("space-4"))
+            .child(table_card)
+            .child(self.render_choice(cx))
+            .child(explorer)
+            .child(caracal)
+            .child(apply)
     }
 }

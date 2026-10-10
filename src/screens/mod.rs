@@ -132,8 +132,8 @@ impl Form {
                 "Rewrites species names another way (e.g. Chinese or scientific names) from a taglist.",
             ),
             Form::Update(_) => t(
-                "按表中的 xmp_update 列修改 XMP 里的标签；每个文件只写一次，并保留备份。",
-                "Changes the tags in the XMP files from the table's xmp_update column; each file is written once, with a backup.",
+                "按表修改 XMP 里的标签：按 xmp_update 列改旧值，或把整张表写入；每个文件只写一次，并保留备份。",
+                "Changes the tags in the XMP files from a table: old values by the xmp_update column, or the whole table; each file written once, with a backup.",
             ),
             Form::Observe(_) => t(
                 "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",

@@ -55,8 +55,6 @@ pub const DESIGN_STATES: &[&str] = &[
     "extract-keep-dirs",
     "extract-conflicts",
     "observe-id-species-after-scan",
-    "browse-grid",
-    "browse-viewer",
 ];
 
 /// What the command line asks for at launch.
@@ -103,7 +101,32 @@ impl Waxbill {
         let capture = cx.new(|cx| CaptureForm::new(window, cx));
         let extract = cx.new(|cx| ExtractForm::new(window, cx));
         let translate = cx.new(|cx| TranslateForm::new(window, cx));
-        let browse = cx.new(crate::browse::Browse::new);
+        let browse = cx.new(|cx| crate::browse::Browse::new(window, cx));
+        cx.subscribe_in(
+            &browse,
+            window,
+            |this: &mut Self, _, event: &crate::browse::BrowseEvent, window, cx| match event {
+                crate::browse::BrowseEvent::ApplyTable(path) => {
+                    let path = path.to_string_lossy().into_owned();
+                    this.update
+                        .update(cx, |form, cx| form.apply_table(path, window, cx));
+                    this.go(ScreenId::XmpUpdate, cx);
+                }
+                crate::browse::BrowseEvent::Extract {
+                    csv,
+                    species,
+                    rating,
+                } => {
+                    let (csv, species, rating) =
+                        (csv.to_string_lossy().into_owned(), species.clone(), *rating);
+                    this.extract.update(cx, |form, cx| {
+                        form.set_selection(csv, species, rating, window, cx)
+                    });
+                    this.go(ScreenId::Extract, cx);
+                }
+            },
+        )
+        .detach();
         let update = cx.new(|cx| UpdateForm::new(window, cx));
         let simple: HashMap<ScreenId, Entity<SimpleForm>> = [
             (ScreenId::XmpInit, &simple::XMP_INIT),
@@ -174,16 +197,6 @@ impl Waxbill {
                     .insert(ScreenId::Observe, Run::example_unresolved());
                 app.ask_id_species(cx);
             }
-            // Browse states open the table remembered in the settings (real data, not the board's samples).
-            Some(state @ ("browse-grid" | "browse-viewer")) => {
-                app.screen = ScreenId::Browse;
-                let program = cx.default_global::<Settings>().serval.clone();
-                app.detect_serval(program, false, cx);
-                app.browse.update(cx, |browse, cx| {
-                    browse.open_viewer_when_read = state == "browse-viewer";
-                    browse.restore(cx);
-                });
-            }
             Some("capture-ready") => {
                 app.serval = example_serval("0.8.0", "serval");
                 app.screen = ScreenId::Capture;
@@ -223,7 +236,8 @@ impl Waxbill {
                 app.translate
                     .update(cx, |form, cx| form.restore(window, cx));
                 app.update.update(cx, |form, cx| form.restore(window, cx));
-                app.browse.update(cx, |browse, cx| browse.restore(cx));
+                app.browse
+                    .update(cx, |browse, cx| browse.restore(window, cx));
                 for form in app.simple.values() {
                     form.update(cx, |form, cx| form.restore(window, cx));
                 }
@@ -269,10 +283,12 @@ impl Waxbill {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                cx.set_global(crate::browse::ServalProgram(
+                cx.set_global(crate::serval::ServalProgram(
                     status.program().map(Into::into),
                 ));
                 this.serval = status;
+                // The write preview needs Serval.
+                this.update.update(cx, |form, cx| form.recheck(cx));
                 cx.notify();
             });
             if run {
@@ -762,18 +778,22 @@ impl Waxbill {
     }
 
     fn render_screen(&self, cx: &mut Context<Self>) -> AnyElement {
-        if self.screen == ScreenId::Browse {
-            // Browse fills the content area: filters, grid and viewer, no form or run bar.
-            return div()
-                .flex_1()
-                .min_w_0()
-                .h_full()
-                .child(self.browse.clone())
-                .into_any_element();
-        }
         let tokens = cx.tokens().clone();
         let form = self.form();
-        let content = if self.screen == ScreenId::Settings {
+        let content = if self.screen == ScreenId::Browse {
+            // Browse hands the looking to other tools: no run bar of its own (browse.md).
+            v_flex()
+                .gap(tokens.px("space-5"))
+                .child(self.render_heading(
+                    t(
+                        "打开标签表，按物种和评分选出要看的记录，再在 Caracal、资源管理器中查看，或把改好的表写入文件。",
+                        "Open a tags table, choose records by species and rating, then look at them in Caracal or the file manager, or write an edited table into the files.",
+                    ),
+                    false,
+                    cx,
+                ))
+                .child(self.browse.clone())
+        } else if self.screen == ScreenId::Settings {
             v_flex()
                 .gap(tokens.px("space-5"))
                 .child(self.render_heading(

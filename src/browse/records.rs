@@ -20,15 +20,6 @@ pub struct Record {
     pub video: bool,
 }
 
-impl Record {
-    pub fn name(&self) -> String {
-        self.media
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default()
-    }
-}
-
 pub struct Records {
     pub all: Vec<Record>,
 }
@@ -206,7 +197,9 @@ impl Records {
         }
         // Species most first; deployments and folders by name.
         counts.species = species.into_iter().collect();
-        counts.species.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        counts
+            .species
+            .sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         counts.deployments = deployments.into_iter().collect();
         counts.folders = folders.into_iter().collect();
         counts
@@ -252,7 +245,11 @@ mod tests {
         };
         let records = Records::from_csv(&csv, Some(2));
         assert_eq!(records.all.len(), 3);
-        let a = records.all.iter().find(|r| r.name() == "a.jpg").unwrap();
+        let a = records
+            .all
+            .iter()
+            .find(|r| r.media.ends_with("a.jpg"))
+            .unwrap();
         assert_eq!(
             (
                 a.species.len(),
@@ -266,7 +263,7 @@ mod tests {
             records
                 .all
                 .iter()
-                .any(|r| r.name() == "c.jpg" && r.sidecar.ends_with("c.jpg.xmp"))
+                .any(|r| r.media.ends_with("c.jpg") && r.sidecar.ends_with("c.jpg.xmp"))
         );
 
         let filters = Filters {

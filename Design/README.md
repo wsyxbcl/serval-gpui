@@ -13,7 +13,7 @@ implemented before it is confirmed; once confirmed, the topic's spec and board a
 | Shell: window, sidebar, screen anatomy, keyboard | [`spec/shell.md`](spec/shell.md) | [`boards/shell.html`](boards/shell.html) |
 | Run: from ready to result, progress, results, errors, stopping | [`spec/run.md`](spec/run.md) | [`boards/run-states.html`](boards/run-states.html) |
 | Questions: what Serval used to ask while running, answered as fields | [`spec/questions.md`](spec/questions.md) | [`boards/questions.html`](boards/questions.html), conflicts in [`boards/run-states.html`](boards/run-states.html) |
-| Browse and pick: open a table, filter across deployments, grid and viewer, rating and species edits, thumbnails | [`spec/browse.md`](spec/browse.md) | [`boards/browse.html`](boards/browse.html) |
+| Browse and pick: choose from a table, then view in Caracal or a review folder, write an edited table back | [`spec/browse.md`](spec/browse.md) | to be drawn |
 | Data: reading inputs, table check and repair, choices from real values, previews | [`spec/data.md`](spec/data.md) | [`boards/data.html`](boards/data.html) |
 | Serval protocol: flags, level numbering, progress and result output | [`spec/serval-protocol.md`](spec/serval-protocol.md) | none |
 | Serval delivery and Settings: choosing the program, compatibility, language, appearance | [`spec/settings.md`](spec/settings.md) | [`boards/settings.html`](boards/settings.html), first run in [`boards/shell.html`](boards/shell.html) |

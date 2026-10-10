@@ -493,6 +493,20 @@ impl ExtractForm {
         }
     }
 
+    /// The choice made in 浏览与精选, to copy with extract.
+    pub fn set_selection(
+        &mut self,
+        csv: String,
+        species: std::collections::BTreeSet<String>,
+        rating: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.selected = species;
+        self.rating = rating.min(RATINGS.len() - 1);
+        self.set_csv(csv, window, cx);
+    }
+
     /// Fill the form like the boards (extract-from-data, extract-keep-dirs).
     pub fn set_example(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let path = "/data/2024_spring_serval_output/serval_observe/tags_2024_spring.csv";

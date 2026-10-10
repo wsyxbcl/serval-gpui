@@ -3818,10 +3818,8 @@ dependencies = [
  "csv",
  "embed-resource",
  "gpui-kit",
- "image",
  "serde",
  "serde_json",
- "tempfile",
 ]
 
 [[package]]
