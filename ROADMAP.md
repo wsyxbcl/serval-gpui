@@ -107,16 +107,20 @@ Rules:
 - [x] Refactor `RootView::render` to extract shared `chip`/`chip_base`/`input_row`/`browse_button`/`muted_label` helpers and centralize the chip color palette, cutting `main.rs` from ~5150 to ~4030 lines with no behavior change.
 - [x] Add a CI workflow that runs `cargo test` and `cargo clippy -D warnings` on push/PR (no prior workflow verified the codebase before release).
 - [x] Review the app against the current Serval (findings G1–G12 in the 2026-10-08 review) and start the redesign: `Design/` with specs, boards, tokens and the decision log (see `Design/spec/decisions.md` for what is confirmed).
-- [ ] Serval side: flags, `--progress json` events and exit codes from `Design/spec/serval-protocol.md` (Serval repository).
-- [ ] Implement the redesign on `gpui-kit` 0.7 once the remaining proposals in `Design/spec/decisions.md` are confirmed.
+- [x] Serval side: flags, `--progress json` events and exit codes from `Design/spec/serval-protocol.md` (Serval 0.8.0), plus `xmp write` and the hidden `xmp get`/`xmp set`.
+- [x] Rebuild on `gpui-kit` 0.7 (rewrite; the old PTY wrapper is in git history): theme built from `Design/boards/tokens.css` at compile time, shell (title bar with Serval pill, grouped sidebar, screen anatomy), `--design-state` for board comparison, observe form, run bar.
+- [x] Run Serval with `--progress json`: runner (events on stderr, other lines to the log), run bar states, results (banner, warnings, output files, log), stop (interrupt, then end after 3 s), Ctrl+Enter / Ctrl+.; launch options `<folder>`, `--serval`, `--run`.
+- [ ] Settings: choose the Serval program (W08), language, appearance; remember them and each form's last values.
+- [ ] The remaining command screens, one by one, each checked against its board (`--design-state`).
+- [ ] Questions as fields and dialogs: path-level pickers, conflicts dialog (exit 3), identified species after observe.
+- [ ] Browse and pick (W16) on `xmp get`/`xmp set`, with the thumbnail cache.
+- [ ] Bring back the CI workflows (tests, clippy, Windows/macOS builds) for the new dependency set.
 
 ---
 
 ## User Work
 
-- Decide whether to support bundling the Serval binary or require an external executable.
 - Decide which subcommands beyond the initial set deserve first-class GUI forms.
-- Decide how much terminal fidelity is actually needed in the integrated output pane.
 - Refine i18n translations for Chinese.
 
 ---
@@ -125,11 +129,8 @@ Rules:
 
 - Add more polished forms for all Serval subcommands, e.g. pre-read CSV input to offer more advanced options in `translate` or pre-read species values in CSV for `extract`.
 - Revisit adaptive sizing/scaling for very small windows after the core workflows settle.
-- Replace common prompt-driven flows with GUI-native configuration screens.
 - Add presets, recent inputs, and saved workflows.
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
-- Investigate and fix Linux IME composition in custom text inputs so Chinese input works there too.
 - Improve packaging and distribution for Linux, Windows, and macOS.
-- Explore Ghostty-based terminal components if a richer embedded terminal becomes necessary.
 - Consider extracting reusable Serval command metadata from the CLI project if it materially improves maintainability.

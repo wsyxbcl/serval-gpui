@@ -1,9 +1,9 @@
 [package]
 name = "maze-serval-gpui"
-version = "1.0.2"
-edition = "2021"
+version = "2.0.0-dev"
+edition = "2024"
 default-run = "waxbill"
-description = "Native GPUI desktop wrapper for the Serval CLI."
+description = "Waxbill: a desktop app for Serval, the camera-trap data tool."
 license = "Apache-2.0"
 repository = "https://github.com/wsyxbcl/serval-gpui"
 
@@ -12,13 +12,10 @@ name = "waxbill"
 path = "src/main.rs"
 
 [dependencies]
-gpui = "0.2.2"
-unicode-segmentation = "1.11"
-portable-pty = "0.9"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-# Keep the transitive macOS font stack aligned with gpui's current zed-font-kit.
-core-text = "=21.0.0"
+# Pinned exactly: gpui-kit follows weekly GPUI snapshots (W01).
+gpui-kit = "=0.7.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [build-dependencies]
 embed-resource = "3.0.2"

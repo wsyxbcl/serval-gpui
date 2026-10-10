@@ -1,0 +1,130 @@
+//! The screens in the sidebar (Design/spec/shell.md §2) and what every command screen provides to the shell.
+
+pub mod form;
+pub mod observe;
+
+use crate::i18n::t;
+use gpui_kit::assets::IconName;
+use gpui_kit::*;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ScreenId {
+    Rename,
+    Align,
+    XmpInit,
+    Browse,
+    Observe,
+    Capture,
+    Translate,
+    XmpUpdate,
+    XmpSync,
+    Extract,
+    XmpCopy,
+    XmpRemove,
+    Settings,
+}
+
+/// Sidebar groups, in order. Settings sits at the bottom, outside the groups.
+pub fn groups() -> [(&'static str, &'static [ScreenId]); 3] {
+    use ScreenId::*;
+    [
+        (t("数据整理", "Data wrangling"), &[Rename, Align, XmpInit]),
+        (
+            t("数据分析", "Data processing"),
+            &[Browse, Observe, Capture, Translate, XmpUpdate, XmpSync],
+        ),
+        (t("工具", "Tools"), &[Extract, XmpCopy, XmpRemove]),
+    ]
+}
+
+impl ScreenId {
+    pub fn label(self) -> &'static str {
+        use ScreenId::*;
+        match self {
+            Rename => t("重命名", "Rename"),
+            Align => t("路径对齐", "Align paths"),
+            XmpInit => t("XMP 初始化", "Initialise XMP"),
+            Browse => t("浏览与精选", "Browse and pick"),
+            Observe => t("标签获取", "Get tags"),
+            Capture => t("独立捕获", "Independent captures"),
+            Translate => t("物种名替换", "Translate species"),
+            XmpUpdate => t("元数据更新", "Update metadata"),
+            XmpSync => t("元数据同步", "Sync metadata"),
+            Extract => t("媒体提取", "Extract media"),
+            XmpCopy => t("XMP 导出", "Export XMP"),
+            XmpRemove => t("XMP 删除", "Remove XMP"),
+            Settings => t("设置", "Settings"),
+        }
+    }
+
+    pub fn icon(self) -> IconName {
+        use ScreenId::*;
+        match self {
+            Rename => IconName::Pencil,
+            Align => IconName::ArrowRightLeft,
+            XmpInit => IconName::Plus,
+            Browse => IconName::LayoutGrid,
+            Observe => IconName::ScanSearch,
+            Capture => IconName::Timer,
+            Translate => IconName::Languages,
+            XmpUpdate => IconName::RefreshCw,
+            XmpSync => IconName::ArrowLeftRight,
+            Extract => IconName::Download,
+            XmpCopy => IconName::Copy,
+            XmpRemove => IconName::Trash,
+            Settings => IconName::Settings,
+        }
+    }
+}
+
+/// What a command screen would run now: Serval's arguments, and either what the run will do (ready) or the first
+/// thing still missing.
+pub struct Plan {
+    pub args: Vec<String>,
+    /// Where Serval runs: the output root, or its nearest existing parent (run.md §5).
+    pub cwd: std::path::PathBuf,
+    pub ready: Result<String, String>,
+}
+
+/// A command screen's form, as the shell sees it.
+#[derive(Clone)]
+pub enum Form {
+    Observe(Entity<observe::ObserveForm>),
+}
+
+impl Form {
+    pub fn summary(&self) -> &'static str {
+        match self {
+            Form::Observe(_) => t(
+                "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",
+                "Reads species, individual and other tags from photos and videos into tags.csv and species counts.",
+            ),
+        }
+    }
+
+    pub fn plan(&self, cx: &App) -> Plan {
+        match self {
+            Form::Observe(form) => form.read(cx).plan(cx),
+        }
+    }
+
+    pub fn view(&self) -> AnyView {
+        match self {
+            Form::Observe(form) => form.clone().into(),
+        }
+    }
+}
+
+/// A command line as a person would type it: arguments with spaces or quotes are quoted.
+pub fn display_command(args: &[String]) -> String {
+    std::iter::once("serval".to_string())
+        .chain(args.iter().map(|arg| {
+            if arg.is_empty() || arg.contains([' ', '"', '\'']) {
+                format!("\"{}\"", arg.replace('"', "\\\""))
+            } else {
+                arg.clone()
+            }
+        }))
+        .collect::<Vec<_>>()
+        .join(" ")
+}

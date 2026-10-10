@@ -1,0 +1,253 @@
+//! One run of a command and how it is described (Design/spec/run.md): the run bar's line in each state, the
+//! result banner's sentence, warnings, produced files and the log.
+
+use crate::i18n::{Language, count, language, t};
+use crate::runner::{Event, EXIT_NEEDS_DECISION, Message, NeedItem, Poll, Running};
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    Running,
+    Finished,
+    NeedsDecision,
+    Failed,
+    Stopped,
+}
+
+pub struct Progress {
+    pub phase: String,
+    pub done: u64,
+    pub total: Option<u64>,
+    pub phase_started: Instant,
+}
+
+pub struct OutputFile {
+    pub kind: String,
+    pub path: PathBuf,
+    pub rows: Option<u64>,
+}
+
+pub struct Run {
+    pub command: String,
+    pub started: Instant,
+    pub elapsed: Duration,
+    pub outcome: Outcome,
+    pub progress: Option<Progress>,
+    pub log: Vec<String>,
+    pub warnings: Vec<(String, Option<String>)>,
+    pub errors: Vec<(String, Option<String>)>,
+    pub outputs: Vec<OutputFile>,
+    pub summary: serde_json::Map<String, serde_json::Value>,
+    pub needs: Option<(u64, Vec<NeedItem>)>,
+    pub log_open: bool,
+    stop_requested: bool,
+    process: Option<Running>,
+}
+
+impl Run {
+    pub fn new(command: String, process: Running) -> Run {
+        Run {
+            log: vec![format!("$ {command}")],
+            command,
+            started: Instant::now(),
+            elapsed: Duration::ZERO,
+            outcome: Outcome::Running,
+            progress: None,
+            warnings: Vec::new(),
+            errors: Vec::new(),
+            outputs: Vec::new(),
+            summary: Default::default(),
+            needs: None,
+            log_open: false,
+            stop_requested: false,
+            process: Some(process),
+        }
+    }
+
+    /// A run that could not start (e.g. the program is gone).
+    pub fn failed_to_start(command: String, error: String) -> Run {
+        let mut run = Run {
+            log: vec![format!("$ {command}"), error.clone()],
+            command,
+            started: Instant::now(),
+            elapsed: Duration::ZERO,
+            outcome: Outcome::Failed,
+            progress: None,
+            warnings: Vec::new(),
+            errors: vec![(error, None)],
+            outputs: Vec::new(),
+            summary: Default::default(),
+            needs: None,
+            log_open: true,
+            stop_requested: false,
+            process: None,
+        };
+        run.elapsed = run.started.elapsed();
+        run
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.outcome == Outcome::Running
+    }
+
+    pub fn stop(&mut self) {
+        if let Some(process) = &mut self.process {
+            self.stop_requested = true;
+            process.stop();
+        }
+    }
+
+    /// Take in what Serval wrote; returns whether anything changed.
+    pub fn poll(&mut self) -> bool {
+        let Some(process) = &mut self.process else {
+            return false;
+        };
+        let (messages, exit) = match process.poll() {
+            Poll::Running(messages) => (messages, None),
+            Poll::Exited(messages, status) => (messages, Some(status)),
+        };
+        let changed = !messages.is_empty() || exit.is_some();
+        for message in messages {
+            self.take(message);
+        }
+        if let Some(status) = exit {
+            self.process = None;
+            self.elapsed = self.started.elapsed();
+            self.outcome = match status.code() {
+                Some(0) => Outcome::Finished,
+                Some(EXIT_NEEDS_DECISION) => Outcome::NeedsDecision,
+                _ if self.stop_requested => Outcome::Stopped,
+                _ => Outcome::Failed,
+            };
+            if self.outcome == Outcome::Failed {
+                self.log_open = true;
+            }
+        }
+        changed
+    }
+
+    fn take(&mut self, message: Message) {
+        match message {
+            Message::Line(line) => self.log.push(line),
+            Message::Event(event) => match event {
+                Event::Progress { phase, done, total } => {
+                    let same_phase = self.progress.as_ref().is_some_and(|p| p.phase == phase);
+                    let phase_started = match &self.progress {
+                        Some(p) if same_phase => p.phase_started,
+                        _ => Instant::now(),
+                    };
+                    self.progress = Some(Progress { phase, done, total, phase_started });
+                }
+                Event::Warning { message, path } => self.warnings.push((message, path)),
+                Event::Error { message, path } => self.errors.push((message, path)),
+                Event::Output { kind, path, rows } => self.outputs.push(OutputFile { kind, path, rows }),
+                Event::Summary(summary) => self.summary = summary,
+                Event::Needs { count, items } => self.needs = Some((count, items)),
+                Event::Hello { .. } | Event::Unresolved(_) | Event::Unknown => {}
+            },
+        }
+    }
+
+    /// "正在复制 · 1,204 / 1,500 · 剩余约 0:42"
+    pub fn progress_line(&self) -> String {
+        let Some(p) = &self.progress else {
+            return t("正在启动…", "Starting…").to_string();
+        };
+        let mut line = phase_words(&p.phase).to_string();
+        match p.total {
+            Some(total) => line.push_str(&format!(" · {} / {}", count(p.done as usize), count(total as usize))),
+            None => line.push_str(&format!(" · {}", count(p.done as usize))),
+        }
+        let running_for = p.phase_started.elapsed();
+        if let Some(total) = p.total
+            && p.done > 0
+            && running_for > Duration::from_secs(5)
+        {
+            let remaining = running_for.mul_f64((total.saturating_sub(p.done)) as f64 / p.done as f64);
+            line.push_str(&format!(" · {} {}", t("剩余约", "about"), clock(remaining)));
+            if language() == Language::English {
+                line.push_str(" left");
+            }
+        }
+        line
+    }
+
+    pub fn fraction(&self) -> Option<f32> {
+        let p = self.progress.as_ref()?;
+        let total = p.total.filter(|&t| t > 0)?;
+        Some((p.done as f32 / total as f32).clamp(0.0, 1.0))
+    }
+
+    /// What happened, in one sentence: what was done, how many, how long.
+    pub fn result_sentence(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        for (key, zh, en) in SUMMARY_WORDS {
+            if let Some(n) = self.summary.get(*key).and_then(|v| v.as_u64())
+                && n > 0
+            {
+                parts.push(match language() {
+                    Language::Chinese => format!("{zh} {}", count(n as usize)),
+                    Language::English => format!("{} {en}", count(n as usize)),
+                });
+            }
+        }
+        if parts.is_empty() && !self.outputs.is_empty() {
+            parts.push(match language() {
+                Language::Chinese => format!("生成 {} 个结果", self.outputs.len()),
+                Language::English => format!("{} results written", self.outputs.len()),
+            });
+        }
+        let took = match language() {
+            Language::Chinese => format!("用时 {}", clock(self.elapsed)),
+            Language::English => format!("took {}", clock(self.elapsed)),
+        };
+        parts.push(took);
+        parts.join(t("，", ", "))
+    }
+
+    /// The first error, for a failed run.
+    pub fn failure(&self) -> String {
+        self.errors
+            .iter()
+            .rev()
+            .find(|(_, path)| path.is_none())
+            .or(self.errors.first())
+            .map(|(message, _)| message.clone())
+            .or_else(|| self.log.iter().rev().find(|l| l.starts_with("Error")).cloned())
+            .unwrap_or_else(|| t("Serval 意外退出", "Serval exited unexpectedly").to_string())
+    }
+}
+
+const SUMMARY_WORDS: &[(&str, &str, &str)] = &[
+    ("written", "写入", "written"),
+    ("updated", "更新", "updated"),
+    ("created", "新建", "created"),
+    ("changed", "修改", "changed"),
+    ("done", "完成", "done"),
+    ("replaced", "替换", "replaced"),
+    ("already", "已是最新", "already up to date"),
+    ("existing", "已存在", "existing"),
+    ("skipped", "跳过", "skipped"),
+    ("failed", "失败", "failed"),
+];
+
+fn phase_words(phase: &str) -> &'static str {
+    match phase {
+        "scan" => t("扫描", "Scanning"),
+        "read" => t("读取", "Reading"),
+        "plan" => t("检查目标", "Checking targets"),
+        "copy" => t("正在复制", "Copying"),
+        "move" => t("正在移动", "Moving"),
+        "write" => t("正在写入", "Writing"),
+        "remove" => t("正在删除", "Removing"),
+        "analyse" => t("正在分析", "Analysing"),
+        _ => t("运行中", "Running"),
+    }
+}
+
+/// m:ss
+pub fn clock(duration: Duration) -> String {
+    let seconds = duration.as_secs();
+    format!("{}:{:02}", seconds / 60, seconds % 60)
+}

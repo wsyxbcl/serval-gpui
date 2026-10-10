@@ -16,13 +16,11 @@ Bootstrap prompt:
 
 `serval-gpui` is a native desktop GUI for the existing Rust CLI tool `serval`.
 
-The current preferred direction is:
-- keep the existing Serval CLI working as-is for v1
-- build a thin GUI wrapper over it
-- use GPUI for the GUI
-- use normal subprocess execution for non-interactive commands
-- use PTY-backed execution for interactive commands such as `capture`
-- show the exact command being run and stream output in an integrated pane
+The current direction (see `Design/spec/decisions.md`):
+- a light front end for Serval: forms in, files out; it does not reimplement Serval
+- GPUI through `gpui-kit` (pinned exactly), with gpui-component's widgets
+- Serval runs as a plain process with every answer as a flag and `--progress json` events (W03); no PTY
+- show the exact command being run; Serval's ordinary output goes to the run log
 
 ## Design comes first
 
@@ -55,36 +53,21 @@ The current preferred direction is:
 
 ## Implementation priorities
 
-1. Preserve existing Serval behavior where possible.
-2. Prefer a thin-wrapper architecture before deeper integration.
-3. Keep the UI understandable for non-CLI users.
-4. Keep the exact Serval command visible for transparency.
-5. Support interactive Serval sessions through PTY when needed.
-6. Avoid unnecessary dependencies and avoid speculative overengineering.
-
-## Expected initial milestones
-
-The agent should generally move in this order unless the codebase suggests a better sequence:
-
-1. Ensure project scaffolding exists.
-2. Make a minimal GPUI app run.
-3. Add a basic layout with controls plus output pane.
-4. Implement subprocess execution for non-interactive commands.
-5. Add command preview generation.
-6. Add file and directory input flows.
-7. Add PTY support for interactive commands.
-8. Improve UX and platform behavior.
+1. Preserve existing Serval behavior; changes Waxbill needs go into Serval as flags or events, never as prompt scraping.
+2. Keep the UI understandable for non-CLI users (plain words, numbers with separators, what happens next).
+3. Keep the exact Serval command visible and copyable.
+4. Every board state can be opened with `--design-state <name>` and compared with its board.
+5. Avoid unnecessary dependencies and avoid speculative overengineering.
 
 ## Notes for decision making
 
-- For v1, the GUI does not need to be a full terminal emulator.
-- For v1, we only support two main serval functions: serval observe and serval capture
-- However, some commands are interactive, so PTY support is required.
-- If richer terminal rendering becomes necessary, the project may later explore Ghostty-based components or prior `gpui-ghostty` work.
+- Serval is a separate program the user chooses (W08); Waxbill needs Serval 0.8.0 or later.
+- Messages between them are JSON lines with lenient readers (W18).
+- Screenshots for review come from an isolated headless KWin session (`Design/README.md`), never the desktop.
 - Do not block useful progress on speculative future architecture.
 
 ## Agent reminder
-serval is available in current environment, so use serval --help or serval <command> --help to check the options/arguments
+Use `serval --help` or `serval <command> --help` (0.8.0 or later) to check options and arguments.
 
 Whenever resuming work, start by reading:
 - `AGENTS.md`
