@@ -4,6 +4,7 @@ pub mod capture;
 pub mod extract;
 pub mod form;
 pub mod observe;
+pub mod simple;
 
 use crate::i18n::t;
 use gpui_kit::assets::IconName;
@@ -115,11 +116,13 @@ pub enum Form {
     Observe(Entity<observe::ObserveForm>),
     Capture(Entity<capture::CaptureForm>),
     Extract(Entity<extract::ExtractForm>),
+    Simple(Entity<simple::SimpleForm>),
 }
 
 impl Form {
-    pub fn summary(&self) -> &'static str {
+    pub fn summary(&self, cx: &App) -> &'static str {
         match self {
+            Form::Simple(form) => form.read(cx).summary(),
             Form::Observe(_) => t(
                 "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",
                 "Reads species, individual and other tags from photos and videos into tags.csv and species counts.",
@@ -140,6 +143,7 @@ impl Form {
             Form::Observe(form) => form.read(cx).plan(cx),
             Form::Capture(form) => form.read(cx).plan(cx),
             Form::Extract(form) => form.read(cx).plan(cx),
+            Form::Simple(form) => form.read(cx).plan(cx),
         }
     }
 
@@ -149,6 +153,7 @@ impl Form {
             Form::Observe(form) => ("observe", form.read(cx).values(cx)),
             Form::Capture(form) => ("capture", form.read(cx).values(cx)),
             Form::Extract(form) => ("extract", form.read(cx).values(cx)),
+            Form::Simple(form) => (form.read(cx).key(), form.read(cx).values(cx)),
         };
         crate::settings::Settings::update(cx, |settings| {
             for (field, value) in values {
@@ -162,6 +167,7 @@ impl Form {
             Form::Observe(form) => form.clone().into(),
             Form::Capture(form) => form.clone().into(),
             Form::Extract(form) => form.clone().into(),
+            Form::Simple(form) => form.clone().into(),
         }
     }
 }

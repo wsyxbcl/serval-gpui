@@ -11,6 +11,7 @@ use crate::screens::capture::CaptureForm;
 use crate::screens::extract::ExtractForm;
 use crate::screens::form::FolderCount;
 use crate::screens::observe::ObserveForm;
+use crate::screens::simple::{self, SimpleForm};
 use crate::screens::{Form, ScreenId, groups};
 use crate::serval::{self, ServalStatus};
 use crate::settings::{Appearance, Settings};
@@ -70,6 +71,8 @@ pub struct Waxbill {
     observe: Entity<ObserveForm>,
     capture: Entity<CaptureForm>,
     extract: Entity<ExtractForm>,
+    /// Screens that are only paths, checkboxes and choices.
+    simple: HashMap<ScreenId, Entity<SimpleForm>>,
     /// The choice in the conflicts dialog: skip, replace or rename (questions.md §3).
     pub(crate) conflict_choice: usize,
     pub(crate) serval: ServalStatus,
@@ -89,6 +92,17 @@ impl Waxbill {
         let observe = cx.new(|cx| ObserveForm::new(window, cx));
         let capture = cx.new(|cx| CaptureForm::new(window, cx));
         let extract = cx.new(|cx| ExtractForm::new(window, cx));
+        let simple: HashMap<ScreenId, Entity<SimpleForm>> = [
+            (ScreenId::XmpInit, &simple::XMP_INIT),
+            (ScreenId::Rename, &simple::RENAME),
+            (ScreenId::Align, &simple::ALIGN),
+            (ScreenId::XmpCopy, &simple::XMP_COPY),
+            (ScreenId::XmpRemove, &simple::XMP_REMOVE),
+            (ScreenId::XmpSync, &simple::XMP_SYNC),
+        ]
+        .into_iter()
+        .map(|(id, spec)| (id, cx.new(|cx| SimpleForm::new(spec, window, cx))))
+        .collect();
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
         let mut app = Waxbill {
@@ -96,6 +110,7 @@ impl Waxbill {
             observe,
             capture,
             extract,
+            simple,
             conflict_choice: 0,
             serval: ServalStatus::Checking,
             runs: HashMap::new(),
@@ -160,6 +175,9 @@ impl Waxbill {
                 app.observe.update(cx, |form, cx| form.restore(window, cx));
                 app.capture.update(cx, |form, cx| form.restore(window, cx));
                 app.extract.update(cx, |form, cx| form.restore(window, cx));
+                for form in app.simple.values() {
+                    form.update(cx, |form, cx| form.restore(window, cx));
+                }
                 if let Some(screen) = cx
                     .default_global::<Settings>()
                     .value("screen")
@@ -486,6 +504,7 @@ impl Waxbill {
             ScreenId::Observe => Some(Form::Observe(self.observe.clone())),
             ScreenId::Capture => Some(Form::Capture(self.capture.clone())),
             ScreenId::Extract => Some(Form::Extract(self.extract.clone())),
+            id if self.simple.contains_key(&id) => Some(Form::Simple(self.simple[&id].clone())),
             _ => None,
         }
     }
@@ -701,7 +720,7 @@ impl Waxbill {
         } else if self.serval == ServalStatus::Missing && form.is_some() {
             self.render_first_run(cx)
         } else {
-            let summary = form.as_ref().map(Form::summary).unwrap_or_else(|| {
+            let summary = form.as_ref().map(|form| form.summary(cx)).unwrap_or_else(|| {
                 t(
                     "这个界面正在按新设计重建，暂时请在命令行使用。",
                     "This screen is being rebuilt to the new design; use the command line for now.",
