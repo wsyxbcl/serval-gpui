@@ -5,6 +5,8 @@ pub mod extract;
 pub mod form;
 pub mod observe;
 pub mod simple;
+pub mod translate;
+pub mod update;
 
 use crate::i18n::t;
 use gpui_kit::assets::IconName;
@@ -117,12 +119,22 @@ pub enum Form {
     Capture(Entity<capture::CaptureForm>),
     Extract(Entity<extract::ExtractForm>),
     Simple(Entity<simple::SimpleForm>),
+    Translate(Entity<translate::TranslateForm>),
+    Update(Entity<update::UpdateForm>),
 }
 
 impl Form {
     pub fn summary(&self, cx: &App) -> &'static str {
         match self {
             Form::Simple(form) => form.read(cx).summary(),
+            Form::Translate(_) => t(
+                "按标签表把物种名换成另一种写法（例如中文名、学名）。",
+                "Rewrites species names another way (e.g. Chinese or scientific names) from a taglist.",
+            ),
+            Form::Update(_) => t(
+                "按表中的 xmp_update 列修改 XMP 里的标签；每个文件只写一次，并保留备份。",
+                "Changes the tags in the XMP files from the table's xmp_update column; each file is written once, with a backup.",
+            ),
             Form::Observe(_) => t(
                 "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",
                 "Reads species, individual and other tags from photos and videos into tags.csv and species counts.",
@@ -144,6 +156,8 @@ impl Form {
             Form::Capture(form) => form.read(cx).plan(cx),
             Form::Extract(form) => form.read(cx).plan(cx),
             Form::Simple(form) => form.read(cx).plan(cx),
+            Form::Translate(form) => form.read(cx).plan(cx),
+            Form::Update(form) => form.read(cx).plan(cx),
         }
     }
 
@@ -154,6 +168,8 @@ impl Form {
             Form::Capture(form) => ("capture", form.read(cx).values(cx)),
             Form::Extract(form) => ("extract", form.read(cx).values(cx)),
             Form::Simple(form) => (form.read(cx).key(), form.read(cx).values(cx)),
+            Form::Translate(form) => ("translate", form.read(cx).values(cx)),
+            Form::Update(form) => ("xmp_update", form.read(cx).values(cx)),
         };
         crate::settings::Settings::update(cx, |settings| {
             for (field, value) in values {
@@ -168,6 +184,8 @@ impl Form {
             Form::Capture(form) => form.clone().into(),
             Form::Extract(form) => form.clone().into(),
             Form::Simple(form) => form.clone().into(),
+            Form::Translate(form) => form.clone().into(),
+            Form::Update(form) => form.clone().into(),
         }
     }
 }

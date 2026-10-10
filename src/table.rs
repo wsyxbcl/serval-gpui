@@ -305,3 +305,42 @@ mod tests {
         assert_eq!(parse_time("1970-01-02 00:01:05"), Some(86_400 + 65));
     }
 }
+
+/// A CSV as text: its header and rows (row numbers count the header as line 1, as Serval reports them).
+#[derive(Clone, Debug, Default)]
+pub struct Csv {
+    pub header: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+}
+
+impl Csv {
+    pub fn read(path: &Path) -> Result<Csv, String> {
+        let mut reader = csv::ReaderBuilder::new()
+            .flexible(true)
+            .from_path(path)
+            .map_err(|err| err.to_string())?;
+        let header = reader
+            .headers()
+            .map_err(|err| err.to_string())?
+            .iter()
+            .map(|h| h.trim_start_matches('\u{feff}').trim().to_string())
+            .collect();
+        let rows = reader
+            .records()
+            .map(|row| row.map(|r| r.iter().map(|c| c.trim().to_string()).collect()))
+            .collect::<Result<_, _>>()
+            .map_err(|err| err.to_string())?;
+        Ok(Csv { header, rows })
+    }
+
+    pub fn column(&self, name: &str) -> Option<usize> {
+        self.header.iter().position(|h| h == name)
+    }
+
+    pub fn cell<'a>(&self, row: &'a [String], column: Option<usize>) -> &'a str {
+        column
+            .and_then(|c| row.get(c))
+            .map(String::as_str)
+            .unwrap_or("")
+    }
+}

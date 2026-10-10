@@ -115,7 +115,9 @@ Rules:
 - [x] 媒体提取 (extract), step 1: species chosen from the table with faceted counts and bars, rating, a live summary (files, records, size, deployments), kept folders on a real path with an example output path, organise options; Serval's filter built from the choice; a stable dated output folder so reruns continue; the conflicts dialog (exit 3) rerunning with `--on-existing`; the last screen and the extract choice are remembered.
 - [ ] 媒体提取 step 2: deployments and date range through a subset table (data.md §3); thumbnails of the match (with browse's cache).
 - [x] XMP 初始化, 重命名, 路径对齐, XMP 导出, XMP 删除, 元数据同步 as one shared form described per screen (`screens/simple.rs`); XMP 删除 needs an explicit confirmation before Run.
-- [ ] 物种名替换 and 元数据更新 with their previews (data.md §3: taglist coverage, update preview).
+- [x] 物种名替换: columns from the taglist's header; every species checked against the taglist before Run (missing, empty translation, repeated), as Serval checks it.
+- [x] 元数据更新: preview of the changes per file (old → new, file count) with conflicting rows marked; rows with media paths (which `xmp update` skips) block Run with how to make an XMP table.
+- [ ] Ask: should `serval xmp update` accept media paths and use their sidecars (as `xmp write`/`xmp set` do)?
 - [ ] Questions as fields and dialogs: path-level pickers, conflicts dialog (exit 3), identified species after observe.
 - [ ] Browse and pick (W16) on `xmp get`/`xmp set`, with the thumbnail cache.
 - [ ] Bring back the CI workflows (tests, clippy, Windows/macOS builds) for the new dependency set.

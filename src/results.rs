@@ -92,7 +92,7 @@ pub fn warning_list(run: &Run, cx: &App) -> Option<Div> {
                                     .text_color(tokens.color("warning"))
                                     .child("•"),
                             )
-                            .child(div().child(match path {
+                            .child(div().flex_1().min_w_0().child(match path {
                                 Some(path) => format!("{path} — {message}"),
                                 None => message.clone(),
                             }))
