@@ -2,7 +2,9 @@
 //! result banner's sentence, warnings, produced files and the log.
 
 use crate::i18n::{Language, count, language, t};
-use crate::runner::{EXIT_NEEDS_DECISION, Event, Message, NeedItem, Poll, Running};
+use crate::runner::{
+    EXIT_NEEDS_DECISION, Event, Message, NeedItem, Poll, Running, UnresolvedSpecies,
+};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -48,6 +50,8 @@ pub struct Run {
     pub outputs: Vec<OutputFile>,
     pub summary: serde_json::Map<String, serde_json::Value>,
     pub needs: Option<Needs>,
+    /// Observe: images whose individual IDs could not be given to a species (questions.md §4).
+    pub unresolved: Option<(u64, Vec<UnresolvedSpecies>)>,
     pub log_open: bool,
     stop_requested: bool,
     process: Option<Running>,
@@ -67,6 +71,7 @@ impl Run {
             outputs: Vec::new(),
             summary: Default::default(),
             needs: None,
+            unresolved: None,
             log_open: false,
             stop_requested: false,
             process: Some(process),
@@ -96,6 +101,29 @@ impl Run {
         run
     }
 
+    /// The board's observe-id-species-after-scan state: a finished observe with 6 unresolved images.
+    pub fn example_unresolved() -> Run {
+        let mut run = Run::failed_to_start(String::new(), String::new());
+        run.errors.clear();
+        run.log_open = false;
+        run.outcome = Outcome::Finished;
+        run.elapsed = Duration::from_secs(124);
+        let species = |name: &str, images, individuals: &[&str]| UnresolvedSpecies {
+            name: name.into(),
+            images,
+            individuals: individuals.iter().map(|s| s.to_string()).collect(),
+        };
+        run.unresolved = Some((
+            6,
+            vec![
+                species("雪豹", 6, &["SL01", "SL03", "SL04", "SL07"]),
+                species("岩羊", 5, &[]),
+                species("赤狐", 1, &[]),
+            ],
+        ));
+        run
+    }
+
     /// A run that could not start (e.g. the program is gone).
     pub fn failed_to_start(command: String, error: String) -> Run {
         let mut run = Run {
@@ -110,6 +138,7 @@ impl Run {
             outputs: Vec::new(),
             summary: Default::default(),
             needs: None,
+            unresolved: None,
             log_open: true,
             stop_requested: false,
             process: None,
@@ -194,7 +223,8 @@ impl Run {
                         items,
                     })
                 }
-                Event::Hello { .. } | Event::Unresolved(_) | Event::Unknown => {}
+                Event::Unresolved { count, species } => self.unresolved = Some((count, species)),
+                Event::Hello { .. } | Event::Unknown => {}
             },
         }
     }

@@ -118,7 +118,7 @@ Rules:
 - [x] 物种名替换: columns from the taglist's header; every species checked against the taglist before Run (missing, empty translation, repeated), as Serval checks it.
 - [x] 元数据更新: preview of the changes per file (old → new, file count) with conflicting rows marked; rows with media paths (which `xmp update` skips) block Run with how to make an XMP table.
 - [ ] Ask: should `serval xmp update` accept media paths and use their sidecars (as `xmp write`/`xmp set` do)?
-- [ ] Questions as fields and dialogs: path-level pickers, conflicts dialog (exit 3), identified species after observe.
+- [x] Questions as fields and dialogs: path-level pickers (capture, extract), conflicts dialog (exit 3), identified species after observe (remembered per folder).
 - [ ] Browse and pick (W16) on `xmp get`/`xmp set`, with the thumbnail cache.
 - [ ] Bring back the CI workflows (tests, clippy, Windows/macOS builds) for the new dependency set.
 

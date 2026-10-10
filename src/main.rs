@@ -4,6 +4,7 @@
 mod app;
 mod conflicts;
 mod i18n;
+mod id_species;
 mod output;
 mod results;
 mod run;

@@ -54,6 +54,7 @@ pub const DESIGN_STATES: &[&str] = &[
     "extract-from-data",
     "extract-keep-dirs",
     "extract-conflicts",
+    "observe-id-species-after-scan",
 ];
 
 /// What the command line asks for at launch.
@@ -70,7 +71,7 @@ pub struct Launch {
 
 pub struct Waxbill {
     pub(crate) screen: ScreenId,
-    observe: Entity<ObserveForm>,
+    pub(crate) observe: Entity<ObserveForm>,
     capture: Entity<CaptureForm>,
     extract: Entity<ExtractForm>,
     /// Screens that are only paths, checkboxes and choices.
@@ -79,6 +80,8 @@ pub struct Waxbill {
     update: Entity<UpdateForm>,
     /// The choice in the conflicts dialog: skip, replace or rename (questions.md §3).
     pub(crate) conflict_choice: usize,
+    /// The identified-species question while it is open: the checked species (questions.md §4).
+    pub(crate) id_species: Option<std::collections::BTreeSet<String>>,
     pub(crate) serval: ServalStatus,
     /// The last run of each screen; at most one is running (shell.md §2).
     pub(crate) runs: HashMap<ScreenId, Run>,
@@ -120,6 +123,7 @@ impl Waxbill {
             translate,
             update,
             conflict_choice: 0,
+            id_species: None,
             serval: ServalStatus::Checking,
             runs: HashMap::new(),
             focus,
@@ -146,6 +150,24 @@ impl Waxbill {
                 if state == "extract-conflicts" {
                     app.runs.insert(ScreenId::Extract, Run::example_conflicts());
                 }
+            }
+            Some("observe-id-species-after-scan") => {
+                app.serval = example_serval("0.8.0", "serval");
+                app.observe.update(cx, |form, cx| {
+                    form.set_example(
+                        "/data/2024_spring",
+                        FolderCount {
+                            images: 12_480,
+                            videos: 1_302,
+                            sidecars: 0,
+                        },
+                        window,
+                        cx,
+                    )
+                });
+                app.runs
+                    .insert(ScreenId::Observe, Run::example_unresolved());
+                app.ask_id_species(cx);
             }
             Some("capture-ready") => {
                 app.serval = example_serval("0.8.0", "serval");
@@ -375,8 +397,12 @@ impl Waxbill {
                         };
                         // Redraw at least once a second for the elapsed and remaining time.
                         run.poll();
+                        let running = run.is_running();
+                        if !running && screen == ScreenId::Observe && run.unresolved.is_some() {
+                            this.ask_id_species(cx);
+                        }
                         cx.notify();
-                        run.is_running()
+                        running
                     })
                     .unwrap_or(false);
                 if !running {
@@ -674,6 +700,7 @@ impl Waxbill {
             v_flex()
                 .gap(tokens.px("space-3"))
                 .children(results::banner(run, cx))
+                .children(self.render_unresolved_banner(cx))
                 .children(results::warning_list(run, cx))
                 .children(results::output_list(run, cx))
                 .child(results::log(
@@ -766,7 +793,9 @@ impl Waxbill {
 
 impl Render for Waxbill {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let dialog = self.render_conflicts(cx);
+        let dialog = self
+            .render_conflicts(cx)
+            .or_else(|| self.render_id_species(cx));
         v_flex()
             .relative()
             .size_full()

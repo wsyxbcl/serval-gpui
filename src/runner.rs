@@ -40,13 +40,26 @@ pub enum Event {
         #[serde(default)]
         items: Vec<NeedItem>,
     },
-    Unresolved(serde_json::Map<String, serde_json::Value>),
+    Unresolved {
+        count: u64,
+        #[serde(default)]
+        species: Vec<UnresolvedSpecies>,
+    },
     Error {
         message: String,
         path: Option<String>,
     },
     #[serde(other)]
     Unknown,
+}
+
+/// A species in images whose individual IDs could not be given to one species (observe, `unresolved`).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct UnresolvedSpecies {
+    pub name: String,
+    pub images: u64,
+    #[serde(default)]
+    pub individuals: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -190,6 +203,10 @@ mod tests {
             }
         );
         assert_eq!(parse(r#"{"serval":"later-kind","x":1}"#), Event::Unknown);
+        assert!(matches!(
+            parse(r#"{"serval":"unresolved","kind":"id-species","count":6,"species":[{"name":"雪豹","images":6,"individuals":["SL01"]},{"name":"岩羊","images":5,"individuals":[]}],"paths":["a"]}"#),
+            Event::Unresolved { count: 6, species } if species[0].individuals == ["SL01"] && species[1].individuals.is_empty()
+        ));
         assert!(matches!(
             parse(r#"{"serval":"summary","written":2,"failed":0}"#),
             Event::Summary(map) if map["written"] == 2

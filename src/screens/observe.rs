@@ -35,6 +35,8 @@ pub struct ObserveForm {
     custom_output: Option<PathBuf>,
     advanced: bool,
     debug: bool,
+    /// Species whose individual IDs win in images with several species (`--id-species`), remembered per folder.
+    id_species: Vec<String>,
     count_generation: usize,
     _subscriptions: Vec<Subscription>,
 }
@@ -59,6 +61,7 @@ impl ObserveForm {
             custom_output: None,
             advanced: false,
             debug: false,
+            id_species: Vec::new(),
             count_generation: 0,
             _subscriptions: vec![subscription],
         }
@@ -117,6 +120,22 @@ impl ObserveForm {
         self.input_changed(cx);
     }
 
+    /// The answer to the identified-species question, remembered for this folder.
+    pub fn set_id_species(
+        &mut self,
+        species: Vec<String>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(input) = self.input_path(cx) {
+            let key = folder_key(&input);
+            let value = species.join("\t");
+            crate::settings::Settings::update(cx, |settings| settings.set_value(&key, value));
+        }
+        self.id_species = species;
+        cx.notify();
+    }
+
     fn input_path(&self, cx: &App) -> Option<PathBuf> {
         let value = self.input.read(cx).value();
         let value = value.trim();
@@ -125,6 +144,18 @@ impl ObserveForm {
 
     /// Count the folder a moment after typing stops.
     fn input_changed(&mut self, cx: &mut Context<Self>) {
+        self.id_species = self
+            .input_path(cx)
+            .and_then(|input| {
+                let settings = cx.default_global::<crate::settings::Settings>();
+                settings.value(&folder_key(&input)).map(|v| {
+                    v.split('\t')
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
         self.count_generation += 1;
         let generation = self.count_generation;
         let Some(path) = self.input_path(cx) else {
@@ -195,6 +226,9 @@ impl ObserveForm {
         }
         if self.debug {
             args.push("--debug".into());
+        }
+        for species in &self.id_species {
+            args.extend(["--id-species".into(), species.clone()]);
         }
         match (self.images, self.videos) {
             (true, false) => args.push("--image".into()),
@@ -395,4 +429,12 @@ impl Render for ObserveForm {
             .child(input_card)
             .child(output_card)
     }
+}
+
+/// The settings key of a folder's identified species.
+fn folder_key(folder: &Path) -> String {
+    format!(
+        "folder.{}.id_species",
+        folder.to_string_lossy().trim_end_matches(['/', '\\'])
+    )
 }
