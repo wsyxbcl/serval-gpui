@@ -3,8 +3,8 @@
 
 use crate::i18n::t;
 use crate::theme::TokensExt;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme, Sizable as _, StyledExt, h_flex, v_flex};
+use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
+use gpui_kit::component::{ActiveTheme, Selectable as _, Sizable as _, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::path::{Path, PathBuf};
@@ -208,4 +208,78 @@ pub fn output_field<V: 'static>(
                     )
                 }),
         )
+}
+
+/// A segmented control for a short exclusive choice (≤ 4 options, shell.md §3).
+pub fn segmented(
+    id: &'static str,
+    options: &[&'static str],
+    selected: usize,
+    on_select: impl Fn(usize, &mut Window, &mut App) + 'static,
+) -> ButtonGroup {
+    ButtonGroup::new(id)
+        .outline()
+        .children(
+            options
+                .iter()
+                .enumerate()
+                .map(|(i, label)| Button::new((id, i)).label(*label).selected(i == selected)),
+        )
+        .on_click(move |selected: &Vec<usize>, window, cx| {
+            if let Some(&index) = selected.first() {
+                on_select(index, window, cx);
+            }
+        })
+}
+
+/// The path level picker (questions.md §2): the sample path as segments; every folder can be chosen, the file
+/// cannot. `detected` is marked "自动识别".
+pub fn level_picker<V: 'static>(
+    sample: &str,
+    selected: Option<usize>,
+    cx: &mut Context<V>,
+    on_select: impl Fn(&mut V, usize, &mut Context<V>) + Clone + 'static,
+) -> Div {
+    let tokens = cx.tokens().clone();
+    let components: Vec<String> = sample.split(['/', '\\']).map(str::to_string).collect();
+    let last = components.len().saturating_sub(1);
+    let mono = cx.theme().mono_font_family.clone();
+    let mut row = h_flex()
+        .flex_wrap()
+        .gap(tokens.px("space-1"))
+        .p(tokens.px("space-2"))
+        .rounded(tokens.px("radius-sm"))
+        .bg(cx.theme().muted)
+        .font_family(mono)
+        .text_size(tokens.px("text-sm"));
+    for (level, name) in components.iter().enumerate() {
+        // Level 0 is the root ("" or "C:"); it is not a folder one can choose.
+        if level == 0 && name.is_empty() {
+            continue;
+        }
+        if level > 1 || (level == 1 && !components[0].is_empty()) {
+            row = row.child(div().text_color(cx.theme().muted_foreground).child("/"));
+        }
+        let chip = div()
+            .id(("level", level))
+            .px(tokens.px("space-2"))
+            .py(px(3.))
+            .rounded(tokens.px("radius-sm"))
+            .child(name.clone());
+        row = row.child(if level == 0 || level == last {
+            chip.text_color(cx.theme().muted_foreground)
+        } else if selected == Some(level) {
+            chip.bg(tokens.color("primary"))
+                .text_color(tokens.color("primary-foreground"))
+        } else {
+            let on_select = on_select.clone();
+            chip.bg(tokens.color("surface"))
+                .border_1()
+                .border_color(tokens.color("input-border"))
+                .cursor_pointer()
+                .hover(|chip| chip.border_color(tokens.color("ring")))
+                .on_click(cx.listener(move |this, _, _, cx| on_select(this, level, cx)))
+        });
+    }
+    row
 }

@@ -12,6 +12,7 @@ mod screens;
 mod serval;
 mod settings;
 mod settings_screen;
+mod table;
 mod theme;
 
 use gpui_kit::component::TitleBar;
@@ -23,6 +24,7 @@ struct Args {
     serval: Option<std::path::PathBuf>,
     open: Option<std::path::PathBuf>,
     run: bool,
+    size: Option<(f32, f32)>,
     mode: ThemeMode,
     english: bool,
 }
@@ -33,6 +35,7 @@ fn parse_args() -> Args {
         serval: None,
         open: None,
         run: false,
+        size: None,
         mode: ThemeMode::Light,
         english: false,
     };
@@ -58,10 +61,17 @@ fn parse_args() -> Args {
             "--english" => args.english = true,
             // Start the run at once (for screenshots of running and finished states).
             "--run" => args.run = true,
+            // Window size for screenshots of long screens, e.g. 1200x1400.
+            "--size" => {
+                args.size = iter.next().and_then(|size| {
+                    let (w, h) = size.split_once('x')?;
+                    Some((w.parse().ok()?, h.parse().ok()?))
+                })
+            }
             path if !path.starts_with("--") && args.open.is_none() => args.open = Some(path.into()),
             _ => {
                 eprintln!(
-                    "Usage: waxbill [<folder>] [--serval <program>] [--run] [--design-state <name>] [--dark] [--english]"
+                    "Usage: waxbill [<folder>] [--serval <program>] [--run] [--size WxH] [--design-state <name>] [--dark] [--english]"
                 );
                 std::process::exit(2);
             }
@@ -95,7 +105,10 @@ fn main() {
             let tokens = theme::Tokens::parse(false);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::centered(
-                    size(tokens.px("window-default-w"), tokens.px("window-default-h")),
+                    match args.size {
+                        Some((w, h)) => size(px(w), px(h)),
+                        None => size(tokens.px("window-default-w"), tokens.px("window-default-h")),
+                    },
                     cx,
                 )),
                 window_min_size: Some(size(tokens.px("window-min-w"), tokens.px("window-min-h"))),

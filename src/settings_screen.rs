@@ -3,12 +3,12 @@
 
 use crate::app::Waxbill;
 use crate::i18n::{Language, language, t};
-use crate::screens::form::{Tone, card, help_line};
+use crate::screens::form::{Tone, card, help_line, segmented};
 use crate::serval::ServalStatus;
 use crate::settings::{Appearance, Settings};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonGroup};
-use gpui_kit::component::{ActiveTheme, Selectable as _, StyledExt, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme, StyledExt, h_flex, v_flex};
 use gpui_kit::*;
 
 fn section_title(title: &'static str, cx: &App) -> Div {
@@ -17,27 +17,6 @@ fn section_title(title: &'static str, cx: &App) -> Div {
         .font_medium()
         .text_color(cx.theme().muted_foreground)
         .child(title)
-}
-
-fn segmented(
-    id: &'static str,
-    options: &[&'static str],
-    selected: usize,
-    on_select: impl Fn(usize, &mut Window, &mut App) + 'static,
-) -> ButtonGroup {
-    ButtonGroup::new(id)
-        .outline()
-        .children(
-            options
-                .iter()
-                .enumerate()
-                .map(|(i, label)| Button::new((id, i)).label(*label).selected(i == selected)),
-        )
-        .on_click(move |selected: &Vec<usize>, window, cx| {
-            if let Some(&index) = selected.first() {
-                on_select(index, window, cx);
-            }
-        })
 }
 
 impl Waxbill {

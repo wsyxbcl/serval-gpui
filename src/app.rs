@@ -7,6 +7,7 @@ use crate::results;
 use crate::run::{Outcome, Run};
 use crate::run_bar::{Bar, Tone, run_bar};
 use crate::runner::Running;
+use crate::screens::capture::CaptureForm;
 use crate::screens::form::FolderCount;
 use crate::screens::observe::ObserveForm;
 use crate::screens::{Form, ScreenId, groups};
@@ -45,6 +46,7 @@ pub const DESIGN_STATES: &[&str] = &[
     "first-run",
     "settings-ready",
     "settings-unsupported",
+    "capture-ready",
 ];
 
 /// What the command line asks for at launch.
@@ -53,7 +55,7 @@ pub struct Launch {
     pub serval: Option<PathBuf>,
     /// Light or dark was given on the command line, so the setting does not apply.
     pub appearance_given: bool,
-    /// A folder to open in 标签获取.
+    /// A folder to open in 标签获取, or a table to open in 独立捕获.
     pub open: Option<PathBuf>,
     /// Start the run as soon as Serval is found.
     pub run: bool,
@@ -62,6 +64,7 @@ pub struct Launch {
 pub struct Waxbill {
     pub(crate) screen: ScreenId,
     observe: Entity<ObserveForm>,
+    capture: Entity<CaptureForm>,
     pub(crate) serval: ServalStatus,
     /// The last run of each screen; at most one is running (shell.md §2).
     runs: HashMap<ScreenId, Run>,
@@ -77,11 +80,13 @@ impl Waxbill {
         cx: &mut Context<Self>,
     ) -> Self {
         let observe = cx.new(|cx| ObserveForm::new(window, cx));
+        let capture = cx.new(|cx| CaptureForm::new(window, cx));
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
         let mut app = Waxbill {
             screen: ScreenId::Observe,
             observe,
+            capture,
             serval: ServalStatus::Checking,
             runs: HashMap::new(),
             focus,
@@ -100,6 +105,12 @@ impl Waxbill {
         };
         match design_state {
             Some("first-run") => app.serval = ServalStatus::Missing,
+            Some("capture-ready") => {
+                app.serval = example_serval("0.8.0", "serval");
+                app.screen = ScreenId::Capture;
+                app.capture
+                    .update(cx, |form, cx| form.set_example(window, cx));
+            }
             Some("settings-ready") => {
                 app.serval = example_serval("0.8.0", "C:\\Program Files\\Serval\\serval.exe");
                 app.screen = ScreenId::Settings;
@@ -128,10 +139,20 @@ impl Waxbill {
             }
             _ => {
                 app.observe.update(cx, |form, cx| form.restore(window, cx));
-                if let Some(folder) = &launch.open {
-                    let folder = folder.to_string_lossy().to_string();
-                    app.observe
-                        .update(cx, |form, cx| form.set_input(folder, window, cx));
+                app.capture.update(cx, |form, cx| form.restore(window, cx));
+                if let Some(path) = &launch.open {
+                    let text = path.to_string_lossy().to_string();
+                    if path
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("csv"))
+                    {
+                        app.screen = ScreenId::Capture;
+                        app.capture
+                            .update(cx, |form, cx| form.set_csv(text, window, cx));
+                    } else {
+                        app.observe
+                            .update(cx, |form, cx| form.set_input(text, window, cx));
+                    }
                 }
                 let program = launch
                     .serval
@@ -407,6 +428,7 @@ impl Waxbill {
     fn form(&self) -> Option<Form> {
         match self.screen {
             ScreenId::Observe => Some(Form::Observe(self.observe.clone())),
+            ScreenId::Capture => Some(Form::Capture(self.capture.clone())),
             _ => None,
         }
     }

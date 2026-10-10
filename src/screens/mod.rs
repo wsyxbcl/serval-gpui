@@ -1,5 +1,6 @@
 //! The screens in the sidebar (Design/spec/shell.md §2) and what every command screen provides to the shell.
 
+pub mod capture;
 pub mod form;
 pub mod observe;
 
@@ -90,6 +91,7 @@ pub struct Plan {
 #[derive(Clone)]
 pub enum Form {
     Observe(Entity<observe::ObserveForm>),
+    Capture(Entity<capture::CaptureForm>),
 }
 
 impl Form {
@@ -99,32 +101,37 @@ impl Form {
                 "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",
                 "Reads species, individual and other tags from photos and videos into tags.csv and species counts.",
             ),
+            Form::Capture(_) => t(
+                "按时间间隔把连续拍到的记录合并为独立捕获，统计每个部署、每个物种的捕获次数。",
+                "Merges records close in time into independent captures and counts them per deployment and species.",
+            ),
         }
     }
 
     pub fn plan(&self, cx: &App) -> Plan {
         match self {
             Form::Observe(form) => form.read(cx).plan(cx),
+            Form::Capture(form) => form.read(cx).plan(cx),
         }
     }
 
     /// Remember the form's values for the next launch (shell.md §3).
     pub fn remember(&self, cx: &mut App) {
-        match self {
-            Form::Observe(form) => {
-                let values = form.read(cx).values(cx);
-                crate::settings::Settings::update(cx, |settings| {
-                    for (field, value) in values {
-                        settings.set_form_value("observe", field, value);
-                    }
-                });
+        let (command, values) = match self {
+            Form::Observe(form) => ("observe", form.read(cx).values(cx)),
+            Form::Capture(form) => ("capture", form.read(cx).values(cx)),
+        };
+        crate::settings::Settings::update(cx, |settings| {
+            for (field, value) in values {
+                settings.set_form_value(command, field, value);
             }
-        }
+        });
     }
 
     pub fn view(&self) -> AnyView {
         match self {
             Form::Observe(form) => form.clone().into(),
+            Form::Capture(form) => form.clone().into(),
         }
     }
 }
