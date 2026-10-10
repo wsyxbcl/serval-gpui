@@ -22,6 +22,7 @@ place and the status changes here.
 | W15 | Writing labels: CLI gains only `xmp write` (overwrite from CSV, all fields in one pass, empty cells unchanged); per-file `xmp get`/`xmp set` exist only for Waxbill (hidden, JSON) | Confirmed 2026-10-09 | [serval-protocol §5](serval-protocol.md#5-writing-labels) |
 | W16 | Browse and pick in Waxbill: open a table or a folder, filter across deployments and folders, grid and viewer, rating 1–5 and species edits written to XMP in the background; no database | Confirmed 2026-10-09 | [browse](browse.md) |
 | W17 | Details: background writing; edited items stay dimmed until refresh; `--backup first`; output `<input>_serval_output/`; table repair as a copy; Waxbill requires Serval ≥ 0.8.0; no `--select` (Waxbill writes a subset table); thumbnails as JPEG, 1 GB cache; video frame previews later | Confirmed 2026-10-09 (thumbnail format proposed) | [browse](browse.md), [data](data.md), [run](run.md) |
+| W18 | Serval ↔ Waxbill messages stay JSON lines (not CBOR or bincode), with shared serde types (`protocol.rs`); edit input refuses unknown fields, output readers ignore them | Confirmed 2026-10-10 | [serval-protocol §5.2](serval-protocol.md#52-for-waxbill-xmp-get-xmp-set) |
 | W14 | Further GUI features: next steps, result tables, quick look, correction loop, project memory | For discussion | [data §5](data.md#5-further-gui-features-for-discussion) |
 
 ## Common direction
@@ -41,3 +42,28 @@ keeps prompting when a flag is missing, so typing users see no change.
 
 Cost: Serval needs the flags, a progress output and a structured result (one Serval release). Conflicts cost
 a second planning pass (no copying) when they occur.
+
+## W18 Message format: confirmed
+
+JSON lines over CBOR and bincode, measured on 50,000 `xmp get` records (release build): JSON 10.6 MB, decode
+23 ms; CBOR 8.8 MB, 37 ms; bincode 1.3 7.8 MB, 11 ms; postcard 5.8 MB, 9 ms. Reading those sidecars takes
+seconds (local) to minutes (NAS), so the format is under 1% either way; the bulk data (opening 50,000 records)
+goes through tags.csv, not the pipe.
+
+What decided it:
+
+- Versions differ (W08: the user chooses Serval). Formats without field names break on that: with one field
+  added, bincode decoded wrong values silently (field added in the middle) or aborted on a 7 EB allocation (added
+  at the end of a record in a stream). JSON and CBOR ignore the unknown field. bincode is also unmaintained
+  (3.0.0 is a `compile_error!`).
+- stderr is shared with panics and plain error lines; JSON lines skip what is not JSON, a binary stream cannot
+  resynchronise.
+- Every command Waxbill runs can be run and read by a person (copied command, logs, bug reports).
+
+Type safety comes from shared serde types instead: `FileEdit`, `FileState`, `Labels` in Serval's
+`src/protocol.rs`, used as they are by Waxbill. Edits refuse unknown fields (an older Serval never ignores an
+edit); results are read leniently (a newer Serval may add fields).
+
+Would be revisited for: a long-lived Serval process, binary payloads (thumbnails, frames), or Serval and
+Waxbill shipped in lockstep.
+

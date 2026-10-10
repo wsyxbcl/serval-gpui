@@ -115,7 +115,12 @@ serval xmp write tags_filled.csv --fields species,rating  # only these fields
   are skipped (a rerun finishes an interrupted run), one backup per file per run; `--create-missing` creates a
   missing sidecar from the media file as `xmp init` does.
 - The summary lists what changed per field and how many files lost values that were not in the table
-  ("12 个文件移除了表中没有的物种").
+  ("12 个文件移除了表中没有的物种"). `--dry-run` checks every file and reports the same summary without writing.
+  Summary event: `{changed, already, fields: {species, individual, rating, datetime}, removed_values,
+  created_sidecars, dry_run}`; conflicting or invalid cells give one `error` event per file (`path`, `rows`,
+  `message`) and nothing is written.
+- A datetime that equals the table's apart from a UTC offset counts as unchanged (tables show local time without
+  the offset, as observe reads it).
 - `--dry-run` reads the files and reports what would change (per field, and the files that would lose values),
   writing nothing; Waxbill uses it for the preview before writing a filled table.
 
@@ -124,37 +129,43 @@ check). `xmp update --datetime` keeps working.
 
 ### 5.2 For Waxbill: `xmp get`, `xmp set`
 
-Hidden from `--help`; JSON in and out.
+Hidden from `--help`; JSON lines in and out (stdout carries only the results). The message types are in Serval's
+`src/protocol.rs` (serde only, no other Serval code), and Waxbill uses the same types. Format decision:
+[W18](decisions.md).
 
 ```sh
-serval xmp get --json <FILE>...
-serval xmp set --edits - --json --backup first --log-to <FILE> [--create-missing]
+serval xmp get [<FILE>...]            # paths from stdin, one per line, when none are given
+serval xmp set --backup first --log-to <FILE> [--create-missing] < edits.jsonl
 ```
 
-- `xmp get` prints one object per file: species, individuals, rating, datetime, the sidecar's modification time.
-- `xmp set` reads edits as JSON lines on stdin. Each edit names one field and one operation:
-
-  | `op` | Lists (species, individual) | Single values (rating, datetime) |
-  | --- | --- | --- |
-  | `set` | the list becomes exactly `values` | overwrite |
-  | `add` | append missing `values` | — |
-  | `remove` | remove `values` if present | — |
-  | `replace` | `old` → `new`; conflict if `old` is absent | — |
+- Paths are sidecars or media files (a media path means its sidecar); results name the sidecar.
+- Output, one `FileState` per file in the order given (`xmp get`) or first seen (`xmp set`):
 
   ```json
-  {"path":"…/IMG_0042.JPG.xmp","field":"rating","op":"set","value":4}
-  {"path":"…/IMG_0042.JPG.xmp","field":"species","op":"set","values":["Red fox"],"expect":["Fox","Deer"]}
+  {"path":"…/IMG_0042.JPG.xmp","result":"written","exists":true,"labels":{"species":["Red fox"],"individuals":[],"rating":4,"datetime":"2024-05-15 10:46:46"},"modified":1791605856532}
   ```
 
-  `expect` (optional) is what Waxbill showed; a file that no longer matches is reported as a conflict and left
-  untouched. Edits are grouped per file and written once.
-- Output: one result per file — `written`, `unchanged`, `conflict` or `error`, with the values now on disk — so
-  Waxbill's table always ends up matching the files.
+  `labels` is read as observe reads it; `rating` 0 is no rating; `datetime` is left out when the file has none;
+  `modified` is the sidecar's modification time (ms). `result` (`written`, `unchanged`, `conflict`, `error`) is
+  `xmp set` only, with `message` for conflicts and errors. Readers ignore fields they do not know.
+- Input, one `FileEdit` per line, applied as `set`, then `add`, then `remove`:
+
+  ```json
+  {"path":"…/IMG_0042.JPG.xmp","expect":{"species":["Fox"],"rating":2},"set":{"species":["Red fox"],"rating":4}}
+  {"path":"…/IMG_0043.JPG.xmp","add":{"species":["Red fox"]}}
+  ```
+
+  `expect` is what Waxbill showed (lists compare as sets); if any given field no longer matches, nothing in the
+  file is changed and the result is `conflict`. `set` makes a field exactly the value (rating -1–5, 0 removes
+  it; datetime `yyyy-MM-dd HH:mm:ss`). Several lines for one file are applied in order and written once.
+  Unknown fields, invalid values or malformed JSON stop the run before anything is written (exit 1), so an
+  older Serval never ignores an edit it does not understand.
 - `--backup first` keeps only each file's original (no new backup when one already exists); the default for all
   commands stays one backup per write. `--log-to` appends to one session log instead of creating a log per run.
+  With `--progress json`, a `summary` event `{written, unchanged, conflict, failed}` on stderr.
 
-Waxbill's mapping: pressing 1–5 → `set` rating; editing an image's species → `set` with `expect`; "添加物种" →
-`add`; writing a filled CSV → `xmp write` after a per-field preview; correcting old → new in a table → `xmp update`.
+Waxbill's mapping: pressing 1–5 → `set` rating (0 clears); editing an image's species or individuals in the
+viewer → `set` with `expect`; "添加物种" on a selection → `add`; writing a filled CSV → `xmp write` after a per-field preview; correcting old → new in a table → `xmp update`.
 
 ## 6. Compatibility
 

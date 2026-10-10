@@ -57,7 +57,7 @@ AI, no maps (Biowatch covers those, [W11](decisions.md)). One person, one machin
 
 - Every edit changes the record at once and joins a write queue. The queue is written when the user moves to
   another image, after 2 seconds without edits, and before the screen or window closes, as one
-  `serval xmp set --edits - --json --backup first --log-to <session log>` call. Repeated edits of one file
+  `serval xmp set --backup first --log-to <session log>` (edits on stdin) call. Repeated edits of one file
   collapse to the last value, so each file is written once per flush.
 - Operations: rating → `set`; the species or individual list edited in the viewer → `set` with `expect` = the
   list shown before the edit; "＋ 添加" on a multi-selection → `add`.
