@@ -7,11 +7,10 @@ const OUTPUT_SUFFIX: &str = "_serval_output";
 /// The output root for `input`: a sibling named `<input>_serval_output`, or, for an input already inside such a
 /// folder (e.g. a tags.csv written by observe), that folder.
 pub fn default_root(input: &Path) -> PathBuf {
-    if let Some(root) = input
-        .ancestors()
-        .skip(1)
-        .find(|dir| dir.file_name().is_some_and(|name| name.to_string_lossy().ends_with(OUTPUT_SUFFIX)))
-    {
+    if let Some(root) = input.ancestors().skip(1).find(|dir| {
+        dir.file_name()
+            .is_some_and(|name| name.to_string_lossy().ends_with(OUTPUT_SUFFIX))
+    }) {
         return root.to_path_buf();
     }
     let input = input.components().as_path();
@@ -20,7 +19,9 @@ pub fn default_root(input: &Path) -> PathBuf {
     } else {
         input.file_name()
     };
-    let name = name.map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let name = name
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
     input.with_file_name(format!("{name}{OUTPUT_SUFFIX}"))
 }
 
@@ -44,7 +45,9 @@ mod tests {
             Path::new("/data/labels_serval_output")
         );
         assert_eq!(
-            default_root(Path::new("/data/2024_spring_serval_output/serval_observe/tags.csv")),
+            default_root(Path::new(
+                "/data/2024_spring_serval_output/serval_observe/tags.csv"
+            )),
             Path::new("/data/2024_spring_serval_output")
         );
     }

@@ -181,7 +181,11 @@ mod tests {
         let parse = |line: &str| serde_json::from_str::<Event>(line).unwrap();
         assert_eq!(
             parse(r#"{"serval":"progress","phase":"copy","done":3,"total":9,"eta":1}"#),
-            Event::Progress { phase: "copy".into(), done: 3, total: Some(9) }
+            Event::Progress {
+                phase: "copy".into(),
+                done: 3,
+                total: Some(9)
+            }
         );
         assert_eq!(parse(r#"{"serval":"later-kind","x":1}"#), Event::Unknown);
         assert!(matches!(

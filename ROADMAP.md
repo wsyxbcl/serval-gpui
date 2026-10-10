@@ -110,7 +110,7 @@ Rules:
 - [x] Serval side: flags, `--progress json` events and exit codes from `Design/spec/serval-protocol.md` (Serval 0.8.0), plus `xmp write` and the hidden `xmp get`/`xmp set`.
 - [x] Rebuild on `gpui-kit` 0.7 (rewrite; the old PTY wrapper is in git history): theme built from `Design/boards/tokens.css` at compile time, shell (title bar with Serval pill, grouped sidebar, screen anatomy), `--design-state` for board comparison, observe form, run bar.
 - [x] Run Serval with `--progress json`: runner (events on stderr, other lines to the log), run bar states, results (banner, warnings, output files, log), stop (interrupt, then end after 3 s), Ctrl+Enter / Ctrl+.; launch options `<folder>`, `--serval`, `--run`.
-- [ ] Settings: choose the Serval program (W08), language, appearance; remember them and each form's last values.
+- [x] Settings: choose the Serval program (W08), language, appearance (following the system by default), about; first-run card; `settings.conf` keeps its format and gains `appearance` and each form's last values (saved off the UI thread); shared output-location field with change and reset; Ctrl+,.
 - [ ] The remaining command screens, one by one, each checked against its board (`--design-state`).
 - [ ] Questions as fields and dialogs: path-level pickers, conflicts dialog (exit 3), identified species after observe.
 - [ ] Browse and pick (W16) on `xmp get`/`xmp set`, with the thumbnail cache.

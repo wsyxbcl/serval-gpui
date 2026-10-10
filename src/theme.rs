@@ -70,7 +70,12 @@ impl Tokens {
                 && (block == "light" || (dark && block == "dark"))
                 && let Some((name, value)) = rest.split_once(':')
             {
-                let value = value.split("/*").next().unwrap().trim().trim_end_matches(';');
+                let value = value
+                    .split("/*")
+                    .next()
+                    .unwrap()
+                    .trim()
+                    .trim_end_matches(';');
                 values.insert(name.trim().to_string(), value.trim().to_string());
             }
         }

@@ -53,7 +53,11 @@ pub fn check(program: PathBuf) -> ServalStatus {
 }
 
 fn find_on_path() -> Option<PathBuf> {
-    let name = if cfg!(windows) { "serval.exe" } else { "serval" };
+    let name = if cfg!(windows) {
+        "serval.exe"
+    } else {
+        "serval"
+    };
     std::env::split_paths(&std::env::var_os("PATH")?)
         .map(|dir| dir.join(name))
         .find(|path| path.is_file())

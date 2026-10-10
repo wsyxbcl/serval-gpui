@@ -25,7 +25,9 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
             tokens.color("warning-soft"),
             match crate::i18n::language() {
                 crate::i18n::Language::Chinese => format!("完成，有 {} 条警告", count(warnings)),
-                crate::i18n::Language::English => format!("Finished with {} warnings", count(warnings)),
+                crate::i18n::Language::English => {
+                    format!("Finished with {} warnings", count(warnings))
+                }
             },
             run.result_sentence(),
         ),
@@ -78,24 +80,35 @@ pub fn warning_list(run: &Run, cx: &App) -> Option<Div> {
         v_flex()
             .gap(px(2.))
             .text_size(tokens.px("text-sm"))
-            .children(rows.into_iter().take(MAX_WARNING_ROWS).map(|(message, path)| {
-                h_flex()
-                    .gap(tokens.px("space-2"))
-                    .child(div().flex_shrink_0().text_color(tokens.color("warning")).child("•"))
-                    .child(div().child(match path {
-                        Some(path) => format!("{path} — {message}"),
-                        None => message.clone(),
-                    }))
-            }))
+            .children(
+                rows.into_iter()
+                    .take(MAX_WARNING_ROWS)
+                    .map(|(message, path)| {
+                        h_flex()
+                            .gap(tokens.px("space-2"))
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .text_color(tokens.color("warning"))
+                                    .child("•"),
+                            )
+                            .child(div().child(match path {
+                                Some(path) => format!("{path} — {message}"),
+                                None => message.clone(),
+                            }))
+                    }),
+            )
             .when(more > 0, |list| {
-                list.child(
-                    div()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(match crate::i18n::language() {
-                            crate::i18n::Language::Chinese => format!("另外 {} 条见运行日志", count(more)),
-                            crate::i18n::Language::English => format!("{} more in the log", count(more)),
-                        }),
-                )
+                list.child(div().text_color(cx.theme().muted_foreground).child(
+                    match crate::i18n::language() {
+                        crate::i18n::Language::Chinese => {
+                            format!("另外 {} 条见运行日志", count(more))
+                        }
+                        crate::i18n::Language::English => {
+                            format!("{} more in the log", count(more))
+                        }
+                    },
+                ))
             }),
     )
 }
@@ -131,7 +144,14 @@ pub fn output_list(run: &Run, cx: &App) -> Option<Div> {
                     .bg(tokens.color("surface"))
                     .border_1()
                     .border_color(cx.theme().border)
-                    .child(div().flex_1().min_w_0().truncate().font_medium().child(name))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .font_medium()
+                            .child(name),
+                    )
                     .child(
                         div()
                             .text_size(tokens.px("text-sm"))
@@ -149,7 +169,11 @@ pub fn output_list(run: &Run, cx: &App) -> Option<Div> {
 }
 
 /// The log: Serval's ordinary output and the command line, monospace. Collapsed after success.
-pub fn log(run: &Run, on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, cx: &App) -> Div {
+pub fn log(
+    run: &Run,
+    on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    cx: &App,
+) -> Div {
     let tokens = cx.tokens();
     let text = run.log.join("\n");
     v_flex()
@@ -171,7 +195,9 @@ pub fn log(run: &Run, on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + '
                     Button::new("copy-log")
                         .ghost()
                         .label(t("复制日志", "Copy log"))
-                        .on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone())))
+                        .on_click(move |_, _, cx| {
+                            cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))
+                        })
                 }),
         )
         .when(run.log_open, |column| {

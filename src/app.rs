@@ -1,6 +1,7 @@
 //! The main window (Design/spec/shell.md): title bar with the Serval pill, the sidebar, and the current screen with
 //! its run bar.
 
+use crate::i18n::Language;
 use crate::i18n::t;
 use crate::results;
 use crate::run::{Outcome, Run};
@@ -10,9 +11,12 @@ use crate::screens::form::FolderCount;
 use crate::screens::observe::ObserveForm;
 use crate::screens::{Form, ScreenId, groups};
 use crate::serval::{self, ServalStatus};
+use crate::settings::{Appearance, Settings};
+use crate::theme;
 use crate::theme::TokensExt;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::theme::ThemeMode;
 use gpui_kit::component::{ActiveTheme, Icon, StyledExt, TitleBar, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -21,12 +25,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-actions!(waxbill, [RunCommand, StopCommand]);
+actions!(waxbill, [RunCommand, StopCommand, OpenSettings]);
 
 pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-enter", RunCommand, None),
         KeyBinding::new("secondary-.", StopCommand, None),
+        KeyBinding::new("secondary-,", OpenSettings, None),
     ]);
 }
 
@@ -34,11 +39,20 @@ const APP_ICON: &[u8] = include_bytes!("../assets/icons/io.github.wsyxbcl.waxbil
 
 /// Named states from the design boards (`data-state`), opened with `--design-state <name>` so screenshots can be
 /// compared with the boards.
-pub const DESIGN_STATES: &[&str] = &["observe-ready", "dark-observe-ready"];
+pub const DESIGN_STATES: &[&str] = &[
+    "observe-ready",
+    "dark-observe-ready",
+    "first-run",
+    "settings-ready",
+    "settings-unsupported",
+];
 
 /// What the command line asks for at launch.
 pub struct Launch {
+    /// A Serval program for this launch only (not remembered).
     pub serval: Option<PathBuf>,
+    /// Light or dark was given on the command line, so the setting does not apply.
+    pub appearance_given: bool,
     /// A folder to open in 标签获取.
     pub open: Option<PathBuf>,
     /// Start the run as soon as Serval is found.
@@ -46,9 +60,9 @@ pub struct Launch {
 }
 
 pub struct Waxbill {
-    screen: ScreenId,
+    pub(crate) screen: ScreenId,
     observe: Entity<ObserveForm>,
-    serval: ServalStatus,
+    pub(crate) serval: ServalStatus,
     /// The last run of each screen; at most one is running (shell.md §2).
     runs: HashMap<ScreenId, Run>,
     focus: FocusHandle,
@@ -73,27 +87,56 @@ impl Waxbill {
             focus,
             icon: Arc::new(Image::from_bytes(ImageFormat::Png, APP_ICON.to_vec())),
         };
+        if design_state.is_none() && !launch.appearance_given {
+            app.apply_appearance(window, cx);
+            cx.observe_window_appearance(window, |this, window, cx| {
+                this.apply_appearance(window, cx)
+            })
+            .detach();
+        }
+        let example_serval = |version: &str, program: &str| ServalStatus::Ready {
+            program: PathBuf::from(program),
+            version: version.into(),
+        };
         match design_state {
-            Some("observe-ready" | "dark-observe-ready") => {
-                app.serval = ServalStatus::Ready {
-                    program: PathBuf::from("serval"),
-                    version: "0.8.0".into(),
+            Some("first-run") => app.serval = ServalStatus::Missing,
+            Some("settings-ready") => {
+                app.serval = example_serval("0.8.0", "C:\\Program Files\\Serval\\serval.exe");
+                app.screen = ScreenId::Settings;
+            }
+            Some("settings-unsupported") => {
+                app.serval = ServalStatus::Unsupported {
+                    program: PathBuf::from("/usr/local/bin/serval"),
+                    version: "0.6.7".into(),
                 };
+                app.screen = ScreenId::Settings;
+            }
+            Some("observe-ready" | "dark-observe-ready") => {
+                app.serval = example_serval("0.8.0", "serval");
                 app.observe.update(cx, |form, cx| {
                     form.set_example(
                         "/data/2024_spring",
-                        FolderCount { images: 12_480, videos: 1_302, sidecars: 0 },
+                        FolderCount {
+                            images: 12_480,
+                            videos: 1_302,
+                            sidecars: 0,
+                        },
                         window,
                         cx,
                     )
                 });
             }
             _ => {
+                app.observe.update(cx, |form, cx| form.restore(window, cx));
                 if let Some(folder) = &launch.open {
                     let folder = folder.to_string_lossy().to_string();
-                    app.observe.update(cx, |form, cx| form.set_input(folder, window, cx));
+                    app.observe
+                        .update(cx, |form, cx| form.set_input(folder, window, cx));
                 }
-                app.detect_serval(launch.serval, launch.run, cx);
+                let program = launch
+                    .serval
+                    .or_else(|| cx.default_global::<Settings>().serval.clone());
+                app.detect_serval(program, launch.run, cx);
             }
         }
         app
@@ -116,15 +159,76 @@ impl Waxbill {
             });
             if run {
                 // Wait for the folder count, which the plan needs.
-                cx.background_executor().timer(Duration::from_millis(1500)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(1500))
+                    .await;
                 let _ = this.update(cx, |this, cx| this.run_or_stop(cx));
             }
         })
         .detach();
     }
 
+    /// Light, dark, or the system's appearance, from Settings.
+    fn apply_appearance(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let mode = match cx.default_global::<Settings>().appearance {
+            Appearance::Light => ThemeMode::Light,
+            Appearance::Dark => ThemeMode::Dark,
+            Appearance::System => ThemeMode::from(window.appearance()),
+        };
+        theme::set_mode(mode, cx);
+    }
+
+    pub(crate) fn set_appearance(
+        &mut self,
+        appearance: Appearance,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        Settings::update(cx, |settings| settings.appearance = appearance);
+        self.apply_appearance(window, cx);
+    }
+
+    pub(crate) fn set_language(
+        &mut self,
+        language: Language,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        crate::i18n::set_language(language);
+        Settings::update(cx, |settings| settings.language = language);
+        window.refresh();
+        cx.notify();
+    }
+
+    /// Choose the Serval program; it is checked and remembered (settings.md §1).
+    pub(crate) fn choose_serval(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let paths = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: None,
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(Ok(Some(paths))) = paths.await else {
+                return;
+            };
+            let Some(program) = paths.into_iter().next() else {
+                return;
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.serval = ServalStatus::Checking;
+                Settings::update(cx, |settings| settings.serval = Some(program.clone()));
+                this.detect_serval(Some(program), false, cx);
+            });
+        })
+        .detach();
+    }
+
     fn running_screen(&self) -> Option<ScreenId> {
-        self.runs.iter().find(|(_, run)| run.is_running()).map(|(id, _)| *id)
+        self.runs
+            .iter()
+            .find(|(_, run)| run.is_running())
+            .map(|(id, _)| *id)
     }
 
     /// Run bar button and Ctrl+Enter: run the current screen's command, or stop it while it runs.
@@ -136,13 +240,15 @@ impl Waxbill {
         if self.running_screen().is_some() {
             return;
         }
-        let (Some(form), Some(program)) = (self.form(), self.serval.program().map(PathBuf::from)) else {
+        let (Some(form), Some(program)) = (self.form(), self.serval.program().map(PathBuf::from))
+        else {
             return;
         };
         let plan = form.plan(cx);
         if plan.ready.is_err() {
             return;
         }
+        form.remember(cx);
         let command = crate::screens::display_command(&plan.args);
         let run = match Running::start(&program, &plan.args, &plan.cwd) {
             Ok(process) => Run::new(command, process),
@@ -153,7 +259,9 @@ impl Waxbill {
         cx.notify();
         cx.spawn(async move |this, cx| {
             loop {
-                cx.background_executor().timer(Duration::from_millis(100)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(100))
+                    .await;
                 let running = this
                     .update(cx, |this, cx| {
                         let Some(run) = this.runs.get_mut(&screen) else {
@@ -199,14 +307,35 @@ impl Waxbill {
             enabled,
         };
         let ready = |button: &'static str| match (&plan.ready, serval_ready, other_running) {
-            (_, false, _) => (false, t("先在设置中选择 Serval 程序", "choose the Serval program in Settings").to_string()),
-            (_, _, true) => (false, t("另一个命令正在运行", "another command is running").to_string()),
+            (_, false, _) if self.serval == ServalStatus::Missing => (
+                false,
+                t("选择程序后即可运行", "choose the program to run").to_string(),
+            ),
+            (_, false, _) => (
+                false,
+                t(
+                    "Serval 版本过旧，请在设置中更换",
+                    "Serval is too old; change it in Settings",
+                )
+                .to_string(),
+            ),
+            (_, _, true) => (
+                false,
+                t("另一个命令正在运行", "another command is running").to_string(),
+            ),
             (Err(missing), _, _) => (false, missing.clone()),
             (Ok(_), _, _) => (true, button.to_string()),
         };
         let Some(run) = self.runs.get(&self.screen) else {
             return match ready("") {
-                (true, _) => idle(t("就绪", "Ready"), plan.ready.clone().unwrap_or_default(), true),
+                (true, _) => idle(
+                    t("就绪", "Ready"),
+                    plan.ready.clone().unwrap_or_default(),
+                    true,
+                ),
+                (false, why) if !serval_ready => {
+                    idle(t("需要 Serval", "Serval needed"), why, false)
+                }
                 (false, why) => idle(t("还不能运行", "Not ready"), why, false),
             };
         };
@@ -224,9 +353,12 @@ impl Waxbill {
                     enabled: true,
                 };
             }
-            Outcome::Finished if warnings == 0 => {
-                (Tone::Success, t("完成", "Finished").to_string(), run.result_sentence(), t("再次运行", "Run again"))
-            }
+            Outcome::Finished if warnings == 0 => (
+                Tone::Success,
+                t("完成", "Finished").to_string(),
+                run.result_sentence(),
+                t("再次运行", "Run again"),
+            ),
             Outcome::Finished => (
                 Tone::Warning,
                 match crate::i18n::language() {
@@ -242,7 +374,12 @@ impl Waxbill {
                 t("还没有写入任何文件", "nothing has been written yet").to_string(),
                 t("运行", "Run"),
             ),
-            Outcome::Failed => (Tone::Danger, t("失败", "Failed").to_string(), run.failure(), t("重新运行", "Run again")),
+            Outcome::Failed => (
+                Tone::Danger,
+                t("失败", "Failed").to_string(),
+                run.failure(),
+                t("重新运行", "Run again"),
+            ),
             Outcome::Stopped => (
                 Tone::Idle,
                 t("已停止", "Stopped").to_string(),
@@ -256,7 +393,11 @@ impl Waxbill {
             title,
             detail,
             progress: None,
-            command: if enabled { command } else { run.command.clone() },
+            command: if enabled {
+                command
+            } else {
+                run.command.clone()
+            },
             button,
             shortcut: "secondary-enter",
             enabled,
@@ -273,13 +414,21 @@ impl Waxbill {
     fn render_title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let tokens = cx.tokens();
         let (dot, label) = match &self.serval {
-            ServalStatus::Checking => (tokens.color("subtle-foreground"), t("正在查找 Serval…", "Looking for Serval…").to_string()),
-            ServalStatus::Ready { version, .. } => (tokens.color("success"), format!("Serval {version}")),
+            ServalStatus::Checking => (
+                tokens.color("subtle-foreground"),
+                t("正在查找 Serval…", "Looking for Serval…").to_string(),
+            ),
+            ServalStatus::Ready { version, .. } => {
+                (tokens.color("success"), format!("Serval {version}"))
+            }
             ServalStatus::Unsupported { version, .. } => (
                 tokens.color("danger"),
                 format!("Serval {version} · {}", t("版本过旧", "too old")),
             ),
-            ServalStatus::Missing => (tokens.color("danger"), t("未找到 Serval", "Serval not found").to_string()),
+            ServalStatus::Missing => (
+                tokens.color("danger"),
+                t("未找到 Serval", "Serval not found").to_string(),
+            ),
         };
         TitleBar::new().h(tokens.px("titlebar-h")).child(
             h_flex()
@@ -290,7 +439,12 @@ impl Waxbill {
                     h_flex()
                         .gap(tokens.px("space-2"))
                         .child(img(self.icon.clone()).size(px(20.)))
-                        .child(div().text_size(tokens.px("text-md")).font_medium().child("Waxbill")),
+                        .child(
+                            div()
+                                .text_size(tokens.px("text-md"))
+                                .font_medium()
+                                .child("Waxbill"),
+                        ),
                 )
                 .child(
                     h_flex()
@@ -338,18 +492,22 @@ impl Waxbill {
             .text_size(tokens.px("text-md"))
             .cursor_pointer()
             .when(active, |item| {
-                item.bg(cx.theme().sidebar_accent).text_color(cx.theme().foreground).child(
-                    div()
-                        .absolute()
-                        .left(px(-8.))
-                        .top(px(8.))
-                        .w(px(3.))
-                        .h(px(18.))
-                        .rounded_full()
-                        .bg(tokens.color("accent")),
-                )
+                item.bg(cx.theme().sidebar_accent)
+                    .text_color(cx.theme().foreground)
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(-8.))
+                            .top(px(8.))
+                            .w(px(3.))
+                            .h(px(18.))
+                            .rounded_full()
+                            .bg(tokens.color("accent")),
+                    )
             })
-            .when(!active, |item| item.hover(|item| item.bg(cx.theme().sidebar_accent.opacity(0.6))))
+            .when(!active, |item| {
+                item.hover(|item| item.bg(cx.theme().sidebar_accent.opacity(0.6)))
+            })
             .child(
                 Icon::new(id.icon())
                     .size(px(15.))
@@ -420,10 +578,9 @@ impl Waxbill {
         )
     }
 
-    fn render_screen(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let tokens = cx.tokens().clone();
-        let form = self.form();
-        let heading = v_flex()
+    fn render_heading(&self, summary: &'static str, help: bool, cx: &App) -> Div {
+        let tokens = cx.tokens();
+        v_flex()
             .gap(tokens.px("space-1"))
             .child(
                 div()
@@ -436,35 +593,63 @@ impl Waxbill {
                     .gap(tokens.px("space-1"))
                     .text_size(tokens.px("text-sm"))
                     .text_color(cx.theme().muted_foreground)
-                    .child(form.as_ref().map(Form::summary).unwrap_or_else(|| {
-                        t(
-                            "这个界面正在按新设计重建，暂时请在命令行使用。",
-                            "This screen is being rebuilt to the new design; use the command line for now.",
+                    .child(summary)
+                    .when(help, |line| {
+                        line.child(
+                            div()
+                                .text_color(tokens.color("accent"))
+                                .child(t("帮助", "Help")),
                         )
-                    }))
-                    .when(form.is_some(), |line| {
-                        line.child(div().text_color(tokens.color("accent")).child(t("帮助", "Help")))
                     }),
-            );
-        let body = div().id("screen").flex_1().min_h_0().overflow_y_scroll().child(
+            )
+    }
+
+    fn render_screen(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let tokens = cx.tokens().clone();
+        let form = self.form();
+        let content = if self.screen == ScreenId::Settings {
             v_flex()
-                .max_w(tokens.px("content-max-w"))
-                .px(tokens.px("space-6"))
-                .py(tokens.px("space-5"))
                 .gap(tokens.px("space-5"))
-                .child(heading)
+                .child(self.render_heading(
+                    t(
+                        "修改会立即生效并保存。",
+                        "Changes apply at once and are saved.",
+                    ),
+                    false,
+                    cx,
+                ))
+                .child(self.render_settings(cx))
+        } else if self.serval == ServalStatus::Missing && form.is_some() {
+            self.render_first_run(cx)
+        } else {
+            let summary = form.as_ref().map(Form::summary).unwrap_or_else(|| {
+                t(
+                    "这个界面正在按新设计重建，暂时请在命令行使用。",
+                    "This screen is being rebuilt to the new design; use the command line for now.",
+                )
+            });
+            v_flex()
+                .gap(tokens.px("space-5"))
+                .child(self.render_heading(summary, form.is_some(), cx))
                 .children(self.render_results(cx))
-                .children(form.as_ref().map(Form::view)),
-        );
-        let bar = form.as_ref().map(|form| self.bar(form, cx));
-        v_flex()
+                .children(form.as_ref().map(Form::view))
+        };
+        let body = div()
+            .id("screen")
             .flex_1()
-            .min_w_0()
-            .h_full()
-            .child(body)
-            .children(bar.map(|bar| {
-                run_bar(bar, cx.listener(|this, _, _, cx| this.run_or_stop(cx)), cx)
-            }))
+            .min_h_0()
+            .overflow_y_scroll()
+            .child(
+                div()
+                    .max_w(tokens.px("content-max-w"))
+                    .px(tokens.px("space-6"))
+                    .py(tokens.px("space-5"))
+                    .child(content),
+            );
+        let bar = form.as_ref().map(|form| self.bar(form, cx));
+        v_flex().flex_1().min_w_0().h_full().child(body).children(
+            bar.map(|bar| run_bar(bar, cx.listener(|this, _, _, cx| this.run_or_stop(cx)), cx)),
+        )
     }
 }
 
@@ -475,6 +660,10 @@ impl Render for Waxbill {
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &RunCommand, _, cx| this.run_or_stop(cx)))
             .on_action(cx.listener(|this, _: &StopCommand, _, cx| this.stop(cx)))
+            .on_action(cx.listener(|this, _: &OpenSettings, _, cx| {
+                this.screen = ScreenId::Settings;
+                cx.notify();
+            }))
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .child(self.render_title_bar(cx))

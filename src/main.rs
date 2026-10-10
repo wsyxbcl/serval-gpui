@@ -10,6 +10,8 @@ mod run_bar;
 mod runner;
 mod screens;
 mod serval;
+mod settings;
+mod settings_screen;
 mod theme;
 
 use gpui_kit::component::TitleBar;
@@ -22,7 +24,7 @@ struct Args {
     open: Option<std::path::PathBuf>,
     run: bool,
     mode: ThemeMode,
-    language: i18n::Language,
+    english: bool,
 }
 
 fn parse_args() -> Args {
@@ -32,7 +34,7 @@ fn parse_args() -> Args {
         open: None,
         run: false,
         mode: ThemeMode::Light,
-        language: i18n::Language::Chinese,
+        english: false,
     };
     let mut iter = std::env::args().skip(1);
     while let Some(arg) = iter.next() {
@@ -40,7 +42,10 @@ fn parse_args() -> Args {
             "--design-state" => {
                 let name = iter.next().unwrap_or_default();
                 if !app::DESIGN_STATES.contains(&name.as_str()) {
-                    eprintln!("Unknown design state '{name}'. Known: {}", app::DESIGN_STATES.join(", "));
+                    eprintln!(
+                        "Unknown design state '{name}'. Known: {}",
+                        app::DESIGN_STATES.join(", ")
+                    );
                     std::process::exit(2);
                 }
                 if name.starts_with("dark-") {
@@ -50,7 +55,7 @@ fn parse_args() -> Args {
             }
             "--dark" => args.mode = ThemeMode::Dark,
             "--serval" => args.serval = iter.next().map(Into::into),
-            "--english" => args.language = i18n::Language::English,
+            "--english" => args.english = true,
             // Start the run at once (for screenshots of running and finished states).
             "--run" => args.run = true,
             path if !path.starts_with("--") && args.open.is_none() => args.open = Some(path.into()),
@@ -67,11 +72,18 @@ fn parse_args() -> Args {
 
 fn main() {
     let args = parse_args();
-    i18n::set_language(args.language);
+    let settings = settings::Settings::load();
+    let appearance_given = args.mode == ThemeMode::Dark || args.design_state.is_some();
+    i18n::set_language(if args.english {
+        i18n::Language::English
+    } else {
+        settings.language
+    });
     application()
         .with_assets(gpui_kit::assets::AllAssets)
         .run(move |cx| {
             gpui_kit::init(cx);
+            cx.set_global(settings);
             theme::init(args.mode, cx);
             app::bind_keys(cx);
             cx.on_window_closed(|cx, _| {
@@ -95,6 +107,7 @@ fn main() {
             let design_state = args.design_state.clone();
             let launch = app::Launch {
                 serval: args.serval.clone(),
+                appearance_given,
                 open: args.open.clone(),
                 run: args.run,
             };

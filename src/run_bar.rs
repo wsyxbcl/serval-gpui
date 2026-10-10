@@ -104,12 +104,20 @@ pub fn run_bar<F: Fn(&ClickEvent, &mut Window, &mut App) + 'static>(
                                 .ghost()
                                 .label(t("复制命令", "Copy command"))
                                 .on_click(move |_, _, cx| {
-                                    cx.write_to_clipboard(ClipboardItem::new_string(command.clone()))
+                                    cx.write_to_clipboard(ClipboardItem::new_string(
+                                        command.clone(),
+                                    ))
                                 }),
                         )
                         .child(
                             Button::new("run")
-                                .map(|button| if running { button.outline() } else { button.primary() })
+                                .map(|button| {
+                                    if running {
+                                        button.outline()
+                                    } else {
+                                        button.primary()
+                                    }
+                                })
                                 .disabled(!bar.enabled)
                                 .label(bar.button)
                                 .child(

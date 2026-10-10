@@ -2,7 +2,7 @@
 //! result banner's sentence, warnings, produced files and the log.
 
 use crate::i18n::{Language, count, language, t};
-use crate::runner::{Event, EXIT_NEEDS_DECISION, Message, NeedItem, Poll, Running};
+use crate::runner::{EXIT_NEEDS_DECISION, Event, Message, NeedItem, Poll, Running};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -137,11 +137,18 @@ impl Run {
                         Some(p) if same_phase => p.phase_started,
                         _ => Instant::now(),
                     };
-                    self.progress = Some(Progress { phase, done, total, phase_started });
+                    self.progress = Some(Progress {
+                        phase,
+                        done,
+                        total,
+                        phase_started,
+                    });
                 }
                 Event::Warning { message, path } => self.warnings.push((message, path)),
                 Event::Error { message, path } => self.errors.push((message, path)),
-                Event::Output { kind, path, rows } => self.outputs.push(OutputFile { kind, path, rows }),
+                Event::Output { kind, path, rows } => {
+                    self.outputs.push(OutputFile { kind, path, rows })
+                }
                 Event::Summary(summary) => self.summary = summary,
                 Event::Needs { count, items } => self.needs = Some((count, items)),
                 Event::Hello { .. } | Event::Unresolved(_) | Event::Unknown => {}
@@ -156,7 +163,11 @@ impl Run {
         };
         let mut line = phase_words(&p.phase).to_string();
         match p.total {
-            Some(total) => line.push_str(&format!(" · {} / {}", count(p.done as usize), count(total as usize))),
+            Some(total) => line.push_str(&format!(
+                " · {} / {}",
+                count(p.done as usize),
+                count(total as usize)
+            )),
             None => line.push_str(&format!(" · {}", count(p.done as usize))),
         }
         let running_for = p.phase_started.elapsed();
@@ -164,7 +175,8 @@ impl Run {
             && p.done > 0
             && running_for > Duration::from_secs(5)
         {
-            let remaining = running_for.mul_f64((total.saturating_sub(p.done)) as f64 / p.done as f64);
+            let remaining =
+                running_for.mul_f64((total.saturating_sub(p.done)) as f64 / p.done as f64);
             line.push_str(&format!(" · {} {}", t("剩余约", "about"), clock(remaining)));
             if language() == Language::English {
                 line.push_str(" left");
@@ -214,7 +226,13 @@ impl Run {
             .find(|(_, path)| path.is_none())
             .or(self.errors.first())
             .map(|(message, _)| message.clone())
-            .or_else(|| self.log.iter().rev().find(|l| l.starts_with("Error")).cloned())
+            .or_else(|| {
+                self.log
+                    .iter()
+                    .rev()
+                    .find(|l| l.starts_with("Error"))
+                    .cloned()
+            })
             .unwrap_or_else(|| t("Serval 意外退出", "Serval exited unexpectedly").to_string())
     }
 }

@@ -108,6 +108,20 @@ impl Form {
         }
     }
 
+    /// Remember the form's values for the next launch (shell.md §3).
+    pub fn remember(&self, cx: &mut App) {
+        match self {
+            Form::Observe(form) => {
+                let values = form.read(cx).values(cx);
+                crate::settings::Settings::update(cx, |settings| {
+                    for (field, value) in values {
+                        settings.set_form_value("observe", field, value);
+                    }
+                });
+            }
+        }
+    }
+
     pub fn view(&self) -> AnyView {
         match self {
             Form::Observe(form) => form.clone().into(),
