@@ -122,7 +122,7 @@ Rules:
 - [x] Browse and pick (W16), step 1: open a table; records merged per file; faceted filters (species, rating with shortcuts, deployment by path level, folder); virtualised grid; thumbnails made only for what is on screen and cached as 320 px JPEG; viewer at screen size with ← → and the next/previous image loaded ahead; rating 1–5 and species/individual edits written in the background through `serval xmp set` (queue flushed on moving on or after 2 s, `expect` from what was shown, conflicts reported); edited items that no longer match stay dimmed until 刷新. The protocol types are a copy of Serval's `protocol.rs`.
 - [ ] Browse step 2: open a folder (observe -x first), date range and order, multi-select with 复制到…, 写入文件… (`xmp write`), undo, video frames; the board's sample data for the browse design states.
 - [ ] Share `protocol.rs` as a `serval-protocol` crate instead of the copy (W18).
-- [ ] Bring back the CI workflows (tests, clippy, Windows/macOS builds) for the new dependency set.
+- [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
 
 ---
 
