@@ -17,6 +17,7 @@ pub struct Record {
     pub time: Option<i64>,
     pub species: String,
     pub individual: String,
+    pub rating: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -39,6 +40,7 @@ impl TagTable {
                 .position(|h| h.trim_start_matches('\u{feff}') == name)
         };
         let camtrap_dp = column("eventStart").is_some() && column("deploymentID").is_some();
+        let rating = column("rating");
         let (path, time, species, individual) = if camtrap_dp {
             (
                 column("deploymentID"),
@@ -67,6 +69,7 @@ impl TagTable {
                 time: parse_time(&cell(time)),
                 species: cell(species),
                 individual: cell(individual),
+                rating: cell(rating),
             });
         }
         Ok(TagTable {
@@ -80,7 +83,7 @@ impl TagTable {
     }
 
     /// The deployment of a record at `level` (a Camtrap DP deploymentID as it is).
-    fn deployment<'a>(&self, record: &'a Record, level: Option<usize>) -> Option<&'a str> {
+    pub fn deployment<'a>(&self, record: &'a Record, level: Option<usize>) -> Option<&'a str> {
         if self.camtrap_dp {
             return Some(record.path.as_str());
         }
@@ -161,6 +164,12 @@ impl TagTable {
             times,
         })
     }
+}
+
+/// `yyyy-MM-dd` of a time from [`Record::time`].
+pub fn date_of(time: i64) -> String {
+    let (y, m, d) = civil_from_days(time.div_euclid(86_400));
+    format!("{y:04}-{m:02}-{d:02}")
 }
 
 pub struct ExampleDay {

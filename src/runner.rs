@@ -35,6 +35,8 @@ pub enum Event {
     Summary(serde_json::Map<String, serde_json::Value>),
     Needs {
         count: u64,
+        ready: Option<u64>,
+        already: Option<u64>,
         #[serde(default)]
         items: Vec<NeedItem>,
     },

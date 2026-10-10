@@ -22,6 +22,14 @@ pub struct Progress {
     pub phase_started: Instant,
 }
 
+/// Targets that already hold different files (serval-protocol §4, `needs`).
+pub struct Needs {
+    pub count: u64,
+    pub ready: u64,
+    pub already: u64,
+    pub items: Vec<NeedItem>,
+}
+
 pub struct OutputFile {
     pub kind: String,
     pub path: PathBuf,
@@ -39,7 +47,7 @@ pub struct Run {
     pub errors: Vec<(String, Option<String>)>,
     pub outputs: Vec<OutputFile>,
     pub summary: serde_json::Map<String, serde_json::Value>,
-    pub needs: Option<(u64, Vec<NeedItem>)>,
+    pub needs: Option<Needs>,
     pub log_open: bool,
     stop_requested: bool,
     process: Option<Running>,
@@ -63,6 +71,29 @@ impl Run {
             stop_requested: false,
             process: Some(process),
         }
+    }
+
+    /// The board's extract-conflicts state: Serval stopped before writing, 37 targets differ.
+    pub fn example_conflicts() -> Run {
+        let mut run = Run::failed_to_start(String::new(), String::new());
+        run.errors.clear();
+        run.log_open = false;
+        run.outcome = Outcome::NeedsDecision;
+        let item = |target: &str, reason: &str| NeedItem {
+            target: format!("/data/2024_spring_serval_output/serval_extract/{target}"),
+            reasons: vec![reason.into()],
+        };
+        run.needs = Some(Needs {
+            count: 37,
+            ready: 1_463,
+            already: 0,
+            items: vec![
+                item("dep01/IMG_0042.JPG", "sidecar-differs"),
+                item("dep01/IMG_0043.JPG", "file-differs"),
+                item("dep03/IMG_0108.JPG", "unrelated-sidecar"),
+            ],
+        });
+        run
     }
 
     /// A run that could not start (e.g. the program is gone).
@@ -150,7 +181,19 @@ impl Run {
                     self.outputs.push(OutputFile { kind, path, rows })
                 }
                 Event::Summary(summary) => self.summary = summary,
-                Event::Needs { count, items } => self.needs = Some((count, items)),
+                Event::Needs {
+                    count,
+                    ready,
+                    already,
+                    items,
+                } => {
+                    self.needs = Some(Needs {
+                        count,
+                        ready: ready.unwrap_or(0),
+                        already: already.unwrap_or(0),
+                        items,
+                    })
+                }
                 Event::Hello { .. } | Event::Unresolved(_) | Event::Unknown => {}
             },
         }

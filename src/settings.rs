@@ -103,6 +103,16 @@ impl Settings {
         text
     }
 
+    pub fn value(&self, key: &str) -> Option<&str> {
+        self.other.get(key).map(String::as_str)
+    }
+
+    pub fn set_value(&mut self, key: &str, value: impl Into<String>) {
+        let value: String = value.into();
+        self.other
+            .insert(key.to_string(), value.replace(['\n', '\r'], " "));
+    }
+
     pub fn form_value(&self, command: &str, field: &str) -> Option<&str> {
         self.other
             .get(&format!("form.{command}.{field}"))

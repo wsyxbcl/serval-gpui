@@ -112,6 +112,8 @@ Rules:
 - [x] Run Serval with `--progress json`: runner (events on stderr, other lines to the log), run bar states, results (banner, warnings, output files, log), stop (interrupt, then end after 3 s), Ctrl+Enter / Ctrl+.; launch options `<folder>`, `--serval`, `--run`.
 - [x] Settings: choose the Serval program (W08), language, appearance (following the system by default), about; first-run card; `settings.conf` keeps its format and gains `appearance` and each form's last values (saved off the UI thread); shared output-location field with change and reset; Ctrl+,.
 - [x] 独立捕获 (capture): the table is read first (row count, Camtrap DP detection); deployment level picked on a real sample path with Serval's detection preselected and the deployment count; interval with a timeline of a real busy day using Serval's rules; measure-from, by, options; `--size` for tall screenshots; `waxbill <table.csv>` opens it.
+- [x] 媒体提取 (extract), step 1: species chosen from the table with faceted counts and bars, rating, a live summary (files, records, size, deployments), kept folders on a real path with an example output path, organise options; Serval's filter built from the choice; a stable dated output folder so reruns continue; the conflicts dialog (exit 3) rerunning with `--on-existing`; the last screen and the extract choice are remembered.
+- [ ] 媒体提取 step 2: deployments and date range through a subset table (data.md §3); thumbnails of the match (with browse's cache).
 - [ ] The remaining command screens, one by one, each checked against its board (`--design-state`).
 - [ ] Questions as fields and dialogs: path-level pickers, conflicts dialog (exit 3), identified species after observe.
 - [ ] Browse and pick (W16) on `xmp get`/`xmp set`, with the thumbnail cache.

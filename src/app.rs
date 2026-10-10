@@ -8,6 +8,7 @@ use crate::run::{Outcome, Run};
 use crate::run_bar::{Bar, Tone, run_bar};
 use crate::runner::Running;
 use crate::screens::capture::CaptureForm;
+use crate::screens::extract::ExtractForm;
 use crate::screens::form::FolderCount;
 use crate::screens::observe::ObserveForm;
 use crate::screens::{Form, ScreenId, groups};
@@ -47,6 +48,9 @@ pub const DESIGN_STATES: &[&str] = &[
     "settings-ready",
     "settings-unsupported",
     "capture-ready",
+    "extract-from-data",
+    "extract-keep-dirs",
+    "extract-conflicts",
 ];
 
 /// What the command line asks for at launch.
@@ -65,9 +69,12 @@ pub struct Waxbill {
     pub(crate) screen: ScreenId,
     observe: Entity<ObserveForm>,
     capture: Entity<CaptureForm>,
+    extract: Entity<ExtractForm>,
+    /// The choice in the conflicts dialog: skip, replace or rename (questions.md §3).
+    pub(crate) conflict_choice: usize,
     pub(crate) serval: ServalStatus,
     /// The last run of each screen; at most one is running (shell.md §2).
-    runs: HashMap<ScreenId, Run>,
+    pub(crate) runs: HashMap<ScreenId, Run>,
     focus: FocusHandle,
     icon: Arc<Image>,
 }
@@ -81,12 +88,15 @@ impl Waxbill {
     ) -> Self {
         let observe = cx.new(|cx| ObserveForm::new(window, cx));
         let capture = cx.new(|cx| CaptureForm::new(window, cx));
+        let extract = cx.new(|cx| ExtractForm::new(window, cx));
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
         let mut app = Waxbill {
             screen: ScreenId::Observe,
             observe,
             capture,
+            extract,
+            conflict_choice: 0,
             serval: ServalStatus::Checking,
             runs: HashMap::new(),
             focus,
@@ -105,6 +115,15 @@ impl Waxbill {
         };
         match design_state {
             Some("first-run") => app.serval = ServalStatus::Missing,
+            Some(state @ ("extract-from-data" | "extract-keep-dirs" | "extract-conflicts")) => {
+                app.serval = example_serval("0.8.0", "serval");
+                app.screen = ScreenId::Extract;
+                app.extract
+                    .update(cx, |form, cx| form.set_example(window, cx));
+                if state == "extract-conflicts" {
+                    app.runs.insert(ScreenId::Extract, Run::example_conflicts());
+                }
+            }
             Some("capture-ready") => {
                 app.serval = example_serval("0.8.0", "serval");
                 app.screen = ScreenId::Capture;
@@ -140,6 +159,14 @@ impl Waxbill {
             _ => {
                 app.observe.update(cx, |form, cx| form.restore(window, cx));
                 app.capture.update(cx, |form, cx| form.restore(window, cx));
+                app.extract.update(cx, |form, cx| form.restore(window, cx));
+                if let Some(screen) = cx
+                    .default_global::<Settings>()
+                    .value("screen")
+                    .and_then(ScreenId::from_key)
+                {
+                    app.screen = screen;
+                }
                 if let Some(path) = &launch.open {
                     let text = path.to_string_lossy().to_string();
                     if path
@@ -245,6 +272,15 @@ impl Waxbill {
         .detach();
     }
 
+    /// Show a screen; it is also where the next launch opens.
+    fn go(&mut self, screen: ScreenId, cx: &mut Context<Self>) {
+        self.screen = screen;
+        Settings::update(cx, |settings| {
+            settings.set_value("screen", format!("{screen:?}"))
+        });
+        cx.notify();
+    }
+
     fn running_screen(&self) -> Option<ScreenId> {
         self.runs
             .iter()
@@ -258,6 +294,17 @@ impl Waxbill {
             self.stop(cx);
             return;
         }
+        self.start_run(&[], cx);
+    }
+
+    /// Run again after a decision (the conflicts dialog).
+    pub(crate) fn start_decided_run(&mut self, extra: &[&str], cx: &mut Context<Self>) {
+        self.runs.remove(&self.screen);
+        self.start_run(extra, cx);
+    }
+
+    /// Start the current screen's command, with `extra` arguments (a decision such as `--on-existing skip`).
+    fn start_run(&mut self, extra: &[&str], cx: &mut Context<Self>) {
         if self.running_screen().is_some() {
             return;
         }
@@ -270,8 +317,17 @@ impl Waxbill {
             return;
         }
         form.remember(cx);
-        let command = crate::screens::display_command(&plan.args);
-        let run = match Running::start(&program, &plan.args, &plan.cwd) {
+        let mut args = plan.args.clone();
+        // Decisions go before the positional arguments at the end (`-o <dir> <input>`).
+        let at = args
+            .iter()
+            .position(|a| a == "--progress")
+            .unwrap_or(args.len());
+        for (i, arg) in extra.iter().enumerate() {
+            args.insert(at + i, arg.to_string());
+        }
+        let command = crate::screens::display_command(&args);
+        let run = match Running::start(&program, &args, &plan.cwd) {
             Ok(process) => Run::new(command, process),
             Err(err) => Run::failed_to_start(command, format!("{}: {err}", program.display())),
         };
@@ -429,6 +485,7 @@ impl Waxbill {
         match self.screen {
             ScreenId::Observe => Some(Form::Observe(self.observe.clone())),
             ScreenId::Capture => Some(Form::Capture(self.capture.clone())),
+            ScreenId::Extract => Some(Form::Extract(self.extract.clone())),
             _ => None,
         }
     }
@@ -484,7 +541,7 @@ impl Waxbill {
                                 .child(div().size(px(7.)).rounded_full().bg(dot))
                                 .child(label)
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.screen = ScreenId::Settings;
+                                    this.go(ScreenId::Settings, cx);
                                     cx.notify();
                                 })),
                         )
@@ -493,7 +550,7 @@ impl Waxbill {
                                 .ghost()
                                 .icon(Icon::new(IconName::Settings))
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.screen = ScreenId::Settings;
+                                    this.go(ScreenId::Settings, cx);
                                     cx.notify();
                                 })),
                         ),
@@ -537,7 +594,7 @@ impl Waxbill {
             )
             .child(id.label())
             .on_click(cx.listener(move |this, _, _, cx| {
-                this.screen = id;
+                this.go(id, cx);
                 cx.notify();
             }))
     }
@@ -677,13 +734,15 @@ impl Waxbill {
 
 impl Render for Waxbill {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let dialog = self.render_conflicts(cx);
         v_flex()
+            .relative()
             .size_full()
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &RunCommand, _, cx| this.run_or_stop(cx)))
             .on_action(cx.listener(|this, _: &StopCommand, _, cx| this.stop(cx)))
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| {
-                this.screen = ScreenId::Settings;
+                this.go(ScreenId::Settings, cx);
                 cx.notify();
             }))
             .bg(cx.theme().background)
@@ -697,5 +756,6 @@ impl Render for Waxbill {
                     .child(self.render_sidebar(cx))
                     .child(self.render_screen(cx)),
             )
+            .children(dialog)
     }
 }

@@ -751,6 +751,7 @@ fn example_table() -> TagTable {
                     time: Some(day(i as i64 - 200) + 3600 * (6 + s as i64)),
                     species: species.to_string(),
                     individual: String::new(),
+                    rating: String::new(),
                 });
             }
         }
@@ -777,6 +778,7 @@ fn example_table() -> TagTable {
             time: Some(time),
             species: "雪豹".into(),
             individual: String::new(),
+            rating: String::new(),
         });
     }
     TagTable {

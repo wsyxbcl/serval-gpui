@@ -2,6 +2,7 @@
 //! Waxbill: a desktop app for Serval. Design: `Design/` (specs, boards and tokens).
 
 mod app;
+mod conflicts;
 mod i18n;
 mod output;
 mod results;

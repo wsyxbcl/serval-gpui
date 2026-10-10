@@ -1,6 +1,7 @@
 //! The screens in the sidebar (Design/spec/shell.md §2) and what every command screen provides to the shell.
 
 pub mod capture;
+pub mod extract;
 pub mod form;
 pub mod observe;
 
@@ -39,6 +40,27 @@ pub fn groups() -> [(&'static str, &'static [ScreenId]); 3] {
 }
 
 impl ScreenId {
+    const ALL: [ScreenId; 13] = [
+        ScreenId::Rename,
+        ScreenId::Align,
+        ScreenId::XmpInit,
+        ScreenId::Browse,
+        ScreenId::Observe,
+        ScreenId::Capture,
+        ScreenId::Translate,
+        ScreenId::XmpUpdate,
+        ScreenId::XmpSync,
+        ScreenId::Extract,
+        ScreenId::XmpCopy,
+        ScreenId::XmpRemove,
+        ScreenId::Settings,
+    ];
+
+    /// The screen saved as `screen=<name>` in the settings.
+    pub fn from_key(key: &str) -> Option<ScreenId> {
+        Self::ALL.into_iter().find(|id| format!("{id:?}") == key)
+    }
+
     pub fn label(self) -> &'static str {
         use ScreenId::*;
         match self {
@@ -92,6 +114,7 @@ pub struct Plan {
 pub enum Form {
     Observe(Entity<observe::ObserveForm>),
     Capture(Entity<capture::CaptureForm>),
+    Extract(Entity<extract::ExtractForm>),
 }
 
 impl Form {
@@ -100,6 +123,10 @@ impl Form {
             Form::Observe(_) => t(
                 "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",
                 "Reads species, individual and other tags from photos and videos into tags.csv and species counts.",
+            ),
+            Form::Extract(_) => t(
+                "按标签筛选，把照片、视频和 XMP 一起复制到新文件夹。",
+                "Copies the photos and videos you choose by tag, with their XMP, into a new folder.",
             ),
             Form::Capture(_) => t(
                 "按时间间隔把连续拍到的记录合并为独立捕获，统计每个部署、每个物种的捕获次数。",
@@ -112,6 +139,7 @@ impl Form {
         match self {
             Form::Observe(form) => form.read(cx).plan(cx),
             Form::Capture(form) => form.read(cx).plan(cx),
+            Form::Extract(form) => form.read(cx).plan(cx),
         }
     }
 
@@ -120,6 +148,7 @@ impl Form {
         let (command, values) = match self {
             Form::Observe(form) => ("observe", form.read(cx).values(cx)),
             Form::Capture(form) => ("capture", form.read(cx).values(cx)),
+            Form::Extract(form) => ("extract", form.read(cx).values(cx)),
         };
         crate::settings::Settings::update(cx, |settings| {
             for (field, value) in values {
@@ -132,6 +161,7 @@ impl Form {
         match self {
             Form::Observe(form) => form.clone().into(),
             Form::Capture(form) => form.clone().into(),
+            Form::Extract(form) => form.clone().into(),
         }
     }
 }
@@ -140,7 +170,9 @@ impl Form {
 pub fn display_command(args: &[String]) -> String {
     std::iter::once("serval".to_string())
         .chain(args.iter().map(|arg| {
-            if arg.is_empty() || arg.contains([' ', '"', '\'']) {
+            if arg.contains('"') && !arg.contains('\'') {
+                format!("'{arg}'")
+            } else if arg.is_empty() || arg.contains([' ', '"', '\'']) {
                 format!("\"{}\"", arg.replace('"', "\\\""))
             } else {
                 arg.clone()
