@@ -620,6 +620,10 @@ impl Waxbill {
                 )
                 .child(
                     h_flex()
+                        // On Windows the title bar is a drag area; occluding it here lets clicks reach the pill and the
+                        // settings button instead of grabbing the window.
+                        .id("title-actions")
+                        .occlude()
                         .gap(tokens.px("space-3"))
                         .child(
                             h_flex()
