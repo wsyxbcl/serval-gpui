@@ -58,7 +58,7 @@
           <div class="line"><span class="dot run"></span><b>正在复制</b>· 1,204 / 1,500 · 剩余约 0:42</div>
           <div class="progress"><i style="width:80%"></i></div>
         </div>
-        <span class="btn wide" style="min-width:132px;justify-content:center">停止 <span class="kbd">Ctrl+.</span></span>
+        <span class="btn wide" style="min-width:132px;justify-content:center">暂停 <span class="kbd">Ctrl+.</span></span>
       </div>
     </div>
   </div>
@@ -165,19 +165,20 @@ Found 1500 matching records
   </div>
 </div>
 
-<div class="state" data-state="extract-cancelled">
-  <div class="state-label">⑦ extract-cancelled <code>已停止：说明可以接着做</code></div>
+<div class="state" data-state="extract-paused">
+  <div class="state-label">⑦ extract-paused <code>已暂停：继续，或取消回到就绪</code></div>
   <div class="window compact" data-active="extract">
     <div class="main">
       <div class="scroll"><div class="content mini-form">
         <h2 class="screen-title">媒体提取</h2>
         <p class="screen-sub">按标签筛选，把照片、视频和 XMP 一起复制到新文件夹。</p>
-        <div class="banner info"><div><div class="title">已停止 · 复制了 1,204 / 1,500</div>已复制的文件都是完整的。再次运行会跳过它们，从中断处继续。</div></div>
+        <div class="banner info"><div><div class="title">已暂停</div>已写入的文件都是完整的。继续会跳过已完成的部分；取消则回到就绪。</div></div>
       </div></div>
       <div class="runbar">
-        <div class="status"><div class="line"><span class="dot"></span><b>已停止</b>· 1,204 / 1,500</div></div>
+        <div class="status"><div class="line"><span class="dot"></span><b>已暂停</b>· 正在复制 · 1,204 / 1,500</div></div>
         <span class="btn ghost">复制命令</span>
-        <span class="btn primary wide">继续运行</span>
+        <span class="btn">取消</span>
+        <span class="btn primary wide">继续</span>
       </div>
     </div>
   </div>

@@ -125,8 +125,8 @@ Rules:
 - [x] W20 Explorer search over embedded labels (experiment): works on Windows after 元数据同步 (`标记:`, `分级:` find the photos). Opt-in only, since it changes the original files.
 - [x] Windows test 2026-10-12, fixes: paths can be dropped onto every path field; observe counts images, videos and XMP; the log scrolls; durations under a minute in seconds; no growing estimate after Stop; the run bar returns to Ready once the form changes; 整表写入 leaves time off by default; the capture timeline is removed.
 - [x] Table check and repair (data.md §2): GBK, UTF-16 and tab-separated tables and times rewritten by Excel/WPS are found under every table field; "生成修复后的副本" writes `<name>.utf8.csv` and switches the field to it.
-- [ ] Pause, continue and cancel a run (暂停 / 继续 / 取消, with an option to delete the partial results on cancel).
-- [ ] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
+- [x] Pause, continue and cancel a run (暂停 / 继续 / 取消, with an option to delete the partial results on cancel).
+- [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [ ] Draw the board for the hand-off screen.
 - [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
 

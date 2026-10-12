@@ -43,6 +43,9 @@ pub struct Run {
     /// The form's command when the run started, without decisions: once the form says something else, the run
     /// bar is about the new command again.
     pub form_command: String,
+    /// The output folder this run (and the paused runs it continues) created, offered for deletion on cancel when
+    /// the command only copies into it.
+    pub created_output: Option<PathBuf>,
     pub started: Instant,
     pub elapsed: Duration,
     pub outcome: Outcome,
@@ -66,6 +69,7 @@ impl Run {
             log: vec![format!("$ {command}")],
             command,
             form_command: String::new(),
+            created_output: None,
             started: Instant::now(),
             elapsed: Duration::ZERO,
             outcome: Outcome::Running,
@@ -134,6 +138,7 @@ impl Run {
             log: vec![format!("$ {command}"), error.clone()],
             command,
             form_command: String::new(),
+            created_output: None,
             started: Instant::now(),
             elapsed: Duration::ZERO,
             outcome: Outcome::Failed,
@@ -154,6 +159,11 @@ impl Run {
 
     pub fn is_running(&self) -> bool {
         self.outcome == Outcome::Running
+    }
+
+    /// Pause was pressed and Serval is finishing what it is writing.
+    pub fn stopping(&self) -> bool {
+        self.stop_requested && self.is_running()
     }
 
     pub fn stop(&mut self) {

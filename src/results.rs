@@ -46,10 +46,10 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
         ),
         Outcome::Stopped => (
             tokens.color("info-soft"),
-            t("已停止", "Stopped").to_string(),
+            t("已暂停", "Paused").to_string(),
             t(
-                "已写入的文件都是完整的。继续运行会跳过已完成的部分。",
-                "Files written so far are complete. Running again skips finished work.",
+                "已写入的文件都是完整的。继续会跳过已完成的部分；取消则回到就绪。",
+                "Files written so far are complete. Continue skips finished work; Cancel goes back to Ready.",
             )
             .to_string(),
         ),

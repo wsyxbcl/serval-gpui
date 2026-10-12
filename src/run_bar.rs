@@ -1,5 +1,5 @@
 //! The run bar (Design/spec/run.md §1): what will happen, what is happening or what happened, the exact command,
-//! and the screen's one primary button.
+//! and the screen's one primary button (with 取消 beside it while a run is paused).
 
 use crate::i18n::t;
 use crate::theme::TokensExt;
@@ -30,13 +30,20 @@ pub struct Bar {
     /// The button's shortcut, as a GPUI keystroke ("secondary-enter").
     pub shortcut: &'static str,
     pub enabled: bool,
+    /// A second, quieter button: 取消 while paused.
+    pub secondary: Option<&'static str>,
 }
 
-pub fn run_bar<F: Fn(&ClickEvent, &mut Window, &mut App) + 'static>(
+pub fn run_bar<F, G>(
     bar: Bar,
     on_click: F,
+    on_secondary: G,
     cx: &App,
-) -> impl IntoElement + use<F> {
+) -> impl IntoElement + use<F, G>
+where
+    F: Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    G: Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+{
     let tokens = cx.tokens();
     let dot = match bar.tone {
         Tone::Idle => tokens.color("subtle-foreground"),
@@ -109,6 +116,14 @@ pub fn run_bar<F: Fn(&ClickEvent, &mut Window, &mut App) + 'static>(
                                     ))
                                 }),
                         )
+                        .when_some(bar.secondary, |row, label| {
+                            row.child(
+                                Button::new("run-secondary")
+                                    .outline()
+                                    .label(label)
+                                    .on_click(on_secondary),
+                            )
+                        })
                         .child(
                             Button::new("run")
                                 .map(|button| {

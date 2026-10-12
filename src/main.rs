@@ -11,6 +11,7 @@ mod repair;
 mod results;
 mod run;
 mod run_bar;
+mod run_dialogs;
 mod runner;
 mod screens;
 mod serval;

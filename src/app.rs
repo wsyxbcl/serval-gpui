@@ -21,8 +21,9 @@ use crate::theme;
 use crate::theme::TokensExt;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::theme::ThemeMode;
-use gpui_kit::component::{ActiveTheme, Icon, StyledExt, TitleBar, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable as _, StyledExt, TitleBar, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::collections::HashMap;
@@ -86,6 +87,12 @@ pub struct Waxbill {
     pub(crate) serval: ServalStatus,
     /// The last run of each screen; at most one is running (shell.md §2).
     pub(crate) runs: HashMap<ScreenId, Run>,
+    /// The cancel question for the current screen's paused run, while it is open.
+    pub(crate) cancel_ask: Option<crate::run_dialogs::CancelAsk>,
+    /// The window was asked to close while a command runs.
+    pub(crate) close_asked: bool,
+    /// 停止并退出 was chosen: quit once the run has stopped.
+    pub(crate) quit_when_stopped: bool,
     focus: FocusHandle,
     icon: Arc<Image>,
 }
@@ -154,9 +161,19 @@ impl Waxbill {
             id_species: None,
             serval: ServalStatus::Checking,
             runs: HashMap::new(),
+            cancel_ask: None,
+            close_asked: false,
+            quit_when_stopped: false,
             focus,
             icon: Arc::new(Image::from_bytes(ImageFormat::Png, APP_ICON.to_vec())),
         };
+        // Closing the window while a command runs asks first (Windows and macOS close through the system; the
+        // Linux title bar button calls `should_close` itself).
+        let this = cx.entity().downgrade();
+        window.on_window_should_close(cx, move |_, cx| {
+            this.update(cx, |this, cx| this.should_close(cx))
+                .unwrap_or(true)
+        });
         if design_state.is_none() && !launch.appearance_given {
             app.apply_appearance(window, cx);
             cx.observe_window_appearance(window, |this, window, cx| {
@@ -268,6 +285,15 @@ impl Waxbill {
                 app.detect_serval(program, launch.run, cx);
             }
         }
+        // A design state's example run belongs to the example form.
+        if design_state.is_some()
+            && let Some(form) = app.form()
+        {
+            let command = crate::screens::display_command(&form.plan(cx).args);
+            for run in app.runs.values_mut() {
+                run.form_command = command.clone();
+            }
+        }
         app
     }
 
@@ -367,7 +393,7 @@ impl Waxbill {
         cx.notify();
     }
 
-    fn running_screen(&self) -> Option<ScreenId> {
+    pub(crate) fn running_screen(&self) -> Option<ScreenId> {
         self.runs
             .iter()
             .find(|(_, run)| run.is_running())
@@ -419,6 +445,15 @@ impl Waxbill {
         };
         run.form_command = crate::screens::display_command(&plan.args);
         let screen = self.screen;
+        // Continuing a paused run keeps the folder the first run created.
+        run.created_output = self
+            .runs
+            .get(&screen)
+            .filter(|last| {
+                last.outcome == Outcome::Stopped && last.form_command == run.form_command
+            })
+            .and_then(|last| last.created_output.clone())
+            .or_else(|| crate::run_dialogs::created_output(&plan.args));
         self.runs.insert(screen, run);
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -437,6 +472,9 @@ impl Waxbill {
                         if !running && screen == ScreenId::Observe && run.unresolved.is_some() {
                             this.ask_id_species(cx);
                         }
+                        if !running && this.quit_when_stopped {
+                            cx.quit();
+                        }
                         cx.notify();
                         running
                     })
@@ -449,7 +487,7 @@ impl Waxbill {
         .detach();
     }
 
-    fn stop(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn stop(&mut self, cx: &mut Context<Self>) {
         if let Some(screen) = self.running_screen()
             && let Some(run) = self.runs.get_mut(&screen)
         {
@@ -473,6 +511,7 @@ impl Waxbill {
             button: t("运行", "Run"),
             shortcut: "secondary-enter",
             enabled,
+            secondary: None,
         };
         let ready = |button: &'static str| match (&plan.ready, serval_ready, other_running) {
             (_, false, _) if self.serval == ServalStatus::Missing => (
@@ -513,13 +552,19 @@ impl Waxbill {
             Outcome::Running => {
                 return Bar {
                     tone: Tone::Running,
-                    title: t("运行中", "Running").to_string(),
+                    title: if run.stopping() {
+                        t("正在暂停…", "Pausing…")
+                    } else {
+                        t("运行中", "Running")
+                    }
+                    .to_string(),
                     detail: run.progress_line(),
                     progress: Some(run.fraction()),
                     command: run.command.clone(),
-                    button: t("停止", "Stop"),
+                    button: t("暂停", "Pause"),
                     shortcut: "secondary-.",
-                    enabled: true,
+                    enabled: !run.stopping(),
+                    secondary: None,
                 };
             }
             Outcome::Finished if warnings == 0 => (
@@ -551,9 +596,9 @@ impl Waxbill {
             ),
             Outcome::Stopped => (
                 Tone::Idle,
-                t("已停止", "Stopped").to_string(),
+                t("已暂停", "Paused").to_string(),
                 run.progress_line(),
-                t("继续运行", "Continue"),
+                t("继续", "Continue"),
             ),
         };
         let (enabled, _) = ready(button);
@@ -570,6 +615,7 @@ impl Waxbill {
             button,
             shortcut: "secondary-enter",
             enabled,
+            secondary: (run.outcome == Outcome::Stopped).then_some(t("取消", "Cancel")),
         }
     }
 
@@ -604,57 +650,64 @@ impl Waxbill {
                 t("未找到 Serval", "Serval not found").to_string(),
             ),
         };
-        TitleBar::new().h(tokens.px("titlebar-h")).child(
-            h_flex()
-                .w_full()
-                .pr(tokens.px("space-2"))
-                .justify_between()
-                .child(
-                    h_flex()
-                        .gap(tokens.px("space-2"))
-                        .child(img(self.icon.clone()).size(px(20.)))
-                        .child(
-                            div()
-                                .text_size(tokens.px("text-md"))
-                                .font_medium()
-                                .child("Waxbill"),
-                        ),
-                )
-                .child(
-                    h_flex()
-                        // On Windows the title bar is a drag area; occluding it here lets clicks reach the pill and the
-                        // settings button instead of grabbing the window.
-                        .id("title-actions")
-                        .occlude()
-                        .gap(tokens.px("space-3"))
-                        .child(
-                            h_flex()
-                                .id("serval-pill")
-                                .gap(tokens.px("space-2"))
-                                .px(tokens.px("space-3"))
-                                .py(px(3.))
-                                .rounded_full()
-                                .bg(cx.theme().muted)
-                                .text_size(tokens.px("text-sm"))
-                                .cursor_pointer()
-                                .child(div().size(px(7.)).rounded_full().bg(dot))
-                                .child(label)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.go(ScreenId::Settings, cx);
-                                    cx.notify();
-                                })),
-                        )
-                        .child(
-                            Button::new("settings")
-                                .ghost()
-                                .icon(Icon::new(IconName::Settings))
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.go(ScreenId::Settings, cx);
-                                    cx.notify();
-                                })),
-                        ),
-                ),
-        )
+        TitleBar::new()
+            .h(tokens.px("titlebar-h"))
+            .on_close_window(cx.listener(|this, _, window, cx| {
+                if this.should_close(cx) {
+                    window.remove_window();
+                }
+            }))
+            .child(
+                h_flex()
+                    .w_full()
+                    .pr(tokens.px("space-2"))
+                    .justify_between()
+                    .child(
+                        h_flex()
+                            .gap(tokens.px("space-2"))
+                            .child(img(self.icon.clone()).size(px(20.)))
+                            .child(
+                                div()
+                                    .text_size(tokens.px("text-md"))
+                                    .font_medium()
+                                    .child("Waxbill"),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            // On Windows the title bar is a drag area; occluding it here lets clicks reach the pill and the
+                            // settings button instead of grabbing the window.
+                            .id("title-actions")
+                            .occlude()
+                            .gap(tokens.px("space-3"))
+                            .child(
+                                h_flex()
+                                    .id("serval-pill")
+                                    .gap(tokens.px("space-2"))
+                                    .px(tokens.px("space-3"))
+                                    .py(px(3.))
+                                    .rounded_full()
+                                    .bg(cx.theme().muted)
+                                    .text_size(tokens.px("text-sm"))
+                                    .cursor_pointer()
+                                    .child(div().size(px(7.)).rounded_full().bg(dot))
+                                    .child(label)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.go(ScreenId::Settings, cx);
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(
+                                Button::new("settings")
+                                    .ghost()
+                                    .icon(Icon::new(IconName::Settings))
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.go(ScreenId::Settings, cx);
+                                        cx.notify();
+                                    })),
+                            ),
+                    ),
+            )
     }
 
     fn sidebar_item(&self, id: ScreenId, cx: &mut Context<Self>) -> impl IntoElement {
@@ -692,6 +745,13 @@ impl Waxbill {
                     .text_color(cx.theme().muted_foreground),
             )
             .child(id.label())
+            .when(self.running_screen() == Some(id), |item| {
+                item.child(
+                    div()
+                        .ml_auto()
+                        .child(Spinner::new().small().color(tokens.color("primary"))),
+                )
+            })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.go(id, cx);
                 cx.notify();
@@ -824,7 +884,14 @@ impl Waxbill {
                 .gap(tokens.px("space-5"))
                 .child(self.render_heading(summary, form.is_some(), cx))
                 .children(self.render_results(cx))
-                .children(form.as_ref().map(Form::view))
+                .children(form.as_ref().map(|form| {
+                    // While its command runs, the form shows what is running and cannot be changed.
+                    let locked = self.running_screen() == Some(self.screen);
+                    div().relative().child(form.view()).when(locked, |view| {
+                        view.opacity(0.6)
+                            .child(div().absolute().inset_0().occlude())
+                    })
+                }))
         };
         let body = div()
             .id("screen")
@@ -844,9 +911,14 @@ impl Waxbill {
             .min_w_0()
             .h_full()
             .child(body)
-            .children(
-                bar.map(|bar| run_bar(bar, cx.listener(|this, _, _, cx| this.run_or_stop(cx)), cx)),
-            )
+            .children(bar.map(|bar| {
+                run_bar(
+                    bar,
+                    cx.listener(|this, _, _, cx| this.run_or_stop(cx)),
+                    cx.listener(|this, _, _, cx| this.cancel(cx)),
+                    cx,
+                )
+            }))
             .into_any_element()
     }
 }
@@ -854,7 +926,9 @@ impl Waxbill {
 impl Render for Waxbill {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let dialog = self
-            .render_conflicts(cx)
+            .render_close(cx)
+            .or_else(|| self.render_cancel(cx))
+            .or_else(|| self.render_conflicts(cx))
             .or_else(|| self.render_id_species(cx));
         v_flex()
             .relative()
