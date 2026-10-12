@@ -6,6 +6,7 @@ use super::Plan;
 use super::form::{Tone, accept_drop, card, field, help_line, output_field, segmented};
 use crate::i18n::{Language, count, language, t};
 use crate::output;
+use crate::repair::TableCheck;
 use crate::table::{Record, TagTable, date_of, detect_level};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::Button;
@@ -46,6 +47,7 @@ struct Matched {
 
 pub struct ExtractForm {
     csv: Entity<InputState>,
+    csv_check: Entity<TableCheck>,
     search: Entity<InputState>,
     table: TableState,
     /// Species with their record counts under the rating choice, most first; untagged records counted apart.
@@ -88,6 +90,7 @@ impl ExtractForm {
             }),
         ];
         ExtractForm {
+            csv_check: cx.new(|cx| TableCheck::new(&csv, cx)),
             csv,
             search,
             table: TableState::Nothing,
@@ -905,7 +908,8 @@ impl Render for ExtractForm {
                                 ),
                         ),
                 )
-                .child(self.table_line(cx)),
+                .child(self.table_line(cx))
+                .child(self.csv_check.clone()),
             &self.csv,
             cx,
         ));

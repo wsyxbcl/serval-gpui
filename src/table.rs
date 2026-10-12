@@ -32,8 +32,8 @@ impl TagTable {
         let mut reader = csv::ReaderBuilder::new()
             .flexible(true)
             .from_path(path)
-            .map_err(|err| err.to_string())?;
-        let headers = reader.headers().map_err(|err| err.to_string())?.clone();
+            .map_err(read_error)?;
+        let headers = reader.headers().map_err(read_error)?.clone();
         let column = |name: &str| {
             headers
                 .iter()
@@ -61,7 +61,7 @@ impl TagTable {
         };
         let mut records = Vec::new();
         for row in reader.records() {
-            let row = row.map_err(|err| err.to_string())?;
+            let row = row.map_err(read_error)?;
             let cell =
                 |i: Option<usize>| i.and_then(|i| row.get(i)).unwrap_or("").trim().to_string();
             records.push(Record {
@@ -199,6 +199,16 @@ mod tests {
     }
 }
 
+/// A reading error, said plainly when the table is not UTF-8 (the check below the field offers a repaired copy).
+fn read_error(err: csv::Error) -> String {
+    match err.kind() {
+        csv::ErrorKind::Utf8 { .. } => {
+            crate::i18n::t("表格不是 UTF-8 编码", "the table is not UTF-8").to_string()
+        }
+        _ => err.to_string(),
+    }
+}
+
 /// A CSV as text: its header and rows (row numbers count the header as line 1, as Serval reports them).
 #[derive(Clone, Debug, Default)]
 pub struct Csv {
@@ -211,10 +221,10 @@ impl Csv {
         let mut reader = csv::ReaderBuilder::new()
             .flexible(true)
             .from_path(path)
-            .map_err(|err| err.to_string())?;
+            .map_err(read_error)?;
         let header = reader
             .headers()
-            .map_err(|err| err.to_string())?
+            .map_err(read_error)?
             .iter()
             .map(|h| h.trim_start_matches('\u{feff}').trim().to_string())
             .collect();
@@ -222,7 +232,7 @@ impl Csv {
             .records()
             .map(|row| row.map(|r| r.iter().map(|c| c.trim().to_string()).collect()))
             .collect::<Result<_, _>>()
-            .map_err(|err| err.to_string())?;
+            .map_err(read_error)?;
         Ok(Csv { header, rows })
     }
 

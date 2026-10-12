@@ -13,6 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 csv = "1"
+# GBK and UTF-16 tables from Excel (repair.rs).
+encoding_rs = "0.8"
 # Pinned exactly: gpui-kit follows weekly GPUI snapshots (W01).
 gpui-kit = "=0.7.1"
 serde = { version = "1", features = ["derive"] }

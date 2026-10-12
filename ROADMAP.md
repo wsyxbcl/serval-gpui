@@ -121,8 +121,12 @@ Rules:
 - [x] Questions as fields and dialogs: path-level pickers (capture, extract), conflicts dialog (exit 3), identified species after observe (remembered per folder).
 - [x] Browse and pick (W16, revised): a native grid, thumbnails and viewer were built and removed (no video in GPUI; Waxbill stays small). The screen now chooses by species and rating and hands off: a hard-linked review folder for Explorer (falling back to 媒体提取 when links cannot be made), Caracal in the browser (path copied), and 应用表格到文件.
 - [x] 元数据更新 · 整表写入: `xmp write` with a background `--dry-run` preview (per field, lost values, created sidecars, problem files block Run).
-- [ ] W19 bridge for the hosted Caracal (proposed): test the browsers' local-network permission on Windows Edge first.
-- [ ] W20 Explorer search over embedded labels (experiment): test on Windows.
+- [ ] W19 bridge for the hosted Caracal (proposed): test the browsers' local-network permission on Windows Edge first. The first test used port 1, which Edge blocks as unsafe (`ERR_UNSAFE_PORT`); retest with `fetch("http://127.0.0.1:8799")`.
+- [x] W20 Explorer search over embedded labels (experiment): works on Windows after 元数据同步 (`标记:`, `分级:` find the photos). Opt-in only, since it changes the original files.
+- [x] Windows test 2026-10-12, fixes: paths can be dropped onto every path field; observe counts images, videos and XMP; the log scrolls; durations under a minute in seconds; no growing estimate after Stop; the run bar returns to Ready once the form changes; 整表写入 leaves time off by default; the capture timeline is removed.
+- [x] Table check and repair (data.md §2): GBK, UTF-16 and tab-separated tables and times rewritten by Excel/WPS are found under every table field; "生成修复后的副本" writes `<name>.utf8.csv` and switches the field to it.
+- [ ] Pause, continue and cancel a run (暂停 / 继续 / 取消, with an option to delete the partial results on cancel).
+- [ ] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [ ] Draw the board for the hand-off screen.
 - [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
 
@@ -142,5 +146,8 @@ Rules:
 - Add presets, recent inputs, and saved workflows.
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
+- "在 Caracal 中打开" for the tables of 标签获取 (species analysis) and XMP 初始化 (time analysis).
+- A sync preview for 元数据同步: what differs between the sidecar and the labels inside the media, before writing.
+- A help illustration for 独立捕获: measuring from the previous record vs. from the previous independent one.
 - Improve packaging and distribution for Linux, Windows, and macOS.
 - Consider extracting reusable Serval command metadata from the CLI project if it materially improves maintainability.

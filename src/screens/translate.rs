@@ -6,6 +6,7 @@ use super::Plan;
 use super::form::{Tone, accept_drop, card, field, help_line, output_field};
 use crate::i18n::{Language, count, language, t};
 use crate::output;
+use crate::repair::TableCheck;
 use crate::table::Csv;
 use crate::theme::TokensExt;
 use gpui_kit::component::button::Button;
@@ -83,6 +84,7 @@ enum Files {
 pub struct TranslateForm {
     table: Entity<InputState>,
     taglist: Entity<InputState>,
+    checks: [Entity<TableCheck>; 2],
     files: Files,
     from: Option<String>,
     to: Option<String>,
@@ -113,6 +115,10 @@ impl TranslateForm {
             })
             .collect();
         TranslateForm {
+            checks: [
+                cx.new(|cx| TableCheck::new(&table, cx)),
+                cx.new(|cx| TableCheck::new(&taglist, cx)),
+            ],
             table,
             taglist,
             files: Files::Nothing,
@@ -492,6 +498,7 @@ impl Render for TranslateForm {
             .child(accept_drop(
                 field(t("要替换的表", "Table to translate"), cx)
                     .child(path_row(&self.table, "choose-table", 0, cx))
+                    .child(self.checks[0].clone())
                     .when_some(read, |f, (rows, _)| {
                         f.child(help_line(
                             match language() {
@@ -508,6 +515,7 @@ impl Render for TranslateForm {
             .child(accept_drop(
                 field(t("标签表", "Taglist"), cx)
                     .child(path_row(&self.taglist, "choose-taglist", 1, cx))
+                    .child(self.checks[1].clone())
                     .when_some(read, |f, (_, tags)| {
                         f.child(help_line(
                             match language() {

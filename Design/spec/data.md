@@ -22,6 +22,11 @@ Every CSV is checked when chosen. Problems that would make Serval fail block Run
 warnings. One action, "生成修复后的副本", writes `<name>.utf8.csv` next to the original (never overwriting it)
 and points the field at the copy.
 
+Built (2026-10-12, `src/repair.rs`): encoding (GBK, UTF-16, tab-separated) and the time columns `datetime`,
+`datetime_original`, `xmp_update_datetime`, under every table field (capture, extract, browse, update,
+translate). The check is a warning with the repair button; an unreadable table already blocks Run. The other
+rows are not built yet.
+
 | Problem (seen in real files) | Detection | Repair |
 | --- | --- | --- |
 | Encoding is not UTF-8 (Excel's "CSV" on Chinese Windows saves GBK; "Unicode text" is UTF-16) | BOM; strict UTF-8 decode; else GB18030 decode succeeds | Re-encode to UTF-8 with BOM (Serval reads it; Excel opens it correctly) |

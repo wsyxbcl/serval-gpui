@@ -5,6 +5,7 @@
 use super::Plan;
 use super::form::{Tone, accept_drop, card, field, help_line, segmented};
 use crate::i18n::{Language, count, language, t};
+use crate::repair::TableCheck;
 use crate::table::Csv;
 use crate::theme::TokensExt;
 use gpui_kit::component::button::Button;
@@ -154,6 +155,7 @@ const FIELDS: [(&str, &str, &str); 4] = [
 
 pub struct UpdateForm {
     csv: Entity<InputState>,
+    csv_check: Entity<TableCheck>,
     mode: usize,
     table: Option<Result<Csv, String>>,
     /// Write the whole table as it is (`xmp write`) instead of the xmp_update column.
@@ -179,6 +181,7 @@ impl UpdateForm {
             }
         });
         UpdateForm {
+            csv_check: cx.new(|cx| TableCheck::new(&csv, cx)),
             csv,
             mode: 0,
             table: None,
@@ -255,6 +258,14 @@ impl UpdateForm {
             self.check = WriteCheck::Idle;
             return;
         };
+        // A table Waxbill cannot read (not UTF-8) fails in Serval too; say why plainly.
+        if let Some(Err(err)) = &self.table {
+            self.check = WriteCheck::Failed(format!(
+                "{} {err}",
+                t("表格无法读取：", "cannot read the table:")
+            ));
+            return;
+        }
         self.check = WriteCheck::Checking;
         let args = self.write_args(&csv, true);
         let cwd = csv
@@ -619,6 +630,7 @@ impl Render for UpdateForm {
                             },
                         ))),
                 )
+                .child(self.csv_check.clone())
                 .child(help_line(
                     if self.write {
                         t(

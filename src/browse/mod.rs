@@ -8,6 +8,7 @@ mod review;
 
 use crate::i18n::{Language, count, language, t};
 use crate::output;
+use crate::repair::TableCheck;
 use crate::screens::form::{Tone, accept_drop, card, field, help_line, segmented};
 use crate::table::{Csv, date_of, detect_level};
 use crate::theme::TokensExt;
@@ -50,6 +51,7 @@ enum Review {
 
 pub struct Browse {
     csv: Entity<InputState>,
+    csv_check: Entity<TableCheck>,
     table: Option<Result<Csv, String>>,
     records: Records,
     species: BTreeSet<String>,
@@ -72,6 +74,7 @@ impl Browse {
             }
         });
         Browse {
+            csv_check: cx.new(|cx| TableCheck::new(&csv, cx)),
             csv,
             table: None,
             records: Records { all: Vec::new() },
@@ -465,7 +468,8 @@ impl Render for Browse {
                                 })),
                         ),
                 )
-                .child(summary),
+                .child(summary)
+                .child(self.csv_check.clone()),
             &self.csv,
             cx,
         ));

@@ -40,7 +40,8 @@ The table is the working document; the XMP files are updated deliberately, with 
   deployment; a name used twice gets `_2`.
 - Hard links take no space; Explorer, Photos and the player treat them as the real files, and copying out of the
   folder copies the real files. Edits Serval makes later replace the sidecar, so a review folder is a snapshot.
-- Hard links need the same drive and are not available on most network shares (symbolic links need admin rights
+- Hard links need the same drive. Over SMB it depends on the server: a Synology share worked in the 2026-10-12
+  test; many other network shares do not allow them (symbolic links need admin rights
   on Windows; Photos does not step through `.lnk` shortcuts). Then nothing is made, and "用媒体提取复制" opens
   媒体提取 with the same species and rating, which copies.
 

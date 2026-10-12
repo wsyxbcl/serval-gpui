@@ -7,6 +7,7 @@ use super::form::{
 };
 use crate::i18n::{Language, count, language, t};
 use crate::output;
+use crate::repair::TableCheck;
 use crate::table::{DEFAULT_EXCLUDED, Record, TagTable, detect_level};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::Button;
@@ -31,6 +32,7 @@ enum TableState {
 
 pub struct CaptureForm {
     csv: Entity<InputState>,
+    csv_check: Entity<TableCheck>,
     gap: Entity<InputState>,
     table: TableState,
     level: Option<usize>,
@@ -69,6 +71,7 @@ impl CaptureForm {
             }),
         ];
         CaptureForm {
+            csv_check: cx.new(|cx| TableCheck::new(&csv, cx)),
             csv,
             gap,
             table: TableState::Nothing,
@@ -451,7 +454,8 @@ impl Render for CaptureForm {
                                         })),
                                 ),
                         )
-                        .children(self.table_line(cx)),
+                        .children(self.table_line(cx))
+                        .child(self.csv_check.clone()),
                     &self.csv,
                     cx,
                 ))
