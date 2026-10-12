@@ -507,6 +507,7 @@ impl Render for Browse {
             Review::Made(folder, n) => {
                 let folder = folder.clone();
                 Some(
+                    v_flex().gap(tokens.px("space-2")).child(
                     h_flex()
                         .gap(tokens.px("space-2"))
                         .child(help_line(
@@ -526,6 +527,19 @@ impl Render for Browse {
                                 .label(t("再次打开", "Open again"))
                                 .on_click(move |_, _, cx| cx.open_with_system(&folder)),
                         ),
+                    )
+                    // Hard links look like copies but are the same files (browse.md §3).
+                    .child(
+                        div()
+                            .p(tokens.px("space-3"))
+                            .rounded(tokens.px("radius-sm"))
+                            .bg(tokens.color("warning-soft"))
+                            .text_size(tokens.px("text-sm"))
+                            .child(t(
+                                "这里的文件就是原文件：在这里旋转或编辑会改动原文件；删除只删除这里的链接，原文件不受影响。",
+                                "These are the original files: rotating or editing them here changes the originals; deleting only removes the link here, the originals stay.",
+                            )),
+                    ),
                 )
             }
             Review::CannotLink => Some(
