@@ -50,8 +50,15 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue, // listed but gone
             Err(err) => return Outcome::Failed(format!("{}: {err}", media.display())),
         }
-        if sidecar.exists() {
-            let _ = std::fs::hard_link(sidecar, folder.join(format!("{target}.xmp")));
+        // Either spelling of the sidecar, linked with the spelling it has.
+        let upper = sidecar.with_extension("XMP");
+        let found = [sidecar, &upper].into_iter().find(|p| p.exists());
+        if let Some(found) = found {
+            let ext = found
+                .extension()
+                .map(|e| e.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let _ = std::fs::hard_link(found, folder.join(format!("{target}.{ext}")));
         }
     }
     Outcome::Made {
