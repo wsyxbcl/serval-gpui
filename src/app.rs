@@ -413,10 +413,11 @@ impl Waxbill {
             args.insert(at + i, arg.to_string());
         }
         let command = crate::screens::display_command(&args);
-        let run = match Running::start(&program, &args, &plan.cwd) {
+        let mut run = match Running::start(&program, &args, &plan.cwd) {
             Ok(process) => Run::new(command, process),
             Err(err) => Run::failed_to_start(command, format!("{}: {err}", program.display())),
         };
+        run.form_command = crate::screens::display_command(&plan.args);
         let screen = self.screen;
         self.runs.insert(screen, run);
         cx.notify();
@@ -493,7 +494,8 @@ impl Waxbill {
             (Err(missing), _, _) => (false, missing.clone()),
             (Ok(_), _, _) => (true, button.to_string()),
         };
-        let Some(run) = self.runs.get(&self.screen) else {
+        let run = self.runs.get(&self.screen);
+        let Some(run) = run.filter(|run| run.is_running() || run.form_command == command) else {
             return match ready("") {
                 (true, _) => idle(
                     t("就绪", "Ready"),

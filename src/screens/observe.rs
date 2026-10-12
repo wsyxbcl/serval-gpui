@@ -2,7 +2,7 @@
 
 use super::Plan;
 use super::form::{
-    FolderCount, Tone, card, count_folder, field, help_line, output_field, pick_folder,
+    FolderCount, Tone, accept_drop, card, count_folder, field, help_line, output_field, pick_folder,
 };
 use crate::i18n::{count, t};
 use crate::output;
@@ -283,29 +283,19 @@ impl ObserveForm {
                     cx,
                 ));
             }
-            Found::Counted(found) if self.read_sidecars => match crate::i18n::language() {
-                crate::i18n::Language::Chinese => {
-                    format!("找到 {} 个 XMP 旁注文件", count(found.sidecars))
-                }
-                crate::i18n::Language::English => {
-                    format!("Found {} XMP sidecars", count(found.sidecars))
-                }
-            },
             Found::Counted(found) => match crate::i18n::language() {
-                crate::i18n::Language::Chinese => {
-                    format!(
-                        "找到 {} 张图片、{} 个视频",
-                        count(found.images),
-                        count(found.videos)
-                    )
-                }
-                crate::i18n::Language::English => {
-                    format!(
-                        "Found {} images and {} videos",
-                        count(found.images),
-                        count(found.videos)
-                    )
-                }
+                crate::i18n::Language::Chinese => format!(
+                    "找到 {} 张图片、{} 个视频、{} 个 XMP",
+                    count(found.images),
+                    count(found.videos),
+                    count(found.sidecars)
+                ),
+                crate::i18n::Language::English => format!(
+                    "Found {} images, {} videos and {} XMP sidecars",
+                    count(found.images),
+                    count(found.videos),
+                    count(found.sidecars)
+                ),
             },
         };
         Some(help_line(text, Tone::Quiet, cx))
@@ -318,7 +308,7 @@ impl Render for ObserveForm {
         let output_root = self.input_path(cx).map(|input| self.output_root(&input));
 
         let input_card = card(cx)
-            .child(
+            .child(accept_drop(
                 field(t("媒体文件夹", "Media folder"), cx)
                     .child(
                         h_flex()
@@ -339,7 +329,9 @@ impl Render for ObserveForm {
                             ),
                     )
                     .children(self.found_line(cx)),
-            )
+                &self.input,
+                cx,
+            ))
             .child(
                 field(t("读取来源", "Read from"), cx).child(
                     RadioGroup::horizontal("source")

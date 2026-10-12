@@ -40,6 +40,9 @@ pub struct OutputFile {
 
 pub struct Run {
     pub command: String,
+    /// The form's command when the run started, without decisions: once the form says something else, the run
+    /// bar is about the new command again.
+    pub form_command: String,
     pub started: Instant,
     pub elapsed: Duration,
     pub outcome: Outcome,
@@ -62,6 +65,7 @@ impl Run {
         Run {
             log: vec![format!("$ {command}")],
             command,
+            form_command: String::new(),
             started: Instant::now(),
             elapsed: Duration::ZERO,
             outcome: Outcome::Running,
@@ -129,6 +133,7 @@ impl Run {
         let mut run = Run {
             log: vec![format!("$ {command}"), error.clone()],
             command,
+            form_command: String::new(),
             started: Instant::now(),
             elapsed: Duration::ZERO,
             outcome: Outcome::Failed,
@@ -244,7 +249,8 @@ impl Run {
             None => line.push_str(&format!(" · {}", count(p.done as usize))),
         }
         let running_for = p.phase_started.elapsed();
-        if let Some(total) = p.total
+        if self.outcome == Outcome::Running
+            && let Some(total) = p.total
             && p.done > 0
             && running_for > Duration::from_secs(5)
         {
@@ -284,8 +290,8 @@ impl Run {
             });
         }
         let took = match language() {
-            Language::Chinese => format!("用时 {}", clock(self.elapsed)),
-            Language::English => format!("took {}", clock(self.elapsed)),
+            Language::Chinese => format!("用时 {}", took(self.elapsed)),
+            Language::English => format!("took {}", took(self.elapsed)),
         };
         parts.push(took);
         parts.join(t("，", ", "))
@@ -341,4 +347,17 @@ fn phase_words(phase: &str) -> &'static str {
 pub fn clock(duration: Duration) -> String {
     let seconds = duration.as_secs();
     format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+/// How long a run took: "3.4 秒" under a minute, m:ss above.
+pub fn took(duration: Duration) -> String {
+    if duration.as_secs_f64() < 59.95 {
+        let seconds = format!("{:.1}", duration.as_secs_f64());
+        match language() {
+            Language::Chinese => format!("{seconds} 秒"),
+            Language::English => format!("{seconds} s"),
+        }
+    } else {
+        clock(duration)
+    }
 }

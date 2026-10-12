@@ -5,6 +5,7 @@ use crate::i18n::{count, t};
 use crate::run::{Outcome, Run};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{ActiveTheme, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -202,10 +203,11 @@ pub fn log(
         )
         .when(run.log_open, |column| {
             column.child(
+                // The log scrolls on its own inside the scrolling page, with a scrollbar to drag.
                 div()
+                    .overflow_y_scrollbar()
                     .id("log")
                     .max_h(px(320.))
-                    .overflow_y_scroll()
                     .p(tokens.px("space-3"))
                     .rounded(tokens.px("radius-sm"))
                     .bg(cx.theme().muted)

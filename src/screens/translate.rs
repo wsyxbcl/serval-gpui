@@ -3,7 +3,7 @@
 //! checks it, so a missing translation is fixed before the run instead of failing it.
 
 use super::Plan;
-use super::form::{Tone, card, field, help_line, output_field};
+use super::form::{Tone, accept_drop, card, field, help_line, output_field};
 use crate::i18n::{Language, count, language, t};
 use crate::output;
 use crate::table::Csv;
@@ -93,7 +93,8 @@ pub struct TranslateForm {
 impl TranslateForm {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let table = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t("选择 tags.csv", "Choose tags.csv"))
+            InputState::new(window, cx)
+                .placeholder(t("选择或拖入 tags.csv", "Choose or drop tags.csv"))
         });
         let taglist = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t(
@@ -488,7 +489,7 @@ impl Render for TranslateForm {
             _ => None,
         };
         let mut files = card(cx)
-            .child(
+            .child(accept_drop(
                 field(t("要替换的表", "Table to translate"), cx)
                     .child(path_row(&self.table, "choose-table", 0, cx))
                     .when_some(read, |f, (rows, _)| {
@@ -501,8 +502,10 @@ impl Render for TranslateForm {
                             cx,
                         ))
                     }),
-            )
-            .child(
+                &self.table,
+                cx,
+            ))
+            .child(accept_drop(
                 field(t("标签表", "Taglist"), cx)
                     .child(path_row(&self.taglist, "choose-taglist", 1, cx))
                     .when_some(read, |f, (_, tags)| {
@@ -515,7 +518,9 @@ impl Render for TranslateForm {
                             cx,
                         ))
                     }),
-            );
+                &self.taglist,
+                cx,
+            ));
         if let Files::Failed(err) = &self.files {
             files = files.child(help_line(
                 format!("{} {err}", t("无法读取：", "Cannot read:")),

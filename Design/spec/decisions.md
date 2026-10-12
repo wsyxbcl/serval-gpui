@@ -12,7 +12,7 @@ place and the status changes here.
 | W04 | Redesign, with this directory as the source | Confirmed 2026-10-08 | this directory |
 | W05 | Sidebar groups 数据整理 / 数据分析 / 工具 (names in shell §2); one task per screen | Confirmed 2026-10-09 | [shell](shell.md) |
 | W06 | Sticky run bar with one button; results first, log collapsed | Confirmed 2026-10-09 | [run](run.md) |
-| W07 | Path levels picked on a sample path (also in browse); capture interval shown on a timeline of real records; conflicts as a dialog after Serval stops with the list | Confirmed 2026-10-09 | [questions](questions.md) |
+| W07 | Path levels picked on a sample path (also in browse); conflicts as a dialog after Serval stops with the list | Confirmed 2026-10-09 (capture timeline removed 2026-10-12) | [questions](questions.md) |
 | W08 | Serval chosen by the user (provided by the project); not bundled, not linked; no GitHub access. Download and update later, from the project's own server | Confirmed 2026-10-08 | [settings](settings.md) |
 | W09 | Palette and type from the brand (paper, teal ink, coral bill), light and dark | Confirmed 2026-10-09 | [appearance](appearance.md) |
 | W10 | Settings as a screen in the main window instead of a separate window; how help looks is decided later | Confirmed 2026-10-09 | [settings](settings.md) |

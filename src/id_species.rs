@@ -4,7 +4,7 @@
 
 use crate::app::Waxbill;
 use crate::i18n::{Language, count, language, t};
-use crate::run::clock;
+use crate::run::took;
 use crate::screens::ScreenId;
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -129,8 +129,8 @@ impl Waxbill {
                     )
             }));
         let rerun_label = match language() {
-            Language::Chinese => format!("重新运行（约 {}）", clock(run.elapsed)),
-            Language::English => format!("Run again (about {})", clock(run.elapsed)),
+            Language::Chinese => format!("重新运行（约 {}）", took(run.elapsed)),
+            Language::English => format!("Run again (about {})", took(run.elapsed)),
         };
         let dialog = v_flex()
             .w(px(520.))

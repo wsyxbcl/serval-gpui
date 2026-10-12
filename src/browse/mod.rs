@@ -8,7 +8,7 @@ mod review;
 
 use crate::i18n::{Language, count, language, t};
 use crate::output;
-use crate::screens::form::{Tone, card, field, help_line, segmented};
+use crate::screens::form::{Tone, accept_drop, card, field, help_line, segmented};
 use crate::table::{Csv, date_of, detect_level};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -63,7 +63,8 @@ pub struct Browse {
 impl Browse {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let csv = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t("选择 tags.csv", "Choose tags.csv"))
+            InputState::new(window, cx)
+                .placeholder(t("选择或拖入 tags.csv", "Choose or drop tags.csv"))
         });
         let subscription = cx.subscribe_in(&csv, window, |this, _, event: &InputEvent, _, cx| {
             if matches!(event, InputEvent::Change) {
@@ -423,7 +424,7 @@ impl Render for Browse {
                 help_line(text, Tone::Quiet, cx)
             }
         };
-        let table_card = card(cx).child(
+        let table_card = card(cx).child(accept_drop(
             field(t("标签表", "Tags table"), cx)
                 .child(
                     h_flex()
@@ -465,7 +466,9 @@ impl Render for Browse {
                         ),
                 )
                 .child(summary),
-        );
+            &self.csv,
+            cx,
+        ));
         let Some(path) = csv.filter(|_| matches!(self.table, Some(Ok(_)))) else {
             return v_flex().gap(tokens.px("space-4")).child(table_card);
         };

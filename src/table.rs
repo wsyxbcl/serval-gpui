@@ -3,7 +3,7 @@
 //! The rules mirror Serval's (`detect_deployment_path_index`, `get_temporal_independence`) so what the form shows is
 //! what the run will do.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 
 /// Tags Serval leaves out of capture analysis unless `--no-exclude` is given.
@@ -110,102 +110,12 @@ impl TagTable {
         let first = depths.next();
         depths.any(|d| Some(d) != first)
     }
-
-    /// The capture rule on one busy day of real data: the deployment and target with the most records, on its
-    /// busiest day.
-    pub fn example_day(
-        &self,
-        level: Option<usize>,
-        by_individual: bool,
-        exclude: bool,
-    ) -> Option<ExampleDay> {
-        let target = |r: &Record| {
-            if by_individual {
-                r.individual.clone()
-            } else {
-                r.species.clone()
-            }
-        };
-        let mut groups: HashMap<(String, String), Vec<i64>> = HashMap::new();
-        for record in &self.records {
-            let (Some(time), Some(deployment)) = (record.time, self.deployment(record, level))
-            else {
-                continue;
-            };
-            let target = target(record);
-            if target.is_empty() || (exclude && DEFAULT_EXCLUDED.contains(&record.species.as_str()))
-            {
-                continue;
-            }
-            groups
-                .entry((deployment.to_string(), target))
-                .or_default()
-                .push(time);
-        }
-        let ((deployment, target), times) = groups
-            .into_iter()
-            .max_by(|a, b| a.1.len().cmp(&b.1.len()).then_with(|| b.0.cmp(&a.0)))?;
-        let mut per_day: HashMap<i64, Vec<i64>> = HashMap::new();
-        for time in times {
-            per_day
-                .entry(time.div_euclid(86_400))
-                .or_default()
-                .push(time);
-        }
-        let (day, mut times) = per_day
-            .into_iter()
-            .max_by(|a, b| a.1.len().cmp(&b.1.len()).then_with(|| b.0.cmp(&a.0)))?;
-        times.sort_unstable();
-        times.dedup();
-        Some(ExampleDay {
-            deployment,
-            target,
-            day,
-            times,
-        })
-    }
 }
 
 /// `yyyy-MM-dd` of a time from [`Record::time`].
 pub fn date_of(time: i64) -> String {
     let (y, m, d) = civil_from_days(time.div_euclid(86_400));
     format!("{y:04}-{m:02}-{d:02}")
-}
-
-pub struct ExampleDay {
-    pub deployment: String,
-    pub target: String,
-    /// Days since 1970-01-01.
-    pub day: i64,
-    /// Seconds since 1970-01-01, sorted, without duplicates (Serval keeps one record per time).
-    pub times: Vec<i64>,
-}
-
-impl ExampleDay {
-    /// Which records are independent captures: gaps of at least `min_gap` minutes from the previous record, or
-    /// from the previous independent one.
-    pub fn independent(&self, min_gap: i64, from_last_independent: bool) -> Vec<bool> {
-        independent(&self.times, min_gap * 60, from_last_independent)
-    }
-
-    pub fn date(&self) -> String {
-        let (y, m, d) = civil_from_days(self.day);
-        format!("{y:04}-{m:02}-{d:02}")
-    }
-}
-
-fn independent(times: &[i64], min_gap: i64, from_last_independent: bool) -> Vec<bool> {
-    let mut last: Option<i64> = None;
-    times
-        .iter()
-        .map(|&time| {
-            let independent = last.is_none_or(|last| time - last >= min_gap);
-            if independent || !from_last_independent {
-                last = Some(time);
-            }
-            independent
-        })
-        .collect()
 }
 
 /// The deployment level Serval detects (`detect_deployment_path_index`): skip the levels every path shares, then
@@ -275,24 +185,7 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{detect_level, independent, parse_time};
-
-    #[test]
-    fn capture_rule_matches_serval() {
-        // Records every 20 minutes with a 30-minute gap: from the last record only the first counts; from the last
-        // independent record, the one 40 minutes after it counts too.
-        let times: Vec<i64> = [0, 20, 40, 60].iter().map(|m| m * 60).collect();
-        assert_eq!(
-            independent(&times, 30 * 60, false),
-            [true, false, false, false]
-        );
-        assert_eq!(
-            independent(&times, 30 * 60, true),
-            [true, false, true, false]
-        );
-        // A gap of exactly the interval is independent (Serval: >=).
-        assert_eq!(independent(&[0, 1800], 1800, false), [true, true]);
-    }
+    use super::{detect_level, parse_time};
 
     #[test]
     fn deployment_level_is_detected_like_serval() {

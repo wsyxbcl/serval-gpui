@@ -3,7 +3,7 @@
 //! match is counted and sized before the run, and the kept folders are picked on a real path.
 
 use super::Plan;
-use super::form::{Tone, card, field, help_line, output_field, segmented};
+use super::form::{Tone, accept_drop, card, field, help_line, output_field, segmented};
 use crate::i18n::{Language, count, language, t};
 use crate::output;
 use crate::table::{Record, TagTable, date_of, detect_level};
@@ -70,7 +70,8 @@ pub struct ExtractForm {
 impl ExtractForm {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let csv = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t("选择 tags.csv", "Choose tags.csv"))
+            InputState::new(window, cx)
+                .placeholder(t("选择或拖入 tags.csv", "Choose or drop tags.csv"))
         });
         let search =
             cx.new(|cx| InputState::new(window, cx).placeholder(t("搜索物种", "Search species")));
@@ -884,7 +885,7 @@ impl Render for ExtractForm {
         let output_root = csv.as_ref().map(|csv| self.output_root(csv));
         let table_read = matches!(self.table, TableState::Read(_));
 
-        let table_card = card(cx).child(
+        let table_card = card(cx).child(accept_drop(
             field(t("标签表", "Tags table"), cx)
                 .child(
                     h_flex()
@@ -905,7 +906,9 @@ impl Render for ExtractForm {
                         ),
                 )
                 .child(self.table_line(cx)),
-        );
+            &self.csv,
+            cx,
+        ));
 
         let choose_card = table_read.then(|| {
             let rating = field(t("评分", "Rating"), cx).child(h_flex().child(segmented(

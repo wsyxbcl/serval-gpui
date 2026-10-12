@@ -4,6 +4,7 @@
 use crate::i18n::t;
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::{ActiveTheme, Selectable as _, Sizable as _, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -88,6 +89,26 @@ pub fn count_folder(dir: &Path) -> FolderCount {
         }
     }
     count
+}
+
+/// Let a path field take a folder or file dropped from the file manager: the first path fills `input` as if it
+/// had been typed, so the form reacts through its usual `InputEvent::Change` subscription.
+pub fn accept_drop(field: Div, input: &Entity<InputState>, cx: &App) -> Div {
+    let tokens = cx.tokens();
+    let tint = tokens.color("info-soft");
+    let input = input.clone();
+    field
+        .rounded(tokens.px("radius-sm"))
+        .drag_over::<ExternalPaths>(move |style, _, _, _| style.bg(tint))
+        .on_drop(move |paths: &ExternalPaths, window, cx| {
+            if let Some(path) = paths.paths().first() {
+                let path = path.to_string_lossy().to_string();
+                input.update(cx, |input, cx| {
+                    input.set_value(path, window, cx);
+                    cx.emit(InputEvent::Change);
+                });
+            }
+        })
 }
 
 /// Ask for a folder and hand it to the form.

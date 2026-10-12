@@ -219,10 +219,3 @@ p.board-note { margin: 0 0 24px; color: #555; max-width: 900px; }
 .tile { display: flex; flex-direction: column; }
 .filters .segmented span { padding: 3px 7px; white-space: nowrap; }
 
-/* Capture: the interval on a timeline of real records */
-.timeline { position: relative; height: 46px; margin-top: var(--space-2); background: var(--muted); border-radius: var(--radius-sm); }
-.timeline .band { position: absolute; top: 8px; height: 18px; background: color-mix(in srgb, var(--primary) 22%, transparent); border-left: 2px solid var(--primary); border-radius: 2px; }
-.timeline .tick { position: absolute; top: 6px; width: 2px; height: 22px; background: var(--foreground); opacity: .7; }
-.timeline .hour { position: absolute; bottom: 2px; font-size: 10px; color: var(--muted-foreground); transform: translateX(-50%); }
-.timeline-note { font-size: var(--text-sm); color: var(--muted-foreground); margin-top: 4px; }
-.timeline-note b { color: var(--foreground); }

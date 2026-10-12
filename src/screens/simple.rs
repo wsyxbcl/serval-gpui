@@ -4,7 +4,8 @@
 
 use super::Plan;
 use super::form::{
-    FolderCount, Tone, card, count_folder, field, help_line, output_field, pick_folder, segmented,
+    FolderCount, Tone, accept_drop, card, count_folder, field, help_line, output_field,
+    pick_folder, segmented,
 };
 use crate::i18n::{Language, count, language, t};
 use crate::output;
@@ -141,8 +142,8 @@ impl SimpleForm {
         let mut subscriptions = Vec::new();
         for path in spec.paths {
             let placeholder = match path.kind {
-                PathKind::Folder => t("选择或输入一个文件夹", "Choose or type a folder"),
-                PathKind::File(_) => t("选择或输入一个文件", "Choose or type a file"),
+                PathKind::Folder => t("选择或拖入一个文件夹", "Choose or drop a folder"),
+                PathKind::File(_) => t("选择或拖入一个文件", "Choose or drop a file"),
             };
             let input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
             let key = path.key;
@@ -386,7 +387,7 @@ impl Render for SimpleForm {
             if path.optional {
                 label.push_str(t("（可选）", " (optional)"));
             }
-            inputs = inputs.child(
+            inputs = inputs.child(accept_drop(
                 field_owned(label, cx)
                     .child(
                         h_flex()
@@ -432,7 +433,9 @@ impl Render for SimpleForm {
                             ),
                     )
                     .children(self.found_line(path, cx)),
-            );
+                &self.inputs[key],
+                cx,
+            ));
         }
         for choice in spec.choices {
             let key = choice.key;

@@ -1,12 +1,13 @@
 //! 独立捕获 Independent captures: `serval capture` (board: questions.html, capture-ready). Every question Serval
-//! asks is a field here; the table is read first, so the deployment level is chosen on a real path and the
-//! interval is shown on a real day of records.
+//! asks is a field here; the table is read first, so the deployment level is chosen on a real path.
 
 use super::Plan;
-use super::form::{Tone, card, field, help_line, level_picker, output_field, segmented};
+use super::form::{
+    Tone, accept_drop, card, field, help_line, level_picker, output_field, segmented,
+};
 use crate::i18n::{Language, count, language, t};
 use crate::output;
-use crate::table::{DEFAULT_EXCLUDED, ExampleDay, Record, TagTable, detect_level};
+use crate::table::{DEFAULT_EXCLUDED, Record, TagTable, detect_level};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::checkbox::Checkbox;
@@ -40,8 +41,7 @@ pub struct CaptureForm {
     exclude: bool,
     camtrap_dp: bool,
     custom_output: Option<PathBuf>,
-    /// The timeline example and the deployment count, recomputed when the level or the target changes.
-    example: Option<ExampleDay>,
+    /// The deployment count, recomputed when the level changes.
     deployments: usize,
     read_generation: usize,
     _subscriptions: Vec<Subscription>,
@@ -80,7 +80,6 @@ impl CaptureForm {
             exclude: true,
             camtrap_dp: false,
             custom_output: None,
-            example: None,
             deployments: 0,
             read_generation: 0,
             _subscriptions: subscriptions,
@@ -154,9 +153,7 @@ impl CaptureForm {
         if let TableState::Read(table) = &self.table {
             let level = if self.camtrap_dp { None } else { self.level };
             self.deployments = table.deployment_count(level);
-            self.example = table.example_day(level, self.by_individual, self.exclude);
         } else {
-            self.example = None;
             self.deployments = 0;
         }
         cx.notify();
@@ -421,129 +418,6 @@ impl CaptureForm {
             ))
             .child(help_line(note, Tone::Quiet, cx))
     }
-
-    fn render_timeline(&self, gap: i64, cx: &App) -> Option<Div> {
-        let example = self.example.as_ref()?;
-        let tokens = cx.tokens();
-        let flags = example.independent(gap, self.from_last_independent);
-        let times = &example.times;
-        let (first, last) = (*times.first()?, *times.last()?);
-        let start = first - first.rem_euclid(3600);
-        let mut end = last - last.rem_euclid(3600) + 3600;
-        if end - start < 2 * 3600 {
-            end = start + 2 * 3600;
-        }
-        let span = (end - start) as f32;
-        let x = |time: i64| relative((time - start) as f32 / span);
-
-        // Captures: from an independent record to the last record before the next one.
-        let mut bands = Vec::new();
-        let mut splits = Vec::new();
-        let mut reference = first;
-        for (i, &time) in times.iter().enumerate() {
-            if flags[i] {
-                let until = (i + 1..times.len())
-                    .find(|&j| flags[j])
-                    .map(|j| times[j - 1])
-                    .unwrap_or(last);
-                bands.push((time, until));
-                if i > 0 {
-                    splits.push((time - reference) / 60);
-                }
-            }
-            if flags[i] || !self.from_last_independent {
-                reference = time;
-            }
-        }
-        let band = tokens.color("primary").opacity(0.18);
-        let tick = tokens.color("primary");
-        let mut lane = div().relative().h(px(28.)).mt(tokens.px("space-2"));
-        for (from, until) in &bands {
-            lane = lane.child(
-                div()
-                    .absolute()
-                    .top(px(4.))
-                    .bottom(px(4.))
-                    .left(x(*from))
-                    .w(relative(((until - from) as f32 / span).max(0.004)))
-                    .bg(band),
-            );
-        }
-        for &time in times {
-            lane = lane.child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .left(x(time))
-                    .w(px(2.))
-                    .bg(tick),
-            );
-        }
-        let mut labels = div()
-            .relative()
-            .h(px(14.))
-            .text_size(px(10.))
-            .text_color(cx.theme().muted_foreground);
-        let hours = (end - start) / 3600;
-        let step = if hours > 8 { 2 } else { 1 };
-        for h in (0..=hours).step_by(step) {
-            let time = start + h * 3600;
-            let hour = time.rem_euclid(86_400) / 3600;
-            labels = labels.child(
-                div()
-                    .absolute()
-                    .left(relative(h as f32 * 3600.0 / span))
-                    .when(h == hours, |label| label.ml(px(-28.)))
-                    .child(format!("{hour:02}:00")),
-            );
-        }
-        let records = times.len();
-        let captures = bands.len();
-        let splits_text = splits
-            .iter()
-            .map(|m| m.to_string())
-            .collect::<Vec<_>>()
-            .join(t("、", ", "));
-        let line = match language() {
-            Language::Chinese => format!(
-                "例：{} · {} · {}。按 {gap} 分钟：这一天 {records} 条记录 → {captures} 次独立捕获{}",
-                example.deployment,
-                example.target,
-                example.date(),
-                if splits.is_empty() {
-                    String::new()
-                } else {
-                    format!("（相隔 {splits_text} 分钟处分开）")
-                }
-            ),
-            Language::English => format!(
-                "Example: {} · {} · {}. At {gap} minutes: {records} records that day → {captures} independent captures{}",
-                example.deployment,
-                example.target,
-                example.date(),
-                if splits.is_empty() {
-                    String::new()
-                } else {
-                    format!(" (split at gaps of {splits_text} min)")
-                }
-            ),
-        };
-        Some(
-            v_flex()
-                .gap(tokens.px("space-1"))
-                .child(
-                    v_flex()
-                        .px(tokens.px("space-4"))
-                        .pb(tokens.px("space-1"))
-                        .rounded(tokens.px("radius-sm"))
-                        .bg(cx.theme().muted)
-                        .child(lane)
-                        .child(labels),
-                )
-                .child(help_line(line, Tone::Quiet, cx)),
-        )
-    }
 }
 
 impl Render for CaptureForm {
@@ -559,7 +433,7 @@ impl Render for CaptureForm {
 
         let table_card =
             card(cx)
-                .child(
+                .child(accept_drop(
                     field(t("标签表", "Tags table"), cx)
                         .child(
                             h_flex()
@@ -578,7 +452,9 @@ impl Render for CaptureForm {
                                 ),
                         )
                         .children(self.table_line(cx)),
-                )
+                    &self.csv,
+                    cx,
+                ))
                 .when_some(table.filter(|t| !t.camtrap_dp), |card, table| {
                     card.child(self.render_level(&table, cx))
                 });
@@ -609,8 +485,7 @@ impl Render for CaptureForm {
             })
             .when(gap.is_some_and(|g| g > ONE_WEEK_MINUTES), |f| {
                 f.child(help_line(t("超过一周（10,080 分钟），通常过大。", "More than a week (10,080 minutes) is unusually large."), Tone::Quiet, cx))
-            })
-            .children(gap.and_then(|gap| self.render_timeline(gap, cx)));
+            });
 
         let measure = field(t("间隔从哪条记录算起", "Measure the interval from"), cx).children(
             [

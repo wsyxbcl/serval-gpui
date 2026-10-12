@@ -12,10 +12,9 @@ it has written anything) and the identified species (asked after an observe scan
 
 - 独立性间隔: a number field with the unit "分钟", default 30, integer ≥ 1. Values above one week (10,080) show a
   quiet note, as the CLI does.
-- Below it, a timeline from the user's own data makes the rule visible: one busy day of one deployment and species
-  (the one with the most records), records as ticks, each independent capture as a band starting at its first
-  record, and one line of result ("按 30 分钟：这一天 9 条记录 → 3 次独立捕获"). It updates as the interval or the
-  measure-from choice changes, computed in Waxbill from the table.
+- No timeline below it (removed after the 2026-10-12 test: it repeated what the field says). Later, a help
+  illustration may show the difference between measuring from the previous record and from the previous
+  independent one.
 - 间隔从哪条记录算起: two radio buttons with one line each — 上一条记录 (default, "每条记录都重新计时"),
   上一条独立记录 ("只在已计为独立的记录处重新计时").
 - 分析对象: segmented 物种 / 个体.

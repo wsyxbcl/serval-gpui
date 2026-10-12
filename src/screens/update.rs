@@ -3,7 +3,7 @@
 //! one file two different new values are marked with their row numbers and block Run (Serval would refuse them).
 
 use super::Plan;
-use super::form::{Tone, card, field, help_line, segmented};
+use super::form::{Tone, accept_drop, card, field, help_line, segmented};
 use crate::i18n::{Language, count, language, t};
 use crate::table::Csv;
 use crate::theme::TokensExt;
@@ -183,7 +183,9 @@ impl UpdateForm {
             mode: 0,
             table: None,
             write: false,
-            fields: [true; 4],
+            // Time is off by default: spreadsheet programs rewrite times (WPS saves 2026-1-5 08:03), and the table's
+            // times rarely need to go back into the files.
+            fields: [true, true, true, false],
             create_missing: true,
             check: WriteCheck::Idle,
             check_generation: 0,
@@ -593,7 +595,7 @@ impl Render for UpdateForm {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let tokens = cx.tokens().clone();
         let csv_path = self.csv_path(cx);
-        let input = card(cx).child(
+        let input = card(cx).child(accept_drop(
             field(t("修改表", "Changes table"), cx)
                 .child(
                     h_flex()
@@ -632,7 +634,9 @@ impl Render for UpdateForm {
                     Tone::Quiet,
                     cx,
                 )),
-        );
+            &self.csv,
+            cx,
+        ));
         let way = {
             let this = cx.entity().downgrade();
             card(cx).child(
@@ -856,6 +860,16 @@ impl UpdateForm {
             .child(
                 field(t("写入的字段", "Fields to write"), cx)
                     .child(fields)
+                    .when(!self.fields[3], |f| {
+                        f.child(help_line(
+                            t(
+                                "时间默认不写入：表格软件保存时常会改动时间格式。",
+                                "Time is not written by default: spreadsheet programs often change its format when saving.",
+                            ),
+                            Tone::Quiet,
+                            cx,
+                        ))
+                    })
                     .child(create),
             )
             .child(field(t("将要做的修改", "What will change"), cx).child(preview))

@@ -50,5 +50,6 @@ The table is the working document; the XMP files are updated deliberately, with 
   fills a table: files to change per field (物种, 个体, 评分, 时间), of which lose values that are not in the
   table, the distinct total, how many already match, how many sidecars will be created. Files with conflicting
   or invalid cells are listed and block Run.
-- Options: the fields to write (all by default), and "没有 XMP 的媒体文件，从媒体文件创建" (`--create-missing`,
+- Options: the fields to write (species, individual and rating by default; time is off because spreadsheet
+  programs rewrite times when saving), and "没有 XMP 的媒体文件，从媒体文件创建" (`--create-missing`,
   on by default). Run is `serval xmp write` with the same options.
