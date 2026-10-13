@@ -8,6 +8,7 @@ use crate::serval::ServalStatus;
 use crate::settings::{Appearance, Settings};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonGroup};
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::{ActiveTheme, StyledExt, h_flex, v_flex};
 use gpui_kit::*;
 
@@ -183,6 +184,31 @@ impl Waxbill {
                     }),
                 ),
             ));
+        // The Caracal bridge (caracal-bridge.md): a read-only server on this computer, started on first use.
+        let caracal = card(cx)
+            .gap(tokens.px("space-2"))
+            .child(section_title("CARACAL", cx))
+            .child(
+                Checkbox::new("caracal-bridge")
+                    .label(t(
+                        "允许 Caracal 从本机读取所选表格和媒体",
+                        "Let Caracal read the chosen table and its media from this computer",
+                    ))
+                    .checked(crate::caracal::bridge_enabled(cx))
+                    .on_click(cx.listener(|_, on: &bool, _, cx| {
+                        let value = if *on { "1" } else { "0" };
+                        Settings::update(cx, |settings| settings.set_value("caracal_bridge", value));
+                        cx.notify();
+                    })),
+            )
+            .child(help_line(
+                t(
+                    "在 Caracal 中打开时，表格和其中列出的照片、视频直接从 Waxbill 读取，不用在浏览器里再选择；只在本机可见，不会上传。浏览器第一次会询问是否允许访问本地网络。",
+                    "When opening in Caracal, the table and the photos and videos it lists are read straight from Waxbill, with nothing to pick in the browser; visible only on this computer, nothing is uploaded. The browser asks once to allow local network access.",
+                ),
+                Tone::Quiet,
+                cx,
+            ));
         let about = card(cx)
             .gap(tokens.px("space-2"))
             .child(section_title(t("关于", "About"), cx))
@@ -214,6 +240,7 @@ impl Waxbill {
             .gap(tokens.px("space-4"))
             .child(self.serval_card(cx))
             .child(interface)
+            .child(caracal)
             .child(about)
     }
 }
