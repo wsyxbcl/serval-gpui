@@ -126,7 +126,7 @@ Rules:
 - [x] Windows test 2026-10-12, fixes: paths can be dropped onto every path field; observe counts images, videos and XMP; the log scrolls; durations under a minute in seconds; no growing estimate after Stop; the run bar returns to Ready once the form changes; 整表写入 leaves time off by default; the capture timeline is removed.
 - [x] Table check and repair (data.md §2): GBK, UTF-16 and tab-separated tables and times rewritten by Excel/WPS are found under every table field; "生成修复后的副本" writes `<name>.utf8.csv` and switches the field to it.
 - [x] Pause, continue and cancel a run (暂停 / 继续 / 取消, with an option to delete the partial results on cancel).
-- [x] 在 Caracal 中打开 (2026-10-13, level b): links name the mode and the table (`#review|#species|#time&table=<name>`); browse, observe's tags table and xmp init's table. Caracal still has to read the fragment: `~/Downloads/caracal-waxbill-links-2026-10-13.md` for the Caracal side.
+- [x] 在 Caracal 中打开 (2026-10-13, level b): links name the mode and the table's full path (`#review|#species|#time&table=<path>`), no clipboard; browse, observe's tags table and xmp init's table. Caracal still has to read the fragment (in progress): `~/Downloads/caracal-waxbill-links-2026-10-13.md` for the Caracal side.
 - [x] Progress says what it counts ("正在检查 · 37 / 126 个文件"), so 整表写入's check over every file no longer reads as 126 writes.
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [ ] Draw the board for the hand-off screen.

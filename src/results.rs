@@ -164,11 +164,9 @@ pub fn output_list(run: &Run, cx: &App) -> Option<Div> {
                         Button::new(("caracal-output", i))
                             .ghost()
                             .label(t("在 Caracal 中打开", "Open in Caracal"))
-                            .tooltip(t(
-                                "打开 Caracal 并复制这张表的路径，在那里选择它",
-                                "Opens Caracal and copies this table's path; choose it there",
-                            ))
-                            .on_click(move |_, _, cx| crate::caracal::open(mode, &path, cx))
+                            .on_click(move |_, _, cx| {
+                                cx.open_url(&crate::caracal::link(mode, &path))
+                            })
                     }))
                     .child(
                         Button::new(("open-output", i))

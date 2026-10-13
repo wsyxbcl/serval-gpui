@@ -57,7 +57,6 @@ pub struct Browse {
     rating: usize,
     show_all: bool,
     review: Review,
-    copied: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -81,7 +80,6 @@ impl Browse {
             rating: 0,
             show_all: false,
             review: Review::None,
-            copied: false,
             _subscriptions: vec![subscription],
         }
     }
@@ -482,17 +480,13 @@ impl Render for Browse {
             self.action(
                 t("在 Caracal 中查看和编辑", "View and edit in Caracal"),
                 t(
-                    "在浏览器中打开 Caracal，选择这张表和媒体所在的文件夹；查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。表格的位置会复制到剪贴板。",
-                    "Opens Caracal in the browser: choose this table and the media folder there; view, rate and fix species, export tags.csv, then come back to 应用表格到文件. The table's path is copied to the clipboard.",
+                    "在浏览器中打开 Caracal 的 Review：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
+                    "Opens Caracal's Review in the browser: view, rate and fix species, export tags.csv, then come back to 应用表格到文件.",
                 ),
                 Button::new("open-caracal")
                     .outline()
-                    .label(if self.copied { t("已打开 · 路径已复制", "Opened · path copied") } else { t("打开 Caracal", "Open Caracal") })
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        crate::caracal::open(crate::caracal::Mode::Review, &path, cx);
-                        this.copied = true;
-                        cx.notify();
-                    }))
+                    .label(t("打开 Caracal", "Open Caracal"))
+                    .on_click(move |_, _, cx| cx.open_url(&crate::caracal::link(crate::caracal::Mode::Review, &path)))
                     .into_any_element(),
                 None,
                 cx,
