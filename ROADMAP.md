@@ -130,6 +130,7 @@ Rules:
 - [x] 在 Caracal 中打开 (2026-10-13, level b): links name the mode and the table's full path (`#review|#species|#time&table=<path>`), no clipboard; browse, observe's tags table and xmp init's table. Caracal still has to read the fragment (in progress): `~/Downloads/caracal-waxbill-links-2026-10-13.md` for the Caracal side.
 - [x] Progress says what it counts ("正在检查 · 37 / 126 个文件"), so 整表写入's check over every file no longer reads as 126 writes.
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
+- [ ] Tie Serval's lifetime to Waxbill's (a Windows Job Object): a Waxbill that is killed or crashes leaves a running Serval going until it finishes; a normal close asks and stops it.
 - [ ] Draw the board for the hand-off screen.
 - [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
 
