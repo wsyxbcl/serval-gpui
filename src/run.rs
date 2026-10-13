@@ -244,20 +244,24 @@ impl Run {
         }
     }
 
-    /// "正在复制 · 1,204 / 1,500 · 剩余约 0:42"
+    /// "正在复制 · 1,204 / 1,500 个文件 · 剩余约 0:42"
     pub fn progress_line(&self) -> String {
         let Some(p) = &self.progress else {
             return t("正在启动…", "Starting…").to_string();
         };
         let mut line = phase_words(&p.phase).to_string();
-        match p.total {
-            Some(total) => line.push_str(&format!(
-                " · {} / {}",
-                count(p.done as usize),
-                count(total as usize)
-            )),
-            None => line.push_str(&format!(" · {}", count(p.done as usize))),
-        }
+        // Every phase counts files; saying so keeps a check over all files from reading as that many writes.
+        let done = count(p.done as usize);
+        line.push_str(&match (p.total, language()) {
+            (Some(total), Language::Chinese) => {
+                format!(" · {done} / {} 个文件", count(total as usize))
+            }
+            (Some(total), Language::English) => {
+                format!(" · {done} / {} files", count(total as usize))
+            }
+            (None, Language::Chinese) => format!(" · {done} 个文件"),
+            (None, Language::English) => format!(" · {done} files"),
+        });
         let running_for = p.phase_started.elapsed();
         if self.outcome == Outcome::Running
             && let Some(total) = p.total
@@ -341,9 +345,9 @@ const SUMMARY_WORDS: &[(&str, &str, &str)] = &[
 
 fn phase_words(phase: &str) -> &'static str {
     match phase {
-        "scan" => t("扫描", "Scanning"),
-        "read" => t("读取", "Reading"),
-        "plan" => t("检查目标", "Checking targets"),
+        "scan" => t("正在扫描", "Scanning"),
+        "read" => t("正在读取", "Reading"),
+        "plan" => t("正在检查", "Checking"),
         "copy" => t("正在复制", "Copying"),
         "move" => t("正在移动", "Moving"),
         "write" => t("正在写入", "Writing"),

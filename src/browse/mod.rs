@@ -22,7 +22,6 @@ use records::{Filters, Records};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-pub const CARACAL_URL: &str = "https://caracal.hinature.cn";
 const LISTED: usize = 10;
 /// Rating choices, as in extract: all, ≥ 3, ≥ 4, 5.
 const RATINGS: [&[u8]; 4] = [&[], &[3, 4, 5], &[4, 5], &[5]];
@@ -490,8 +489,7 @@ impl Render for Browse {
                     .outline()
                     .label(if self.copied { t("已打开 · 路径已复制", "Opened · path copied") } else { t("打开 Caracal", "Open Caracal") })
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(path.to_string_lossy().into_owned()));
-                        cx.open_url(CARACAL_URL);
+                        crate::caracal::open(crate::caracal::Mode::Review, &path, cx);
                         this.copied = true;
                         cx.notify();
                     }))

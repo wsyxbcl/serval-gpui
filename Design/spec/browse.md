@@ -29,8 +29,10 @@ The table is the working document; the XMP files are updated deliberately, with 
   ≥ 3 / ≥ 4 / 5, as in 媒体提取). The line below says how many files (and videos) are chosen.
 - **Three ways out**, one card each, no run bar:
   1. **在资源管理器中查看所选** — §3.
-  2. **在 Caracal 中查看和编辑** — opens Caracal and copies the table's path; the user opens the table and the
-     media folder there, reviews, edits, and exports tags.csv. (W19 would load both without picking.)
+  2. **在 Caracal 中查看和编辑** — opens Caracal at `#review&table=<file name>` and copies the table's path; the
+     user opens the table there (Caracal names the file to pick), links the media folder, reviews, edits, and
+     exports tags.csv. The fragment never leaves the browser. (W19 would load both without picking.) The same
+     link opens observe's tags table in `#species` and xmp init's table in `#time`, from the result rows.
   3. **应用表格到文件** — opens 元数据更新 in 整表写入 with this table (§4).
 
 ## 3. Review folder (Explorer)

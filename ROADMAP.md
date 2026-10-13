@@ -113,7 +113,7 @@ Rules:
 - [x] Settings: choose the Serval program (W08), language, appearance (following the system by default), about; first-run card; `settings.conf` keeps its format and gains `appearance` and each form's last values (saved off the UI thread); shared output-location field with change and reset; Ctrl+,.
 - [x] 独立捕获 (capture): the table is read first (row count, Camtrap DP detection); deployment level picked on a real sample path with Serval's detection preselected and the deployment count; interval (the timeline of a real busy day was removed after the 2026-10-12 test); measure-from, by, options; `--size` for tall screenshots; `waxbill <table.csv>` opens it.
 - [x] 媒体提取 (extract), step 1: species chosen from the table with faceted counts and bars, rating, a live summary (files, records, size, deployments), kept folders on a real path with an example output path, organise options; Serval's filter built from the choice; a stable dated output folder so reruns continue; the conflicts dialog (exit 3) rerunning with `--on-existing`; the last screen and the extract choice are remembered.
-- [ ] 媒体提取 step 2: deployments and date range through a subset table (data.md §3); thumbnails of the match (with browse's cache).
+- [ ] 媒体提取 step 2: deployments and date range through a subset table (data.md §3). Held 2026-10-13 for a later version.
 - [x] XMP 初始化, 重命名, 路径对齐, XMP 导出, XMP 删除, 元数据同步 as one shared form described per screen (`screens/simple.rs`); XMP 删除 needs an explicit confirmation before Run.
 - [x] 物种名替换: columns from the taglist's header; every species checked against the taglist before Run (missing, empty translation, repeated), as Serval checks it.
 - [x] 元数据更新: preview of the changes per file (old → new, file count) with conflicting rows marked; rows with media paths (which `xmp update` skips) block Run with how to make an XMP table.
@@ -126,6 +126,8 @@ Rules:
 - [x] Windows test 2026-10-12, fixes: paths can be dropped onto every path field; observe counts images, videos and XMP; the log scrolls; durations under a minute in seconds; no growing estimate after Stop; the run bar returns to Ready once the form changes; 整表写入 leaves time off by default; the capture timeline is removed.
 - [x] Table check and repair (data.md §2): GBK, UTF-16 and tab-separated tables and times rewritten by Excel/WPS are found under every table field; "生成修复后的副本" writes `<name>.utf8.csv` and switches the field to it.
 - [x] Pause, continue and cancel a run (暂停 / 继续 / 取消, with an option to delete the partial results on cancel).
+- [x] 在 Caracal 中打开 (2026-10-13, level b): links name the mode and the table (`#review|#species|#time&table=<name>`); browse, observe's tags table and xmp init's table. Caracal still has to read the fragment: `~/Downloads/caracal-waxbill-links-2026-10-13.md` for the Caracal side.
+- [x] Progress says what it counts ("正在检查 · 37 / 126 个文件"), so 整表写入's check over every file no longer reads as 126 writes.
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [ ] Draw the board for the hand-off screen.
 - [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
@@ -146,8 +148,10 @@ Rules:
 - Add presets, recent inputs, and saved workflows.
 - Add a visualization module utilizing Charton + WASM, by starting a serval in native rust to visualize csv
 - Add richer output presentation for tables and generated paths.
-- "在 Caracal 中打开" for the tables of 标签获取 (species analysis) and XMP 初始化 (time analysis).
-- A sync preview for 元数据同步: what differs between the sidecar and the labels inside the media, before writing.
-- A help illustration for 独立捕获: measuring from the previous record vs. from the previous independent one.
+- A sync preview for 元数据同步: what differs between the sidecar and the labels inside the media, before writing (needs a Serval dry-run with a per-field summary). Held 2026-10-13.
+- A help illustration for 独立捕获: measuring from the previous record vs. from the previous independent one. Held.
+- The rest of the table check (data.md §2): paths that moved to another computer or drive (find the new prefix from where the table sits, or from a chosen media folder; rewrite it in the repaired copy) and required columns missing or differently cased, named per command. Leading zeros lost by spreadsheets are not worth a warning. For a future version.
+- CamtrapDP export (Serval). Held.
+- xlsx input (W11). Held: CSV stays the format.
 - Improve packaging and distribution for Linux, Windows, and macOS.
 - Consider extracting reusable Serval command metadata from the CLI project if it materially improves maintainability.

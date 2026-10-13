@@ -3,6 +3,7 @@
 
 mod app;
 mod browse;
+mod caracal;
 mod conflicts;
 mod i18n;
 mod id_species;

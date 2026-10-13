@@ -22,7 +22,8 @@ The run bar always answers one of: what will happen, what is happening, what hap
   the run, and "复制命令" copies it. During a failure the secondary action is "复制日志".
 - The remaining-time estimate appears only after 5 seconds of a phase with a known total.
 - While running, the form is read-only (dimmed), the screen's sidebar entry shows a spinner, and other screens
-  can be visited (their Run is disabled: "另一个命令正在运行").
+  can be visited (their Run is disabled: "另一个命令正在运行"). Leaving the screen does not warn: nothing
+  stops; only closing the window asks.
 - Once the form says a different command from the last run's, the bar is about the form again (就绪); the last
   run's results stay on the screen until the next run.
 
