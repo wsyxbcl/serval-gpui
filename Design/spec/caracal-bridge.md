@@ -24,14 +24,18 @@ https://caracal.hinature.cn/#<mode>&table=<path>&source=<base>
 | Request | Answer |
 | --- | --- |
 | `GET info` | `{"bridge": 1, "waxbill": "<version>", "table": "<path>"}` |
-| `GET table` | The table's bytes as they are on disk (`text/csv`). |
+| `GET table` | The table as UTF-8 (`text/csv; charset=utf-8`), whatever it is stored as (GBK and UTF-16 are decoded as the table check does), so its paths are the strings `media` accepts. |
+| `GET missing` | `{"checked": N, "missing": ["<path>", …]}`: the media the table lists (a sidecar row counts as its media file) that are not on disk, checked by Waxbill in parallel, for "47,056 of 52,716 found" without 52k requests. |
 | `GET media?path=<path>` | The file, `Accept-Ranges: bytes`; a `Range: bytes=a-b` / `a-` / `-n` request gets 206 with `Content-Range`. `Content-Type` from the extension. |
 | `OPTIONS …` | 204 with the CORS headers below. |
 
-- `path` is a path exactly as written in the table's `path` column, or the media file of a listed sidecar
+- `path` is percent-decoded, with `+` read as a space (URLSearchParams); a real `+` arrives as `%2B`. It is a
+  path as written in the table's `path` column (or trimmed), or the media file of a listed sidecar
   (`IMG_0001.JPG` for `IMG_0001.JPG.xmp`), or the sidecar of a listed media file (`IMG_0001.JPG.xmp` /
   `.XMP`). Anything else is 404, as is a listed file that does not exist.
 - Errors: 403 for an unknown token or a foreign `Origin`; 404 as above; 416 for a range outside the file.
+- Every response has a `Content-Length` (no chunked encoding).
+- The allowed paths are read again when the table changes on disk.
 
 ## 3. Safety
 

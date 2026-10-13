@@ -6,7 +6,8 @@ use std::collections::{HashSet, VecDeque};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 const PORT: u16 = 8799;
@@ -16,8 +17,80 @@ const CARACAL_ORIGIN: &str = "https://caracal.hinature.cn";
 struct Session {
     token: String,
     table: PathBuf,
-    /// The paths Caracal may ask for, read from the table on the first media request.
-    allowed: OnceLock<HashSet<String>>,
+    /// The paths Caracal may ask for, read from the table on the first media request and again when the table
+    /// changes on disk.
+    allowed: Mutex<Option<Allowed>>,
+}
+
+/// The allowed paths and the table's modification time they were read at.
+type Allowed = (Option<SystemTime>, Arc<HashSet<String>>);
+
+impl Session {
+    fn allowed(&self) -> Arc<HashSet<String>> {
+        let modified = std::fs::metadata(&self.table)
+            .and_then(|m| m.modified())
+            .ok();
+        let mut allowed = self.allowed.lock().unwrap();
+        match &*allowed {
+            Some((at, paths)) if *at == modified => paths.clone(),
+            _ => {
+                let paths = Arc::new(allowed_paths(&self.table));
+                *allowed = Some((modified, paths.clone()));
+                paths
+            }
+        }
+    }
+
+    /// A path from the table as a file on disk: relative paths are next to the table.
+    fn file(&self, path: &str) -> PathBuf {
+        let path = PathBuf::from(path);
+        if path.is_relative() {
+            self.table.parent().unwrap_or(Path::new("")).join(path)
+        } else {
+            path
+        }
+    }
+}
+
+/// The media file a table row stands for: a sidecar row (`IMG.JPG.xmp`) stands for its media (`IMG.JPG`).
+fn media_of(path: &str) -> &str {
+    if path.to_lowercase().ends_with(".xmp") {
+        &path[..path.len() - 4]
+    } else {
+        path
+    }
+}
+
+/// The media the table lists that are not on disk, checked by a few threads (a NAS answers slowly but in
+/// parallel): `{"checked": N, "missing": [...]}`.
+fn missing(session: &Session) -> serde_json::Value {
+    let mut seen = HashSet::new();
+    let media: Vec<String> = crate::repair::column(&session.table, "path")
+        .unwrap_or_default()
+        .iter()
+        .map(|p| media_of(p.trim()).to_string())
+        .filter(|p| !p.is_empty() && seen.insert(p.clone()))
+        .collect();
+    let chunk = media.len().div_ceil(8).max(1);
+    let missing: Vec<String> = std::thread::scope(|scope| {
+        let workers: Vec<_> = media
+            .chunks(chunk)
+            .map(|paths| {
+                scope.spawn(|| {
+                    paths
+                        .iter()
+                        .filter(|p| !session.file(p).exists())
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        workers
+            .into_iter()
+            .flat_map(|w| w.join().unwrap_or_default())
+            .collect()
+    });
+    serde_json::json!({"checked": media.len(), "missing": missing})
 }
 
 #[derive(Clone)]
@@ -69,7 +142,7 @@ impl Bridge {
                 sessions.push_back(Arc::new(Session {
                     token: token.clone(),
                     table: table.to_path_buf(),
-                    allowed: OnceLock::new(),
+                    allowed: Mutex::new(None),
                 }));
                 token
             }
@@ -88,24 +161,19 @@ fn origin_allowed(origin: &str) -> bool {
 
 /// The table's paths, the media of listed sidecars and the sidecars of listed media.
 fn allowed_paths(table: &Path) -> HashSet<String> {
-    let Ok(csv) = crate::table::Csv::read(table) else {
-        return HashSet::new();
-    };
-    let column = csv.column("path");
     let mut allowed = HashSet::new();
-    for row in &csv.rows {
-        let path = csv.cell(row, column);
-        if path.is_empty() {
-            continue;
+    for cell in crate::repair::column(table, "path").unwrap_or_default() {
+        // As written, and trimmed (Waxbill's own readers trim cells).
+        for path in [cell.as_str(), cell.trim()] {
+            if path.is_empty() {
+                continue;
+            }
+            let media = media_of(path);
+            allowed.insert(media.to_string());
+            allowed.insert(format!("{media}.xmp"));
+            allowed.insert(format!("{media}.XMP"));
+            allowed.insert(path.to_string());
         }
-        let lower = path.to_lowercase();
-        if lower.ends_with(".xmp") {
-            allowed.insert(path[..path.len() - 4].to_string());
-        } else {
-            allowed.insert(format!("{path}.xmp"));
-            allowed.insert(format!("{path}.XMP"));
-        }
-        allowed.insert(path.to_string());
     }
     allowed
 }
@@ -142,6 +210,11 @@ fn percent_decode(text: &str) -> String {
             (b'%', Some(hi), Some(lo)) => {
                 out.push((hi * 16 + lo) as u8);
                 i += 3;
+            }
+            // Query strings built with URLSearchParams write a space as `+`; a real `+` arrives as `%2B`.
+            (b'+', ..) => {
+                out.push(b' ');
+                i += 1;
             }
             (b, ..) => {
                 out.push(b);
@@ -201,7 +274,8 @@ fn handle(request: Request, sessions: &Mutex<VecDeque<Arc<Session>>>) {
         ));
     }
     let respond = |request: Request, response: Response<Box<dyn Read + Send>>| {
-        let mut response = response;
+        // A length instead of tiny_http's chunked encoding above 32 KB: some players need it.
+        let mut response = response.with_chunked_threshold(usize::MAX);
         for h in &cors {
             response.add_header(h.clone());
         }
@@ -213,6 +287,17 @@ fn handle(request: Request, sessions: &Mutex<VecDeque<Arc<Session>>>) {
             vec![],
             Box::new(std::io::empty()),
             Some(0),
+            None,
+        )
+    };
+
+    let data = |body: String, kind: &str| -> Response<Box<dyn Read + Send>> {
+        let len = body.len();
+        Response::new(
+            StatusCode(200),
+            vec![header("Content-Type", kind)],
+            Box::new(std::io::Cursor::new(body.into_bytes())),
+            Some(len),
             None,
         )
     };
@@ -244,24 +329,25 @@ fn handle(request: Request, sessions: &Mutex<VecDeque<Arc<Session>>>) {
     };
 
     let file = match endpoint {
-        "info" => {
-            let body = serde_json::json!({
-                "bridge": 1,
-                "waxbill": env!("CARGO_PKG_VERSION"),
-                "table": session.table.to_string_lossy(),
-            })
-            .to_string();
-            let len = body.len();
-            let response = Response::new(
-                StatusCode(200),
-                vec![header("Content-Type", "application/json")],
-                Box::new(std::io::Cursor::new(body.into_bytes())) as Box<dyn Read + Send>,
-                Some(len),
-                None,
-            );
-            return respond(request, response);
+        "info" | "missing" => {
+            let body = if endpoint == "info" {
+                serde_json::json!({
+                    "bridge": 1,
+                    "waxbill": env!("CARGO_PKG_VERSION"),
+                    "table": session.table.to_string_lossy(),
+                })
+            } else {
+                missing(&session)
+            };
+            return respond(request, data(body.to_string(), "application/json"));
         }
-        "table" => session.table.clone(),
+        // As UTF-8 whatever the table is stored as (Excel's GBK, UTF-16), so its paths match what media accepts.
+        "table" => {
+            return match crate::repair::text(&session.table) {
+                Ok(text) => respond(request, data(text, "text/csv; charset=utf-8")),
+                Err(_) => respond(request, empty(404)),
+            };
+        }
         "media" => {
             let Some(path) = query
                 .split('&')
@@ -270,18 +356,10 @@ fn handle(request: Request, sessions: &Mutex<VecDeque<Arc<Session>>>) {
             else {
                 return respond(request, empty(404));
             };
-            let allowed = session
-                .allowed
-                .get_or_init(|| allowed_paths(&session.table));
-            if !allowed.contains(&path) {
+            if !session.allowed().contains(&path) {
                 return respond(request, empty(404));
             }
-            let path = PathBuf::from(path);
-            if path.is_relative() {
-                session.table.parent().unwrap_or(Path::new("")).join(path)
-            } else {
-                path
-            }
+            session.file(&path)
         }
         _ => return respond(request, empty(404)),
     };
@@ -364,9 +442,14 @@ mod tests {
         std::fs::write(dir.join("secret.txt"), "no").unwrap();
         let table = dir.join("tags.csv");
         // A sidecar table: the media behind the listed sidecar may be asked for.
+        let gone = dir.join("gone.JPG");
         std::fs::write(
             &table,
-            format!("path,species\n{}.xmp,Fox\n", media.display()),
+            format!(
+                "path,species\n{}.xmp,Fox\n{},Pika\n",
+                media.display(),
+                gone.display()
+            ),
         )
         .unwrap();
 
@@ -378,12 +461,21 @@ mod tests {
 
         let (status, head, body) = get(
             port,
-            &format!("{route}media?path={}", encode(&media)),
+            // As URLSearchParams writes it: the space in the name as `+`.
+            &format!("{route}media?path={}", encode(&media).replace("%20", "+")),
             "Range: bytes=10-19\r\n",
         );
         assert_eq!(status, 206);
         assert!(head.contains("Content-Range: bytes 10-19/100"), "{head}");
+        assert!(head.contains("Content-Length: 10"), "{head}");
         assert_eq!(body, &bytes[10..20]);
+
+        let (_, _, body) = get(port, &format!("{route}missing"), "");
+        let missing: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            missing,
+            serde_json::json!({"checked": 2, "missing": [gone.to_string_lossy()]})
+        );
 
         let secret = dir.join("secret.txt");
         assert_eq!(
