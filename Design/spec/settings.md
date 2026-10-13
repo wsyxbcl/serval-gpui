@@ -8,15 +8,22 @@ States: [`boards/settings.html`](../boards/settings.html); first run in [`boards
 Waxbill stays small (about 19 MB stripped today) and does not bundle or link Serval (Serval is about 66 MB
 stripped, mostly Polars, and its XMP library is a C++ build).
 
-Now:
+Now (W08 revised 2026-10-13):
 
-- The user chooses the Serval program, which the project provides (`serval.exe` / `serval`). First run without a
-  usable Serval shows a card "选择 Serval 程序" in the content area, and Run is disabled with "需要 Serval".
+- **Shipped together, still two programs.** The release archive holds `waxbill.exe` and `serval.exe` side by
+  side (with their READMEs and licences); Serval is not built into Waxbill. Unpacking the archive is the whole
+  installation.
+- Waxbill uses, in this order: the program chosen in Settings (or `--serval`) when it works; else `serval.exe`
+  next to `waxbill.exe`; else `serval` on PATH. A chosen program that has gone or is too old does not hide a
+  working one next to Waxbill. Only an explicit choice is saved, so unpacking a newer archive brings its Serval
+  into use.
+- With none of these, the card "选择 Serval 程序" appears in the content area, and Run is disabled with
+  "需要 Serval".
 - Waxbill checks the chosen program with `serval --version` and remembers it. An unsupported version shows a red
   banner with the required version and "选择其他程序…" ("请向项目组获取新版本").
 - Waxbill does not download or update Serval and does not contact GitHub: users often cannot reach it.
 
-Later (needs the project's own download server):
+Later (needs the project's own download server; until then, a new version is a new archive):
 
 - Download on first run and an update check, from the project's server: platform archive plus a SHA-256 file,
   unpacked into Waxbill's data directory, verified with the checksum and `serval --version`, the previous version

@@ -131,6 +131,9 @@ Rules:
 - [x] Progress says what it counts ("正在检查 · 37 / 126 个文件"), so 整表写入's check over every file no longer reads as 126 writes.
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [ ] Tie Serval's lifetime to Waxbill's (a Windows Job Object): a Waxbill that is killed or crashes leaves a running Serval going until it finishes; a normal close asks and stops it.
+- [x] Ship Serval with Waxbill (W08 revised): `serval.exe` next to `waxbill.exe` in the archive is found without setup; a chosen program still wins while it works.
+- [ ] Release archive with both programs: package by hand for now, or let the Windows release job add `serval.exe` (pinned Serval version).
+- [ ] Update check and download from the project's own server (manifest, checksums, signature); Waxbill itself notify-only at first. Later.
 - [ ] Draw the board for the hand-off screen.
 - [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
 

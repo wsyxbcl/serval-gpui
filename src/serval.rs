@@ -23,12 +23,34 @@ impl ServalStatus {
     }
 }
 
-/// Look for `serval` on PATH and ask it for its version. Blocking; run it in the background.
-pub fn detect() -> ServalStatus {
-    let Some(program) = find_on_path() else {
-        return ServalStatus::Missing;
-    };
-    check(program)
+/// The Serval to use (settings.md §1): the one chosen in Settings (or with `--serval`) when it works; otherwise the
+/// one shipped next to Waxbill, then one on PATH. A chosen program that has gone or is too old does not hide a
+/// working one shipped with Waxbill. Blocking; run it in the background.
+pub fn find(chosen: Option<PathBuf>) -> ServalStatus {
+    let chosen = chosen.map(check);
+    if let Some(ready @ ServalStatus::Ready { .. }) = chosen {
+        return ready;
+    }
+    let found = next_to_waxbill().or_else(find_on_path).map(check);
+    match (found, chosen) {
+        (Some(ready @ ServalStatus::Ready { .. }), _) => ready,
+        (_, Some(chosen)) if chosen != ServalStatus::Missing => chosen,
+        (found, _) => found.unwrap_or(ServalStatus::Missing),
+    }
+}
+
+fn program_name() -> &'static str {
+    if cfg!(windows) {
+        "serval.exe"
+    } else {
+        "serval"
+    }
+}
+
+/// `serval.exe` in Waxbill's own folder, as the release archive ships it.
+fn next_to_waxbill() -> Option<PathBuf> {
+    let program = std::env::current_exe().ok()?.parent()?.join(program_name());
+    program.is_file().then_some(program)
 }
 
 pub fn check(program: PathBuf) -> ServalStatus {
@@ -54,13 +76,8 @@ pub fn check(program: PathBuf) -> ServalStatus {
 }
 
 fn find_on_path() -> Option<PathBuf> {
-    let name = if cfg!(windows) {
-        "serval.exe"
-    } else {
-        "serval"
-    };
     std::env::split_paths(&std::env::var_os("PATH")?)
-        .map(|dir| dir.join(name))
+        .map(|dir| dir.join(program_name()))
         .find(|path| path.is_file())
 }
 

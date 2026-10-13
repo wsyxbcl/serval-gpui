@@ -303,12 +303,7 @@ impl Waxbill {
         cx.spawn(async move |this, cx| {
             let status = cx
                 .background_executor()
-                .spawn(async move {
-                    match program {
-                        Some(program) => serval::check(program),
-                        None => serval::detect(),
-                    }
-                })
+                .spawn(async move { serval::find(program) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 cx.set_global(crate::serval::ServalProgram(
