@@ -194,26 +194,36 @@ pub fn repair(path: &Path) -> Result<PathBuf, String> {
         writer.write_record(row).map_err(|err| err.to_string())?;
     }
     let bytes = writer.into_inner().map_err(|err| err.to_string())?;
-    let target = copy_path(path);
-    std::fs::write(&target, bytes).map_err(|err| err.to_string())?;
-    Ok(target)
+    write_new_copy(path, &bytes)
 }
 
-/// `<name>.utf8.csv` next to the table, or `<name>.utf8_2.csv` … if that exists (an earlier copy may have been
-/// edited since).
-fn copy_path(path: &Path) -> PathBuf {
+/// Write `<name>.utf8.csv` next to the table, or `<name>.utf8_2.csv` … when that exists: an earlier copy may have
+/// been edited since. Each name is created only if it does not exist (atomically), so two repairs at once never
+/// write to the same file.
+fn write_new_copy(path: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
+    use std::io::Write;
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
     let stem = stem.trim_end_matches(".utf8");
-    (1..)
-        .map(|n| {
-            path.with_file_name(if n == 1 {
-                format!("{stem}.utf8.csv")
-            } else {
-                format!("{stem}.utf8_{n}.csv")
-            })
-        })
-        .find(|candidate| !candidate.exists())
-        .unwrap()
+    for n in 1.. {
+        let target = path.with_file_name(if n == 1 {
+            format!("{stem}.utf8.csv")
+        } else {
+            format!("{stem}.utf8_{n}.csv")
+        });
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+        {
+            Ok(mut file) => {
+                file.write_all(bytes).map_err(|err| err.to_string())?;
+                return Ok(target);
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(err) => return Err(err.to_string()),
+        }
+    }
+    unreachable!()
 }
 
 enum State {
@@ -288,6 +298,8 @@ impl TableCheck {
 
     fn repair(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let original = PathBuf::from(self.value.trim());
+        // The field may have moved on to another table by the time the copy is written.
+        let generation = self.generation;
         self.state = State::Repairing;
         cx.notify();
         let input = self.input.clone();
@@ -298,6 +310,7 @@ impl TableCheck {
                 .spawn(async move { repair(&source) })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match repaired {
+                _ if this.generation != generation => {}
                 Ok(copy) => {
                     this.repaired_from = Some((original, copy.clone()));
                     input.update(cx, |input, cx| {
@@ -450,6 +463,15 @@ mod tests {
             "\u{feff}path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-01-05 06:09:00\n/data/雪豹/2.JPG,雪豹,2023-01-05 06:10:07\n"
         );
         assert_eq!(std::fs::read(&table).unwrap(), gbk.as_ref());
+
+        // Repairs at the same time each get their own copy.
+        let copies: std::collections::HashSet<_> = std::thread::scope(|scope| {
+            let repairs: Vec<_> = (0..16)
+                .map(|_| scope.spawn(|| repair(&table).unwrap()))
+                .collect();
+            repairs.into_iter().map(|r| r.join().unwrap()).collect()
+        });
+        assert_eq!(copies.len(), 16);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

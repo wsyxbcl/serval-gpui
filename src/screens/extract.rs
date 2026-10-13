@@ -66,6 +66,8 @@ pub struct ExtractForm {
     matched: Matched,
     bytes: Option<u64>,
     generation: usize,
+    /// Its command is running: the inputs are disabled (the app also blocks the mouse).
+    pub locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -108,6 +110,7 @@ impl ExtractForm {
             matched: Matched::default(),
             bytes: None,
             generation: 0,
+            locked: false,
             _subscriptions: subscriptions,
         }
     }
@@ -894,9 +897,12 @@ impl Render for ExtractForm {
                     h_flex()
                         .gap(tokens.px("space-2"))
                         .child(
-                            div()
-                                .flex_1()
-                                .child(Input::new(&self.csv).large().bg(tokens.color("surface"))),
+                            div().flex_1().child(
+                                Input::new(&self.csv)
+                                    .large()
+                                    .disabled(self.locked)
+                                    .bg(tokens.color("surface")),
+                            ),
                         )
                         .child(
                             Button::new("choose-csv")

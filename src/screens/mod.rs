@@ -178,6 +178,26 @@ impl Form {
         });
     }
 
+    /// While its command runs, the form cannot be edited.
+    pub fn set_locked(&self, locked: bool, cx: &mut App) {
+        macro_rules! lock {
+            ($form:expr) => {
+                $form.update(cx, |form, cx| {
+                    form.locked = locked;
+                    cx.notify();
+                })
+            };
+        }
+        match self {
+            Form::Observe(form) => lock!(form),
+            Form::Capture(form) => lock!(form),
+            Form::Extract(form) => lock!(form),
+            Form::Simple(form) => lock!(form),
+            Form::Translate(form) => lock!(form),
+            Form::Update(form) => lock!(form),
+        }
+    }
+
     pub fn view(&self) -> AnyView {
         match self {
             Form::Observe(form) => form.clone().into(),

@@ -198,6 +198,10 @@ impl Waxbill {
                     .on_click(cx.listener(|_, on: &bool, _, cx| {
                         let value = if *on { "1" } else { "0" };
                         Settings::update(cx, |settings| settings.set_value("caracal_bridge", value));
+                        // Switching off also ends the access already given, not only future links.
+                        if !*on && let Some(bridge) = cx.try_global::<crate::bridge::Bridge>() {
+                            bridge.revoke_all();
+                        }
                         cx.notify();
                     })),
             )

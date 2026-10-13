@@ -48,6 +48,9 @@ https://caracal.hinature.cn/#<mode>&table=<path>&source=<base>
   `Access-Control-Allow-Private-Network: true` on preflights, and expose `Content-Range`, `Content-Length`,
   `Accept-Ranges`.
 - Only GET; files outside the table are never served.
+- Switching the bridge off in Settings ends every session at once (their tokens get 403), not only future links.
+- Eight worker threads answer all requests (a bound on what a slow NAS can pile up). `missing` runs one scan
+  at a time, and an answer is reused for 10 seconds.
 
 ## 4. Waxbill
 

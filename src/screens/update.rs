@@ -164,6 +164,8 @@ pub struct UpdateForm {
     create_missing: bool,
     check: WriteCheck,
     check_generation: usize,
+    /// Its command is running: the inputs are disabled (the app also blocks the mouse).
+    pub locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -192,6 +194,7 @@ impl UpdateForm {
             create_missing: true,
             check: WriteCheck::Idle,
             check_generation: 0,
+            locked: false,
             _subscriptions: vec![subscription],
         }
     }
@@ -611,7 +614,7 @@ impl Render for UpdateForm {
                 .child(
                     h_flex()
                         .gap(tokens.px("space-2"))
-                        .child(div().flex_1().child(Input::new(&self.csv).large().bg(tokens.color("surface"))))
+                        .child(div().flex_1().child(Input::new(&self.csv).large().disabled(self.locked).bg(tokens.color("surface"))))
                         .child(Button::new("choose-csv").label(t("选择…", "Choose…")).outline().large().on_click(cx.listener(
                             |this, _, window, cx| {
                                 let paths = cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: false, prompt: None });

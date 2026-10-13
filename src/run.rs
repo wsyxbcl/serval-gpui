@@ -39,13 +39,15 @@ pub struct OutputFile {
 }
 
 pub struct Run {
+    /// Distinguishes this run from a later one on the same screen, for work that finishes after a while.
+    pub id: u64,
     pub command: String,
     /// The form's command when the run started, without decisions: once the form says something else, the run
     /// bar is about the new command again.
     pub form_command: String,
     /// The output folder this run (and the paused runs it continues) created, offered for deletion on cancel when
     /// the command only copies into it.
-    pub created_output: Option<PathBuf>,
+    pub created_output: Option<crate::run_dialogs::CreatedOutput>,
     pub started: Instant,
     pub elapsed: Duration,
     pub outcome: Outcome,
@@ -69,6 +71,7 @@ impl Run {
             log: vec![format!("$ {command}")],
             command,
             form_command: String::new(),
+            id: 0,
             created_output: None,
             started: Instant::now(),
             elapsed: Duration::ZERO,
@@ -138,6 +141,7 @@ impl Run {
             log: vec![format!("$ {command}"), error.clone()],
             command,
             form_command: String::new(),
+            id: 0,
             created_output: None,
             started: Instant::now(),
             elapsed: Duration::ZERO,

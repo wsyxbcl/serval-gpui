@@ -46,6 +46,8 @@ pub struct CaptureForm {
     /// The deployment count, recomputed when the level changes.
     deployments: usize,
     read_generation: usize,
+    /// Its command is running: the inputs are disabled (the app also blocks the mouse).
+    pub locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -85,6 +87,7 @@ impl CaptureForm {
             custom_output: None,
             deployments: 0,
             read_generation: 0,
+            locked: false,
             _subscriptions: subscriptions,
         }
     }
@@ -434,34 +437,38 @@ impl Render for CaptureForm {
         let output_root = csv.as_ref().map(|csv| self.output_root(csv));
         let gap = self.gap_minutes(cx);
 
-        let table_card =
-            card(cx)
-                .child(accept_drop(
-                    field(t("标签表", "Tags table"), cx)
-                        .child(
-                            h_flex()
-                                .gap(tokens.px("space-2"))
-                                .child(div().flex_1().child(
-                                    Input::new(&self.csv).large().bg(tokens.color("surface")),
-                                ))
-                                .child(
-                                    Button::new("choose-csv")
-                                        .label(t("选择…", "Choose…"))
-                                        .outline()
+        let table_card = card(cx)
+            .child(accept_drop(
+                field(t("标签表", "Tags table"), cx)
+                    .child(
+                        h_flex()
+                            .gap(tokens.px("space-2"))
+                            .child(
+                                div().flex_1().child(
+                                    Input::new(&self.csv)
                                         .large()
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.choose_csv(window, cx)
-                                        })),
+                                        .disabled(self.locked)
+                                        .bg(tokens.color("surface")),
                                 ),
-                        )
-                        .children(self.table_line(cx))
-                        .child(self.csv_check.clone()),
-                    &self.csv,
-                    cx,
-                ))
-                .when_some(table.filter(|t| !t.camtrap_dp), |card, table| {
-                    card.child(self.render_level(&table, cx))
-                });
+                            )
+                            .child(
+                                Button::new("choose-csv")
+                                    .label(t("选择…", "Choose…"))
+                                    .outline()
+                                    .large()
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.choose_csv(window, cx)
+                                    })),
+                            ),
+                    )
+                    .children(self.table_line(cx))
+                    .child(self.csv_check.clone()),
+                &self.csv,
+                cx,
+            ))
+            .when_some(table.filter(|t| !t.camtrap_dp), |card, table| {
+                card.child(self.render_level(&table, cx))
+            });
 
         let gap_field = field(t("独立性间隔", "Independence interval"), cx)
             .child(
@@ -470,6 +477,7 @@ impl Render for CaptureForm {
                     .child(
                         div().w(px(110.)).child(
                             Input::new(&self.gap)
+                                .disabled(self.locked)
                                 .large()
                                 .bg(tokens.color("surface"))
                                 .suffix(div().text_color(cx.theme().muted_foreground).child(t("分钟", "min"))),

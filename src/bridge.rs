@@ -7,11 +7,16 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 const PORT: u16 = 8799;
 const MAX_SESSIONS: usize = 16;
+/// Requests are answered by this many threads: enough for thumbnails next to a playing video, and a bound on what
+/// a slow NAS can pile up.
+const WORKERS: usize = 8;
+/// A `missing` answer is reused this long: Caracal asking twice does not scan a NAS twice.
+const MISSING_REUSE: Duration = Duration::from_secs(10);
 const CARACAL_ORIGIN: &str = "https://caracal.hinature.cn";
 
 struct Session {
@@ -20,6 +25,8 @@ struct Session {
     /// The paths Caracal may ask for, read from the table on the first media request and again when the table
     /// changes on disk.
     allowed: Mutex<Option<Allowed>>,
+    /// The last `missing` answer; held while scanning, so a second request waits for the first scan.
+    missing: Mutex<Option<(Instant, serde_json::Value)>>,
 }
 
 /// The allowed paths and the table's modification time they were read at.
@@ -64,6 +71,9 @@ fn media_of(path: &str) -> &str {
 /// The media the table lists that are not on disk, checked by a few threads (a NAS answers slowly but in
 /// parallel): `{"checked": N, "missing": [...]}`.
 fn missing(session: &Session) -> serde_json::Value {
+    // One scan at a time, whatever the number of sessions: at most 8 threads stat files.
+    static SCANNING: Mutex<()> = Mutex::new(());
+    let _scanning = SCANNING.lock().unwrap_or_else(|e| e.into_inner());
     let mut seen = HashSet::new();
     let media: Vec<String> = crate::repair::column(&session.table, "path")
         .unwrap_or_default()
@@ -116,15 +126,21 @@ impl Bridge {
             port,
             sessions: Arc::default(),
         };
-        let sessions = bridge.sessions.clone();
-        std::thread::spawn(move || {
-            for request in server.incoming_requests() {
-                let sessions = sessions.clone();
-                // One thread per request: a video being played must not hold up thumbnails.
-                std::thread::spawn(move || handle(request, &sessions));
-            }
-        });
+        let server = Arc::new(server);
+        for _ in 0..WORKERS {
+            let (server, sessions) = (server.clone(), bridge.sessions.clone());
+            std::thread::spawn(move || {
+                for request in server.incoming_requests() {
+                    handle(request, &sessions);
+                }
+            });
+        }
         bridge
+    }
+
+    /// End every session: pages opened before can no longer read anything (Settings › Caracal switched off).
+    pub fn revoke_all(&self) {
+        self.sessions.lock().unwrap().clear();
     }
 
     /// The base URL for `table`; opening the same table again reuses its session.
@@ -143,6 +159,7 @@ impl Bridge {
                     token: token.clone(),
                     table: table.to_path_buf(),
                     allowed: Mutex::new(None),
+                    missing: Mutex::new(None),
                 }));
                 token
             }
@@ -337,7 +354,15 @@ fn handle(request: Request, sessions: &Mutex<VecDeque<Arc<Session>>>) {
                     "table": session.table.to_string_lossy(),
                 })
             } else {
-                missing(&session)
+                let mut last = session.missing.lock().unwrap();
+                match &*last {
+                    Some((at, answer)) if at.elapsed() < MISSING_REUSE => answer.clone(),
+                    _ => {
+                        let answer = missing(&session);
+                        *last = Some((Instant::now(), answer.clone()));
+                        answer
+                    }
+                }
             };
             return respond(request, data(body.to_string(), "application/json"));
         }
@@ -502,6 +527,9 @@ mod tests {
             head.contains("Access-Control-Allow-Origin: https://caracal.hinature.cn"),
             "{head}"
         );
+        // Switching the bridge off ends the access already given.
+        bridge.revoke_all();
+        assert_eq!(get(port, &format!("{route}info"), "").0, 403);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

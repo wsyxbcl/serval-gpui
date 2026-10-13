@@ -93,6 +93,7 @@ pub struct Waxbill {
     pub(crate) close_asked: bool,
     /// 停止并退出 was chosen: quit once the run has stopped.
     pub(crate) quit_when_stopped: bool,
+    next_run_id: u64,
     focus: FocusHandle,
     icon: Arc<Image>,
 }
@@ -164,6 +165,7 @@ impl Waxbill {
             cancel_ask: None,
             close_asked: false,
             quit_when_stopped: false,
+            next_run_id: 0,
             focus,
             icon: Arc::new(Image::from_bytes(ImageFormat::Png, APP_ICON.to_vec())),
         };
@@ -400,8 +402,16 @@ impl Waxbill {
             .map(|(id, _)| *id)
     }
 
+    /// A question about a run is open (cancel, close): nothing starts or stops until it is answered.
+    fn run_question_open(&self) -> bool {
+        self.cancel_ask.is_some() || self.close_asked
+    }
+
     /// Run bar button and Ctrl+Enter: run the current screen's command, or stop it while it runs.
     fn run_or_stop(&mut self, cx: &mut Context<Self>) {
+        if self.run_question_open() {
+            return;
+        }
         if self.running_screen() == Some(self.screen) {
             self.stop(cx);
             return;
@@ -411,6 +421,17 @@ impl Waxbill {
 
     /// Run again after a decision (the conflicts dialog).
     pub(crate) fn start_decided_run(&mut self, extra: &[&str], cx: &mut Context<Self>) {
+        // The decision is about the command that asked; a form changed since gets the Ready bar instead.
+        let asked = self
+            .runs
+            .get(&self.screen)
+            .map(|run| run.form_command.clone());
+        let now = self
+            .form()
+            .map(|form| crate::screens::display_command(&form.plan(cx).args));
+        if self.run_question_open() || asked != now {
+            return;
+        }
         self.runs.remove(&self.screen);
         self.start_run(extra, cx);
     }
@@ -439,22 +460,28 @@ impl Waxbill {
             args.insert(at + i, arg.to_string());
         }
         let command = crate::screens::display_command(&args);
+        let form_command = crate::screens::display_command(&plan.args);
+        let screen = self.screen;
+        // Before Serval starts, which may create the folder at once. Continuing a paused run keeps the folder the
+        // first run created.
+        let created_output = self
+            .runs
+            .get(&screen)
+            .filter(|last| last.outcome == Outcome::Stopped && last.form_command == form_command)
+            .and_then(|last| last.created_output.clone())
+            .or_else(|| crate::run_dialogs::created_output(&plan.args));
         let mut run = match Running::start(&program, &args, &plan.cwd) {
             Ok(process) => Run::new(command, process),
             Err(err) => Run::failed_to_start(command, format!("{}: {err}", program.display())),
         };
-        run.form_command = crate::screens::display_command(&plan.args);
-        let screen = self.screen;
-        // Continuing a paused run keeps the folder the first run created.
-        run.created_output = self
-            .runs
-            .get(&screen)
-            .filter(|last| {
-                last.outcome == Outcome::Stopped && last.form_command == run.form_command
-            })
-            .and_then(|last| last.created_output.clone())
-            .or_else(|| crate::run_dialogs::created_output(&plan.args));
+        run.form_command = form_command;
+        run.created_output = created_output;
+        self.next_run_id += 1;
+        let id = self.next_run_id;
+        run.id = id;
         self.runs.insert(screen, run);
+        // While it runs, its form cannot be edited, by mouse or keyboard.
+        form.set_locked(true, cx);
         cx.notify();
         cx.spawn(async move |this, cx| {
             loop {
@@ -463,7 +490,8 @@ impl Waxbill {
                     .await;
                 let running = this
                     .update(cx, |this, cx| {
-                        let Some(run) = this.runs.get_mut(&screen) else {
+                        let Some(run) = this.runs.get_mut(&screen).filter(|run| run.id == id)
+                        else {
                             return false;
                         };
                         // Redraw at least once a second for the elapsed and remaining time.
@@ -474,6 +502,9 @@ impl Waxbill {
                         }
                         if !running && this.quit_when_stopped {
                             cx.quit();
+                        }
+                        if !running && let Some(form) = this.form_of(screen) {
+                            form.set_locked(false, cx);
                         }
                         cx.notify();
                         running
@@ -620,7 +651,11 @@ impl Waxbill {
     }
 
     fn form(&self) -> Option<Form> {
-        match self.screen {
+        self.form_of(self.screen)
+    }
+
+    fn form_of(&self, screen: ScreenId) -> Option<Form> {
+        match screen {
             ScreenId::Observe => Some(Form::Observe(self.observe.clone())),
             ScreenId::Capture => Some(Form::Capture(self.capture.clone())),
             ScreenId::Extract => Some(Form::Extract(self.extract.clone())),

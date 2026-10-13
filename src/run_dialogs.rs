@@ -20,10 +20,18 @@ pub struct CancelAsk {
     pub error: Option<String>,
 }
 
-/// The folder a run will create: the highest missing ancestor of its `-o` folder, so cancelling can remove exactly
-/// what the run made. Only for commands that copy into it (extract, align without moving): deleting anything else
-/// could lose originals.
-pub fn created_output(args: &[String]) -> Option<PathBuf> {
+/// The output folder a run creates, and so owns: its `-o` folder when that did not exist before the run started.
+/// Only for commands that copy into it (extract, align without moving): deleting anything else could lose
+/// originals. `top` is the highest folder the run created on the way (often `<data>_serval_output`); it is
+/// removed on cancel only if nothing else was written there in the meantime.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CreatedOutput {
+    pub dir: PathBuf,
+    top: PathBuf,
+}
+
+/// Called before the run starts, so a folder Serval creates at once is still recognised as the run's own.
+pub fn created_output(args: &[String]) -> Option<CreatedOutput> {
     let copies = match args.first().map(String::as_str) {
         Some("extract") => true,
         Some("align") => !args.iter().any(|a| a == "--move-mode"),
@@ -44,7 +52,24 @@ pub fn created_output(args: &[String]) -> Option<PathBuf> {
     {
         top = parent;
     }
-    Some(top.to_path_buf())
+    Some(CreatedOutput {
+        top: top.to_path_buf(),
+        dir,
+    })
+}
+
+/// Delete the run's own folder, then the folders above it up to `top` while they are empty: another command may
+/// have written next to it since (`<data>_serval_output/serval_observe`), and that stays.
+pub fn delete_created(created: &CreatedOutput) -> std::io::Result<()> {
+    std::fs::remove_dir_all(&created.dir)?;
+    if created.dir != created.top {
+        for folder in created.dir.ancestors().skip(1) {
+            if std::fs::remove_dir(folder).is_err() || folder == created.top {
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn dialog(title: &'static str, body: &'static str, cx: &App) -> Div {
@@ -86,7 +111,7 @@ impl Waxbill {
         if run.outcome != Outcome::Stopped {
             return;
         }
-        if run.created_output.as_ref().is_some_and(|dir| dir.exists()) {
+        if run.created_output.as_ref().is_some_and(|c| c.dir.exists()) {
             self.cancel_ask = Some(CancelAsk::default());
         } else {
             self.runs.remove(&self.screen);
@@ -96,14 +121,21 @@ impl Waxbill {
 
     fn confirm_cancel(&mut self, cx: &mut Context<Self>) {
         let screen = self.screen;
-        let folder = self
+        // The run this dialog is about: paused, not running again.
+        let Some((id, created)) = self
             .runs
             .get(&screen)
-            .and_then(|run| run.created_output.clone());
+            .filter(|run| run.outcome == Outcome::Stopped)
+            .map(|run| (run.id, run.created_output.clone()))
+        else {
+            self.cancel_ask = None;
+            cx.notify();
+            return;
+        };
         let Some(ask) = &mut self.cancel_ask else {
             return;
         };
-        let Some(folder) = folder.filter(|_| ask.delete) else {
+        let Some(created) = created.filter(|_| ask.delete) else {
             self.cancel_ask = None;
             self.runs.remove(&screen);
             cx.notify();
@@ -115,13 +147,16 @@ impl Waxbill {
         cx.spawn(async move |this, cx| {
             let removed = cx
                 .background_executor()
-                .spawn(async move { std::fs::remove_dir_all(&folder) })
+                .spawn(async move { delete_created(&created) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 match removed {
                     Ok(()) => {
                         this.cancel_ask = None;
-                        this.runs.remove(&screen);
+                        // Only the run that was cancelled, never one started since.
+                        if this.runs.get(&screen).is_some_and(|run| run.id == id) {
+                            this.runs.remove(&screen);
+                        }
                     }
                     Err(err) => {
                         if let Some(ask) = &mut this.cancel_ask {
@@ -139,7 +174,7 @@ impl Waxbill {
 
     pub(crate) fn render_cancel(&self, cx: &mut Context<Self>) -> Option<Div> {
         let ask = self.cancel_ask.as_ref()?;
-        let folder = self.runs.get(&self.screen)?.created_output.clone()?;
+        let folder = self.runs.get(&self.screen)?.created_output.clone()?.dir;
         let tokens = cx.tokens().clone();
         let body = dialog(
             t("取消这次运行？", "Cancel this run?"),
@@ -190,6 +225,7 @@ impl Waxbill {
                 .child(
                     Button::new("cancel-back")
                         .outline()
+                        .disabled(ask.deleting)
                         .label(t("返回", "Back"))
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.cancel_ask = None;
@@ -270,13 +306,14 @@ impl Waxbill {
 
 #[cfg(test)]
 mod tests {
-    use super::created_output;
+    use super::{created_output, delete_created};
 
     #[test]
-    fn only_a_folder_a_copying_run_creates_is_offered_for_deletion() {
+    fn cancel_deletes_only_the_folder_the_run_owns() {
         let dir = std::env::temp_dir().join(format!("waxbill-created-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let out = dir.join("data_serval_output/serval_extract/20261012_Red fox");
+        let root = dir.join("data_serval_output");
+        let out = root.join("serval_extract/20261012_Red fox");
         let args = |command: &str, extra: &[&str]| -> Vec<String> {
             [command, "-o", out.to_str().unwrap()]
                 .iter()
@@ -284,14 +321,22 @@ mod tests {
                 .map(|s| s.to_string())
                 .collect()
         };
-        // The highest folder that does not exist yet, so nothing that was there before is removed.
-        assert_eq!(
-            created_output(&args("extract", &[])),
-            Some(dir.join("data_serval_output"))
-        );
         // Moving puts the originals there; commands that write in place have nothing to offer.
         assert_eq!(created_output(&args("align", &["--move-mode"])), None);
         assert_eq!(created_output(&args("observe", &[])), None);
+
+        // Extract creates its folder (and the output root), is paused; observe then writes into the same root.
+        let created = created_output(&args("extract", &[])).unwrap();
+        assert_eq!(created.dir, out);
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(out.join("IMG_0001.JPG"), "copy").unwrap();
+        std::fs::create_dir_all(root.join("serval_observe")).unwrap();
+        std::fs::write(root.join("serval_observe/tags.csv"), "observe").unwrap();
+
+        delete_created(&created).unwrap();
+        assert!(!out.exists() && !root.join("serval_extract").exists());
+        assert!(root.join("serval_observe/tags.csv").exists());
+        // A folder that existed before the run is never the run's.
         std::fs::create_dir_all(&out).unwrap();
         assert_eq!(created_output(&args("extract", &[])), None);
         std::fs::remove_dir_all(&dir).unwrap();

@@ -38,6 +38,8 @@ pub struct ObserveForm {
     /// Species whose individual IDs win in images with several species (`--id-species`), remembered per folder.
     id_species: Vec<String>,
     count_generation: usize,
+    /// Its command is running: the inputs are disabled (the app also blocks the mouse).
+    pub locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -63,6 +65,7 @@ impl ObserveForm {
             debug: false,
             id_species: Vec::new(),
             count_generation: 0,
+            locked: false,
             _subscriptions: vec![subscription],
         }
     }
@@ -315,7 +318,10 @@ impl Render for ObserveForm {
                             .gap(tokens.px("space-2"))
                             .child(
                                 div().flex_1().child(
-                                    Input::new(&self.input).large().bg(tokens.color("surface")),
+                                    Input::new(&self.input)
+                                        .large()
+                                        .disabled(self.locked)
+                                        .bg(tokens.color("surface")),
                                 ),
                             )
                             .child(

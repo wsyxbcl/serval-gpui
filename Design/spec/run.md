@@ -21,7 +21,7 @@ The run bar always answers one of: what will happen, what is happening, what hap
 - The exact command (with every flag Waxbill will pass) is shown under the status line before, during and after
   the run, and "复制命令" copies it. During a failure the secondary action is "复制日志".
 - The remaining-time estimate appears only after 5 seconds of a phase with a known total.
-- While running, the form is read-only (dimmed), the screen's sidebar entry shows a spinner, and other screens
+- While running, the form is read-only (dimmed; its inputs disabled, so the keyboard cannot change it either), the screen's sidebar entry shows a spinner, and other screens
   can be visited (their Run is disabled: "另一个命令正在运行"). Leaving the screen does not warn: nothing
   stops; only closing the window asks.
 - Once the form says a different command from the last run's, the bar is about the form again (就绪); the last
@@ -76,6 +76,9 @@ The result area is kept until the next run of that screen starts, and is not res
 - 暂停 sends an interrupt and, if Serval has not exited after 3 seconds, ends it. The banner then shows
   "已暂停"; nothing needs cleaning up. 继续 runs the same command again, which skips finished work.
 - 取消 goes back to 就绪 and keeps what was written. When the run created its output folder and only copies into
-  it (extract; align without moving), 取消 first asks, with "同时删除这次运行新建的文件夹" unticked: the folder
-  offered is the highest one the run created, so nothing that existed before is removed.
+  it (extract; align without moving), 取消 first asks, with "同时删除这次运行新建的文件夹" unticked. Only the
+  run's own `-o` folder is deleted, and only if it did not exist before the run started (checked before Serval
+  starts); folders above it that the run created go only if they are empty, so another command's results
+  written there in the meantime stay. While the question is open nothing starts or stops, and the deletion
+  removes only the run it was asked about.
 - Closing the window while a command runs asks "停止并退出 / 继续运行".

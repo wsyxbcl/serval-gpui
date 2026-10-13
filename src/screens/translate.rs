@@ -89,6 +89,8 @@ pub struct TranslateForm {
     from: Option<String>,
     to: Option<String>,
     custom_output: Option<PathBuf>,
+    /// Its command is running: the inputs are disabled (the app also blocks the mouse).
+    pub locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -125,6 +127,7 @@ impl TranslateForm {
             from: None,
             to: None,
             custom_output: None,
+            locked: false,
             _subscriptions: subscriptions,
         }
     }
@@ -446,14 +449,18 @@ impl Render for TranslateForm {
         let tokens = cx.tokens().clone();
         let table = Self::path(&self.table, cx);
         let output_root = table.as_ref().map(|t| self.output_root(t));
+        let locked = self.locked;
         let path_row =
             |input: &Entity<InputState>, id: &'static str, which: usize, cx: &mut Context<Self>| {
                 h_flex()
                     .gap(tokens.px("space-2"))
                     .child(
-                        div()
-                            .flex_1()
-                            .child(Input::new(input).large().bg(tokens.color("surface"))),
+                        div().flex_1().child(
+                            Input::new(input)
+                                .large()
+                                .disabled(locked)
+                                .bg(tokens.color("surface")),
+                        ),
                     )
                     .child(
                         Button::new(id)

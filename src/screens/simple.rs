@@ -133,6 +133,8 @@ pub struct SimpleForm {
     counts: HashMap<&'static str, FolderCount>,
     custom_output: Option<PathBuf>,
     generation: usize,
+    /// Its command is running: the inputs are disabled (the app also blocks the mouse).
+    pub locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -166,6 +168,7 @@ impl SimpleForm {
             counts: HashMap::new(),
             custom_output: None,
             generation: 0,
+            locked: false,
             _subscriptions: subscriptions,
         }
     }
@@ -395,6 +398,7 @@ impl Render for SimpleForm {
                             .child(
                                 div().flex_1().child(
                                     Input::new(&self.inputs[key])
+                                        .disabled(self.locked)
                                         .large()
                                         .bg(tokens.color("surface")),
                                 ),
