@@ -19,6 +19,9 @@ encoding_rs = "0.8"
 gpui-kit = "=0.7.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# The Caracal bridge (bridge.rs): a loopback server and its session tokens.
+tiny_http = "0.12"
+getrandom = "0.3"
 
 [build-dependencies]
 embed-resource = "3.0.2"

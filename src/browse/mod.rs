@@ -486,7 +486,7 @@ impl Render for Browse {
                 Button::new("open-caracal")
                     .outline()
                     .label(t("打开 Caracal", "Open Caracal"))
-                    .on_click(move |_, _, cx| cx.open_url(&crate::caracal::link(crate::caracal::Mode::Review, &path)))
+                    .on_click(move |_, _, cx| crate::caracal::open(crate::caracal::Mode::Review, &path, cx))
                     .into_any_element(),
                 None,
                 cx,

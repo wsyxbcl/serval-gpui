@@ -164,9 +164,7 @@ pub fn output_list(run: &Run, cx: &App) -> Option<Div> {
                         Button::new(("caracal-output", i))
                             .ghost()
                             .label(t("在 Caracal 中打开", "Open in Caracal"))
-                            .on_click(move |_, _, cx| {
-                                cx.open_url(&crate::caracal::link(mode, &path))
-                            })
+                            .on_click(move |_, _, cx| crate::caracal::open(mode, &path, cx))
                     }))
                     .child(
                         Button::new(("open-output", i))

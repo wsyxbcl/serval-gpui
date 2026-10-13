@@ -157,6 +157,29 @@ fn read(path: &Path) -> Result<(Vec<csv::StringRecord>, Check), String> {
     Ok((rows, check))
 }
 
+/// The table as UTF-8 text without a BOM, however it was stored.
+pub fn text(path: &Path) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
+    let (text, _) = decode(&bytes)?;
+    Ok(text.trim_start_matches('\u{feff}').to_string())
+}
+
+/// The cells of one column as written, in any encoding the check reads.
+pub fn column(path: &Path, name: &str) -> Result<Vec<String>, String> {
+    let (rows, _) = read(path)?;
+    let Some(index) = rows
+        .first()
+        .and_then(|header| header.iter().position(|h| h.trim() == name))
+    else {
+        return Ok(Vec::new());
+    };
+    Ok(rows
+        .iter()
+        .skip(1)
+        .filter_map(|row| row.get(index).map(str::to_string))
+        .collect())
+}
+
 pub fn check(path: &Path) -> Result<Check, String> {
     read(path).map(|(_, check)| check)
 }

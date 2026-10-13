@@ -29,6 +29,7 @@ are saved; there is no Save button.
 
 - SERVAL: version and state (dot), the program's path, compatibility, "更换程序…".
 - 界面: 语言 (中文 / English, segmented), 外观 (跟随系统 / 浅色 / 深色).
+- CARACAL: "允许 Caracal 从本机读取所选表格和媒体" (`caracal_bridge`, on by default; [caracal-bridge](caracal-bridge.md)).
 - 关于: Waxbill version, licence, source link, icon attribution (from today's About dialog).
 
 ## 3. Stored settings
