@@ -1,4 +1,4 @@
-//! 元数据更新 Update metadata: `serval xmp update` (board: data.html update-preview). Before Run, the table's
+//! XMP 更新 Update XMP: `serval xmp update` (board: data.html update-preview). Before Run, the table's
 //! changes are listed the way Serval applies them: per file, old → new, with the number of files; rows that give
 //! one file two different new values are marked with their row numbers and block Run (Serval would refuse them).
 
@@ -214,7 +214,7 @@ impl UpdateForm {
         cx.notify();
     }
 
-    /// Open a table in the write mode (from 浏览与精选's 应用表格到文件).
+    /// Open a table in the write mode (from 查看媒体's 应用表格到文件).
     pub fn apply_table(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
         self.write = true;
         self.csv
@@ -554,7 +554,7 @@ impl UpdateForm {
         if !preview.media_rows.is_empty() {
             summary.push_str(&match language() {
                 Language::Chinese => format!(
-                    "；{} 行的路径是媒体文件而不是 XMP，元数据更新只修改 XMP：请在标签获取中选择「XMP 旁注文件」生成表格",
+                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP 旁注文件」生成表格",
                     count(preview.media_rows.len())
                 ),
                 Language::English => format!(

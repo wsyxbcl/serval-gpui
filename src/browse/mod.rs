@@ -1,4 +1,4 @@
-//! 浏览与精选 Browse and pick (Design/spec/browse.md, W16): Waxbill chooses, other tools show. A tags table is
+//! 查看媒体 View media (formerly 浏览与精选) (Design/spec/browse.md, W16): Waxbill chooses, other tools show. A tags table is
 //! opened and narrowed by species and rating; the choice is then looked at in Caracal (in the browser, where it can
 //! also be edited and exported), in the file manager (a review folder of hard links), or copied with extract; an
 //! edited table comes back through 应用表格到文件 (`xmp write`).
@@ -28,7 +28,7 @@ const RATINGS: [&[u8]; 4] = [&[], &[3, 4, 5], &[4, 5], &[5]];
 
 /// What the shell does for this screen.
 pub enum BrowseEvent {
-    /// Open the table in 元数据更新, writing the whole table.
+    /// Open the table in XMP 更新, writing the whole table.
     ApplyTable(PathBuf),
     /// Copy the choice with 媒体提取.
     Extract {

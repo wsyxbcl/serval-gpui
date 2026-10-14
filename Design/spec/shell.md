@@ -19,21 +19,22 @@ Commands grouped by kind of work. Labels are the task, not the CLI name:
 
 | Group | Item | Serval command |
 | --- | --- | --- |
+| 数据分析 Data analysis | 标签获取 Get tags | `observe` |
+| | 独立捕获 Independent captures | `capture` |
+| | 查看媒体 View media (was 浏览与精选) | `xmp get`, `xmp set`, `xmp write` ([browse](browse.md)) |
+| 元数据 Metadata | XMP 初始化 Initialise XMP | `xmp init` |
+| | XMP 更新 Update XMP (was 元数据更新) | `xmp update`, `xmp write` |
+| | 元数据同步 Sync metadata | `xmp sync` |
+| 文件导出 Export | 媒体提取 Extract media | `extract` |
+| | XMP 导出 Export XMP | `xmp copy` |
 | 数据整理 Data wrangling | 重命名 Rename | `rename` |
 | | 路径对齐 Align paths | `align` |
-| | XMP 初始化 Initialise XMP | `xmp init` |
-| 数据分析 Data processing | 浏览与精选 Browse and pick | `xmp get`, `xmp set`, `xmp write` ([browse](browse.md)) |
-| | 标签获取 Get tags | `observe` |
-| | 独立捕获 Independent captures | `capture` |
+| 工具 Tools | XMP 删除 Remove XMP | `xmp remove` |
 | | 物种名替换 Translate species | `translate` |
-| | 元数据更新 Update metadata | `xmp update`, `xmp write` |
-| | 元数据同步 Sync metadata | `xmp sync` |
-| 工具 Tools | 媒体提取 Extract media | `extract` |
-| | XMP 导出 Export XMP | `xmp copy` |
-| | XMP 删除 Remove XMP | `xmp remove` |
-| | (later) 数据脱敏 Anonymise data, Agent | — |
+| | (later) 数据脱敏 Anonymise data, 添加水印 Watermark, Agent | — |
 | (bottom) | 设置 Settings | |
 
+- Order and names from the 2026-10-14 review. The groups scroll on a short window; Settings stays at the bottom.
 - Width `--sidebar-w`. The selected item has the `--sidebar-active` fill and a 3px `--accent` marker.
 - A running command shows a small spinner next to its item, so the user can look at other screens meanwhile.
   Only one command runs at a time; Run on another screen is disabled with "另一个命令正在运行".

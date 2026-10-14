@@ -213,7 +213,7 @@ impl Waxbill {
                 Tone::Quiet,
                 cx,
             ));
-        let about = card(cx)
+        let about_text = v_flex()
             .gap(tokens.px("space-2"))
             .child(section_title(t("关于", "About"), cx))
             .child(format!("Waxbill {}", env!("CARGO_PKG_VERSION")))
@@ -240,6 +240,14 @@ impl Waxbill {
                 Tone::Quiet,
                 cx,
             ));
+        let about = card(cx).child(
+            h_flex()
+                .justify_between()
+                .items_center()
+                .gap(tokens.px("space-4"))
+                .child(about_text)
+                .child(img(self.icon.clone()).size(px(88.)).flex_shrink_0()),
+        );
         v_flex()
             .gap(tokens.px("space-4"))
             .child(self.serval_card(cx))

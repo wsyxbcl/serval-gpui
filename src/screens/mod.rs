@@ -30,15 +30,14 @@ pub enum ScreenId {
 }
 
 /// Sidebar groups, in order. Settings sits at the bottom, outside the groups.
-pub fn groups() -> [(&'static str, &'static [ScreenId]); 3] {
+pub fn groups() -> [(&'static str, &'static [ScreenId]); 5] {
     use ScreenId::*;
     [
-        (t("数据整理", "Data wrangling"), &[Rename, Align, XmpInit]),
-        (
-            t("数据分析", "Data processing"),
-            &[Browse, Observe, Capture, Translate, XmpUpdate, XmpSync],
-        ),
-        (t("工具", "Tools"), &[Extract, XmpCopy, XmpRemove]),
+        (t("数据分析", "Data analysis"), &[Observe, Capture, Browse]),
+        (t("元数据", "Metadata"), &[XmpInit, XmpUpdate, XmpSync]),
+        (t("文件导出", "Export"), &[Extract, XmpCopy]),
+        (t("数据整理", "Data wrangling"), &[Rename, Align]),
+        (t("工具", "Tools"), &[XmpRemove, Translate]),
     ]
 }
 
@@ -70,11 +69,11 @@ impl ScreenId {
             Rename => t("重命名", "Rename"),
             Align => t("路径对齐", "Align paths"),
             XmpInit => t("XMP 初始化", "Initialise XMP"),
-            Browse => t("浏览与精选", "Browse and pick"),
+            Browse => t("查看媒体", "View media"),
             Observe => t("标签获取", "Get tags"),
             Capture => t("独立捕获", "Independent captures"),
             Translate => t("物种名替换", "Translate species"),
-            XmpUpdate => t("元数据更新", "Update metadata"),
+            XmpUpdate => t("XMP 更新", "Update XMP"),
             XmpSync => t("元数据同步", "Sync metadata"),
             Extract => t("媒体提取", "Extract media"),
             XmpCopy => t("XMP 导出", "Export XMP"),

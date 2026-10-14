@@ -500,7 +500,7 @@ impl ExtractForm {
         }
     }
 
-    /// The choice made in 浏览与精选, to copy with extract.
+    /// The choice made in 查看媒体, to copy with extract.
     pub fn set_selection(
         &mut self,
         csv: String,

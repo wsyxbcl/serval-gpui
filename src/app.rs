@@ -95,7 +95,7 @@ pub struct Waxbill {
     pub(crate) quit_when_stopped: bool,
     next_run_id: u64,
     focus: FocusHandle,
-    icon: Arc<Image>,
+    pub(crate) icon: Arc<Image>,
 }
 
 impl Waxbill {
@@ -693,13 +693,14 @@ impl Waxbill {
                     .pr(tokens.px("space-2"))
                     .justify_between()
                     .child(
+                        // The bird carries the design language: shown at a size where it reads.
                         h_flex()
                             .gap(tokens.px("space-2"))
-                            .child(img(self.icon.clone()).size(px(20.)))
+                            .child(img(self.icon.clone()).size(px(30.)))
                             .child(
                                 div()
-                                    .text_size(tokens.px("text-md"))
-                                    .font_medium()
+                                    .text_size(tokens.px("text-lg"))
+                                    .font_semibold()
                                     .child("Waxbill"),
                             ),
                     )
@@ -816,7 +817,15 @@ impl Waxbill {
             .text_color(cx.theme().sidebar_foreground)
             .border_r_1()
             .border_color(cx.theme().border)
-            .child(list)
+            // Twelve entries under five headings: on a short window the groups scroll, Settings stays put.
+            .child(
+                div()
+                    .id("nav")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(list),
+            )
             .child(self.sidebar_item(ScreenId::Settings, cx))
     }
 
