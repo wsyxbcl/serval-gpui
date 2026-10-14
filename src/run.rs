@@ -69,6 +69,8 @@ pub struct Run {
 
 impl Run {
     pub fn new(command: String, process: Running) -> Run {
+        // A preview's result is the plan Serval prints: the log is open from the start.
+        let preview = is_preview(&command);
         Run {
             log: vec![format!("$ {command}")],
             command,
@@ -85,7 +87,7 @@ impl Run {
             summary: Default::default(),
             needs: None,
             unresolved: None,
-            log_open: false,
+            log_open: preview,
             log_scroll: gpui_kit::ScrollHandle::new(),
             stop_requested: false,
             process: Some(process),
@@ -167,6 +169,11 @@ impl Run {
 
     pub fn is_running(&self) -> bool {
         self.outcome == Outcome::Running
+    }
+
+    /// A preview (`--dryrun`): nothing was changed, and the same command can be run for real.
+    pub fn is_preview(&self) -> bool {
+        is_preview(&self.command)
     }
 
     /// Pause was pressed and Serval is finishing what it is writing.
@@ -382,4 +389,8 @@ pub fn took(duration: Duration) -> String {
     } else {
         clock(duration)
     }
+}
+
+fn is_preview(command: &str) -> bool {
+    command.split(' ').any(|arg| arg == "--dryrun")
 }

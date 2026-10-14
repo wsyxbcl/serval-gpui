@@ -279,45 +279,32 @@ impl SimpleForm {
         }
     }
 
-    pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
-        let mut values: Vec<(&'static str, String)> = self
-            .spec
-            .paths
-            .iter()
-            .map(|p| {
-                (
-                    p.key,
-                    self.path(p.key, cx)
-                        .map(|p| p.to_string_lossy().into_owned())
-                        .unwrap_or_default(),
-                )
-            })
-            .collect();
+    pub fn values(&self, _cx: &App) -> Vec<(&'static str, String)> {
+        let mut values: Vec<(&'static str, String)> = Vec::new();
         values.extend(
             self.flags
                 .iter()
-                .filter(|(k, _)| **k != "confirm")
+                // Confirmations and the preview are asked afresh each time.
+                .filter(|(k, _)| !matches!(**k, "confirm" | "dryrun"))
                 .map(|(k, v)| (*k, if *v { "1" } else { "0" }.to_string())),
         );
         values.extend(self.choices.iter().map(|(k, v)| (*k, v.to_string())));
-        values.push((
-            "output",
-            self.custom_output
-                .as_ref()
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_default(),
-        ));
         values
     }
 
-    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn restore(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = cx.default_global::<crate::settings::Settings>().clone();
         let value = |field: &str| {
             settings
                 .form_value(self.spec.key, field)
                 .map(str::to_string)
         };
-        for flag in self.spec.flags.iter().filter(|f| f.key != "confirm") {
+        for flag in self
+            .spec
+            .flags
+            .iter()
+            .filter(|f| !matches!(f.key, "confirm" | "dryrun"))
+        {
             if let Some(v) = value(flag.key) {
                 self.flags.insert(flag.key, v == "1");
             }
@@ -328,12 +315,6 @@ impl SimpleForm {
                 .filter(|&i| i < choice.options.len())
             {
                 self.choices.insert(choice.key, i);
-            }
-        }
-        self.custom_output = value("output").filter(|v| !v.is_empty()).map(PathBuf::from);
-        for path in self.spec.paths {
-            if let Some(v) = value(path.key).filter(|v| !v.is_empty()) {
-                self.set_path(path.key, v, window, cx);
             }
         }
     }
@@ -699,7 +680,7 @@ pub static ALIGN: Spec = Spec {
             key: "dryrun",
             label: ("先预览，不复制", "Preview only, copy nothing"),
             help: None,
-            default: false,
+            default: true,
         },
     ],
     output: Some("align"),

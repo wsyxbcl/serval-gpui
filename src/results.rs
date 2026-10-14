@@ -17,6 +17,15 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
     let warnings = run.warnings.len() + run.errors.iter().filter(|(_, p)| p.is_some()).count();
     let (fill, title, body) = match run.outcome {
         Outcome::Running | Outcome::NeedsDecision => return None,
+        Outcome::Finished if run.is_preview() => (
+            tokens.color("success-soft"),
+            t("预览完成", "Preview finished").to_string(),
+            t(
+                "没有改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。",
+                "Nothing was changed. The planned changes are listed in the run log below; when they look right, press Run it for real.",
+            )
+            .to_string(),
+        ),
         Outcome::Finished if warnings == 0 => (
             tokens.color("success-soft"),
             t("完成", "Finished").to_string(),

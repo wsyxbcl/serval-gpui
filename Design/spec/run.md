@@ -21,6 +21,9 @@ The run bar always answers one of: what will happen, what is happening, what hap
 - The exact command (with every flag Waxbill will pass) is shown under the status line before, during and after
   the run, and "复制命令" copies it. During a failure the secondary action is "复制日志".
 - The remaining-time estimate appears only after 5 seconds of a phase with a known total.
+- Commands that change files in place (重命名, 路径对齐) start as a preview (`--dryrun`, on by default and not
+  remembered). A finished preview opens its log, which holds Serval's plan, and the bar says "预览完成" with
+  **按此执行**, which runs the same command without `--dryrun`.
 - While running, the form is read-only (dimmed; its inputs disabled, so the keyboard cannot change it either), the screen's sidebar entry shows a spinner, and other screens
   can be visited (their Run is disabled: "另一个命令正在运行"). Leaving the screen does not warn: nothing
   stops; only closing the window asks.

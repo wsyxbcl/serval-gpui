@@ -87,34 +87,22 @@ impl ObserveForm {
     }
 
     /// The values remembered for the next launch.
-    pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
+    pub fn values(&self, _cx: &App) -> Vec<(&'static str, String)> {
         let flag = |b: bool| if b { "1" } else { "0" }.to_string();
         vec![
-            ("input", self.input.read(cx).value().to_string()),
             ("xmp", flag(self.read_sidecars)),
             ("images", flag(self.images)),
             ("videos", flag(self.videos)),
-            (
-                "output",
-                self.custom_output
-                    .as_ref()
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            ),
         ]
     }
 
     /// Restore the values of the last run.
-    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn restore(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = cx.default_global::<crate::settings::Settings>().clone();
         let value = |field: &str| settings.form_value("observe", field);
         self.read_sidecars = value("xmp") == Some("1");
         self.images = value("images") != Some("0");
         self.videos = value("videos") != Some("0");
-        self.custom_output = value("output").filter(|v| !v.is_empty()).map(PathBuf::from);
-        if let Some(input) = value("input").filter(|v| !v.is_empty()) {
-            self.set_input(input.to_string(), window, cx);
-        }
     }
 
     pub fn set_input(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {

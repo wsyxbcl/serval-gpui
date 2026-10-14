@@ -255,8 +255,6 @@ impl Waxbill {
                 app.translate
                     .update(cx, |form, cx| form.restore(window, cx));
                 app.update.update(cx, |form, cx| form.restore(window, cx));
-                app.browse
-                    .update(cx, |browse, cx| browse.restore(window, cx));
                 for form in app.simple.values() {
                     form.update(cx, |form, cx| form.restore(window, cx));
                 }
@@ -411,7 +409,15 @@ impl Waxbill {
             self.stop(cx);
             return;
         }
-        self.start_run(&[], cx);
+        // After a successful preview, the button runs the same command for real.
+        let for_real = self.runs.get(&self.screen).is_some_and(|run| {
+            run.outcome == Outcome::Finished
+                && run.is_preview()
+                && self.form().is_some_and(|form| {
+                    crate::screens::display_command(&form.plan(cx).args) == run.form_command
+                })
+        });
+        self.start_run_with(&[], if for_real { &["--dryrun"] } else { &[] }, cx);
     }
 
     /// Run again after a decision (the conflicts dialog).
@@ -433,6 +439,12 @@ impl Waxbill {
 
     /// Start the current screen's command, with `extra` arguments (a decision such as `--on-existing skip`).
     fn start_run(&mut self, extra: &[&str], cx: &mut Context<Self>) {
+        self.start_run_with(extra, &[], cx);
+    }
+
+    /// Start the current screen's command with `extra` arguments added and `without` ones left out (`--dryrun` when
+    /// a preview is run for real).
+    fn start_run_with(&mut self, extra: &[&str], without: &[&str], cx: &mut Context<Self>) {
         if self.running_screen().is_some() {
             return;
         }
@@ -446,6 +458,7 @@ impl Waxbill {
         }
         form.remember(cx);
         let mut args = plan.args.clone();
+        args.retain(|arg| !without.contains(&arg.as_str()));
         // Decisions go before the positional arguments at the end (`-o <dir> <input>`).
         let at = args
             .iter()
@@ -593,6 +606,16 @@ impl Waxbill {
                     secondary: None,
                 };
             }
+            Outcome::Finished if run.is_preview() => (
+                Tone::Success,
+                t("预览完成", "Preview finished").to_string(),
+                t(
+                    "没有改动任何文件；计划见运行日志",
+                    "nothing was changed; the plan is in the run log",
+                )
+                .to_string(),
+                t("按此执行", "Run it for real"),
+            ),
             Outcome::Finished if warnings == 0 => (
                 Tone::Success,
                 t("完成", "Finished").to_string(),

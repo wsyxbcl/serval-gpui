@@ -60,7 +60,10 @@ Rules:
   wrong type is marked at once (`.input.invalid` and a one-line reason), not at Run.
 - Under an input folder or CSV, one quiet line confirms what Waxbill found (e.g. "找到 12,480 张图片、1,302
   个视频", "14,106 行"), read without running Serval.
-- Each form remembers its last values per command (restored on next launch).
+- Each form keeps everything while Waxbill runs. Across launches it remembers its options (checkboxes, choices,
+  intervals) but not paths: data moves, a stale path only gives errors at start, and an empty field shows the
+  drop hint. The one exception is 物种名替换's taglist, a reference file that rarely moves. Previews and
+  confirmations are not remembered either (2026-10-14).
 
 ## 4. Keyboard
 

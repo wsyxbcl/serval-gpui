@@ -92,10 +92,6 @@ impl Browse {
 
     fn read(&mut self, cx: &mut Context<Self>) {
         let path = self.csv_path(cx).filter(|p| p.is_file());
-        if let Some(path) = &path {
-            let value = path.to_string_lossy().into_owned();
-            crate::settings::Settings::update(cx, |s| s.set_form_value("browse", "table", value));
-        }
         self.table = path.map(|p| Csv::read(&p));
         self.records = match &self.table {
             Some(Ok(csv)) => {
@@ -110,18 +106,6 @@ impl Browse {
             .retain(|s| records.all.iter().any(|r| r.species.contains(s)));
         self.review = Review::None;
         cx.notify();
-    }
-
-    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let table = cx
-            .default_global::<crate::settings::Settings>()
-            .form_value("browse", "table")
-            .map(str::to_string);
-        if let Some(table) = table.filter(|t| !t.is_empty()) {
-            self.csv
-                .update(cx, |input, cx| input.set_value(table, window, cx));
-            self.read(cx);
-        }
     }
 
     fn filters(&self) -> Filters {

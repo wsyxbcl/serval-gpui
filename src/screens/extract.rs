@@ -58,8 +58,6 @@ pub struct ExtractForm {
     show_all: bool,
     level: Option<usize>,
     keep_dirs: Option<usize>,
-    /// The kept folders of the last run, applied when its table is read again.
-    restored_keep_dirs: Option<usize>,
     species_folders: bool,
     rename: bool,
     custom_output: Option<PathBuf>,
@@ -103,7 +101,6 @@ impl ExtractForm {
             show_all: false,
             level: None,
             keep_dirs: None,
-            restored_keep_dirs: None,
             species_folders: false,
             rename: false,
             custom_output: None,
@@ -160,10 +157,7 @@ impl ExtractForm {
                     .sample_path()
                     .map(|p| p.split(['/', '\\']).count())
                     .unwrap_or(0);
-                self.keep_dirs = self
-                    .restored_keep_dirs
-                    .take()
-                    .or_else(|| self.level.map(|level| depth.saturating_sub(level + 1)));
+                self.keep_dirs = self.level.map(|level| depth.saturating_sub(level + 1));
                 let names: HashSet<&str> =
                     table.records.iter().map(|r| r.species.as_str()).collect();
                 self.selected.retain(|s| names.contains(s.as_str()));
@@ -451,53 +445,24 @@ impl ExtractForm {
         }
     }
 
-    pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
+    pub fn values(&self, _cx: &App) -> Vec<(&'static str, String)> {
         let flag = |b: bool| if b { "1" } else { "0" }.to_string();
         vec![
-            ("csv", self.csv.read(cx).value().to_string()),
-            (
-                "species",
-                self.selected.iter().cloned().collect::<Vec<_>>().join("\t"),
-            ),
             ("rating", self.rating.to_string()),
-            (
-                "keep_dirs",
-                self.keep_dirs.map(|k| k.to_string()).unwrap_or_default(),
-            ),
             ("rename", flag(self.rename)),
             ("species_folders", flag(self.species_folders)),
-            (
-                "output",
-                self.custom_output
-                    .as_ref()
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            ),
         ]
     }
 
-    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn restore(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = cx.default_global::<crate::settings::Settings>().clone();
         let value = |field: &str| settings.form_value("extract", field);
         self.rename = value("rename") == Some("1");
         self.species_folders = value("species_folders") == Some("1");
-        self.custom_output = value("output").filter(|v| !v.is_empty()).map(PathBuf::from);
-        self.selected = value("species")
-            .map(|s| {
-                s.split('\t')
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_string)
-                    .collect()
-            })
-            .unwrap_or_default();
         self.rating = value("rating")
             .and_then(|r| r.parse().ok())
             .filter(|&r| r < RATINGS.len())
             .unwrap_or(0);
-        self.restored_keep_dirs = value("keep_dirs").and_then(|k| k.parse().ok());
-        if let Some(csv) = value("csv").filter(|v| !v.is_empty()) {
-            self.set_csv(csv.to_string(), window, cx);
-        }
     }
 
     /// The choice made in 查看媒体, to copy with extract.

@@ -292,19 +292,11 @@ impl CaptureForm {
     pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
         let flag = |b: bool| if b { "1" } else { "0" }.to_string();
         vec![
-            ("csv", self.csv.read(cx).value().to_string()),
             ("min_gap", self.gap.read(cx).value().to_string()),
             ("last_independent", flag(self.from_last_independent)),
             ("individual", flag(self.by_individual)),
             ("event", flag(self.event)),
             ("exclude", flag(self.exclude)),
-            (
-                "output",
-                self.custom_output
-                    .as_ref()
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            ),
         ]
     }
 
@@ -313,15 +305,11 @@ impl CaptureForm {
         let value = |field: &str| settings.form_value("capture", field);
         self.from_last_independent = value("last_independent") == Some("1");
         self.by_individual = value("individual") == Some("1");
-        self.event = value("event") == Some("1");
+        self.event = value("event") != Some("0");
         self.exclude = value("exclude") != Some("0");
-        self.custom_output = value("output").filter(|v| !v.is_empty()).map(PathBuf::from);
         if let Some(gap) = value("min_gap").filter(|v| !v.is_empty()) {
             self.gap
                 .update(cx, |input, cx| input.set_value(gap.to_string(), window, cx));
-        }
-        if let Some(csv) = value("csv").filter(|v| !v.is_empty()) {
-            self.set_csv(csv.to_string(), window, cx);
         }
     }
 

@@ -256,17 +256,9 @@ impl TranslateForm {
 
     pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
         vec![
-            ("table", self.table.read(cx).value().to_string()),
             ("taglist", self.taglist.read(cx).value().to_string()),
             ("from", self.from.clone().unwrap_or_default()),
             ("to", self.to.clone().unwrap_or_default()),
-            (
-                "output",
-                self.custom_output
-                    .as_ref()
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            ),
         ]
     }
 
@@ -280,12 +272,10 @@ impl TranslateForm {
         };
         self.from = value("from");
         self.to = value("to");
-        self.custom_output = value("output").map(PathBuf::from);
-        // The taglist is usually the same for every table.
-        for (input, key) in [(&self.taglist, "taglist"), (&self.table, "table")] {
-            if let Some(path) = value(key) {
-                input.update(cx, |input, cx| input.set_value(path, window, cx));
-            }
+        // The taglist is a reference file, usually the same for every table: the one path remembered.
+        if let Some(path) = value("taglist") {
+            self.taglist
+                .update(cx, |input, cx| input.set_value(path, window, cx));
         }
         self.check(cx);
     }

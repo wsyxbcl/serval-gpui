@@ -427,10 +427,9 @@ impl UpdateForm {
         Plan { args, cwd, ready }
     }
 
-    pub fn values(&self, cx: &App) -> Vec<(&'static str, String)> {
+    pub fn values(&self, _cx: &App) -> Vec<(&'static str, String)> {
         let flag = |b: bool| if b { "1" } else { "0" }.to_string();
         vec![
-            ("csv", self.csv.read(cx).value().to_string()),
             ("mode", self.mode.to_string()),
             ("write", flag(self.write)),
             (
@@ -444,7 +443,7 @@ impl UpdateForm {
         ]
     }
 
-    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn restore(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = cx.default_global::<crate::settings::Settings>().clone();
         self.mode = settings
             .form_value("xmp_update", "mode")
@@ -460,14 +459,6 @@ impl UpdateForm {
             for (i, c) in fields.chars().enumerate() {
                 self.fields[i] = c == '1';
             }
-        }
-        if let Some(csv) = settings
-            .form_value("xmp_update", "csv")
-            .filter(|v| !v.is_empty())
-        {
-            self.csv
-                .update(cx, |input, cx| input.set_value(csv.to_string(), window, cx));
-            self.read(cx);
         }
     }
 
