@@ -135,12 +135,12 @@ impl Tokens {
     }
 
     /// The gpui-component theme for this appearance, as gpui-component's theme JSON.
-    fn theme_json(&self, name: &str, dark: bool) -> serde_json::Value {
+    fn theme_json(&self, name: &str, dark: bool, font: Option<&str>) -> serde_json::Value {
         let colors: serde_json::Map<String, serde_json::Value> = THEME_KEYS
             .iter()
             .map(|(key, token)| (key.to_string(), self.resolve(token).into()))
             .collect();
-        serde_json::json!({
+        let mut theme = serde_json::json!({
             "name": name,
             "mode": if dark { "dark" } else { "light" },
             "font.size": self.px("text-md").as_f32(),
@@ -148,7 +148,11 @@ impl Tokens {
             "radius.lg": self.px("radius-lg").as_f32() as usize,
             "shadow": false,
             "colors": colors,
-        })
+        });
+        if let Some(font) = font {
+            theme["font.family"] = font.into();
+        }
+        theme
     }
 }
 
@@ -168,12 +172,40 @@ impl TokensExt for App {
 }
 
 /// Register the Waxbill light and dark themes and switch to `mode`.
+/// Simplified-Chinese UI families as Linux distributions name them, in order of preference. Each also covers Latin.
+const LINUX_UI_FONTS: &[&str] = &[
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    "Source Han Sans CN",
+    "WenQuanYi Micro Hei",
+    "WenQuanYi Zen Hei",
+];
+
+/// The UI font to name on the theme. On Linux the system UI font (Noto Sans, Cantarell…) has no Chinese, and
+/// every Chinese character then falls back on its own, sometimes to a Japanese or Korean face, so one word can mix
+/// fonts; naming an installed Simplified-Chinese family keeps a line in one font. Windows and macOS fall back to
+/// Microsoft YaHei and PingFang, which is right.
+fn ui_font(cx: &App) -> Option<String> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let installed = cx.text_system().all_font_names();
+    LINUX_UI_FONTS
+        .iter()
+        .find(|family| installed.iter().any(|name| name == *family))
+        .map(|family| family.to_string())
+}
+
 pub fn init(mode: ThemeMode, cx: &mut App) {
     let light = Tokens::parse(false);
     let dark = Tokens::parse(true);
+    let font = ui_font(cx);
     let set = serde_json::json!({
         "name": "Waxbill",
-        "themes": [light.theme_json("Waxbill Light", false), dark.theme_json("Waxbill Dark", true)],
+        "themes": [
+            light.theme_json("Waxbill Light", false, font.as_deref()),
+            dark.theme_json("Waxbill Dark", true, font.as_deref()),
+        ],
     });
     ThemeRegistry::global_mut(cx)
         .load_themes_from_str(&set.to_string())

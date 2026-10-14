@@ -47,7 +47,7 @@
   --progress-bar: var(--primary);
 
   /* Type: system UI faces; CJK falls back to the platform's Chinese UI font. */
-  --font-ui: "Inter", "Segoe UI", "SF Pro Text", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-ui: "Inter", "Segoe UI", "SF Pro Text", "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Mono", "Noto Sans Mono CJK SC", ui-monospace, monospace;
   --text-xs: 12px;   /* captions, table meta */
   --text-sm: 13px;   /* body in dense areas, field help */
