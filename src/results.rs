@@ -209,18 +209,138 @@ pub fn log(
                 }),
         )
         .when(run.log_open, |column| {
+            let scroll = run.log_scroll.clone();
+            let at_edge = scroll.clone();
             column.child(
-                // The log scrolls on its own inside the scrolling page, with a scrollbar to drag.
+                // The page only gets the wheel once the log is at its top or bottom: GPUI scrolls every area
+                // under the pointer, and the page moving with it would carry the log away while reading.
                 div()
-                    .overflow_y_scrollbar()
-                    .id("log")
-                    .max_h(px(320.))
-                    .p(tokens.px("space-3"))
-                    .rounded(tokens.px("radius-sm"))
-                    .bg(cx.theme().muted)
-                    .font_family(cx.theme().mono_font_family.clone())
-                    .text_size(tokens.px("text-xs"))
-                    .children(run.log.iter().map(|line| div().child(line.clone()))),
+                    .on_scroll_wheel(move |event, window, cx| {
+                        let dy = event.delta.pixel_delta(window.line_height()).y;
+                        let (offset, max) = (at_edge.offset().y, at_edge.max_offset().y);
+                        let room = if dy < px(0.) {
+                            offset > -max
+                        } else {
+                            offset < px(0.)
+                        };
+                        if dy != px(0.) && room {
+                            cx.stop_propagation();
+                        }
+                    })
+                    .child(
+                        div()
+                            .id("log")
+                            .max_h(px(320.))
+                            .overflow_y_scroll()
+                            .track_scroll(&scroll)
+                            .vertical_scrollbar(&scroll)
+                            .p(tokens.px("space-3"))
+                            .rounded(tokens.px("radius-sm"))
+                            .bg(cx.theme().muted)
+                            .font_family(cx.theme().mono_font_family.clone())
+                            .text_size(tokens.px("text-xs"))
+                            .children(run.log.iter().enumerate().map(|(i, line)| {
+                                div()
+                                    .debug_selector(move || format!("log-line-{i}"))
+                                    .child(line.clone())
+                            })),
+                    ),
             )
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::run::Run;
+    use gpui_kit::component::theme::ThemeMode;
+    use gpui_kit::component::v_flex;
+    use gpui_kit::{
+        Context, InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollDelta,
+        ScrollWheelEvent, StatefulInteractiveElement as _, Styled as _, TestAppContext,
+        VisualTestContext, Window, div, point, px,
+    };
+
+    struct Page {
+        run: Run,
+    }
+
+    impl Render for Page {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            // As the app lays out a screen: a scrolling page with the results in it.
+            v_flex().size_full().child(
+                div()
+                    .id("screen")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(
+                        v_flex()
+                            .child(div().h(px(100.)).debug_selector(|| "above".into()))
+                            .child(super::log(&self.run, |_, _, _| {}, cx))
+                            .child(div().h(px(1500.))),
+                    ),
+            )
+        }
+    }
+
+    #[gpui_kit::test]
+    fn the_log_scrolls_inside_the_scrolling_page(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::theme::init(ThemeMode::Light, cx);
+        });
+        let mut run = Run::failed_to_start("serval observe".into(), "error".into());
+        run.log_open = true;
+        run.log.extend((0..200).map(|i| format!("line {i}")));
+        let (_, cx) = cx.add_window_view(|_, _| Page { run });
+        cx.run_until_parked();
+        cx.update(|window, cx| _ = window.draw(cx));
+
+        let offset = |cx: &mut VisualTestContext| {
+            cx.debug_bounds("log-line-2").unwrap().top() - cx.debug_bounds("above").unwrap().top()
+        };
+        for delta in [
+            ScrollDelta::Pixels(point(px(0.), px(-60.))),
+            ScrollDelta::Lines(point(0., -3.)),
+        ] {
+            let before = offset(cx);
+            let page = cx.debug_bounds("above").unwrap().top();
+            let line = cx.debug_bounds("log-line-5").unwrap();
+            cx.simulate_event(ScrollWheelEvent {
+                position: line.center(),
+                delta,
+                ..Default::default()
+            });
+            cx.update(|window, cx| _ = window.draw(cx));
+            eprintln!(
+                "{delta:?}: log {before:?} → {:?}, page {page:?} → {:?}",
+                offset(cx),
+                cx.debug_bounds("above").unwrap().top()
+            );
+            assert!(
+                offset(cx) < before,
+                "the log did not scroll: {before:?} → {:?}",
+                offset(cx)
+            );
+            assert_eq!(
+                cx.debug_bounds("above").unwrap().top(),
+                page,
+                "the page moved with the log"
+            );
+        }
+        // At the bottom of the log, the wheel scrolls the page again.
+        let line = cx.debug_bounds("log-line-5").unwrap();
+        for _ in 0..2 {
+            cx.simulate_event(ScrollWheelEvent {
+                position: line.center(),
+                delta: ScrollDelta::Pixels(point(px(0.), px(-5000.))),
+                ..Default::default()
+            });
+            cx.update(|window, cx| _ = window.draw(cx));
+        }
+        assert!(
+            cx.debug_bounds("above").unwrap().top() < px(0.),
+            "the page did not take over"
+        );
+    }
 }

@@ -61,6 +61,8 @@ pub struct Run {
     /// Observe: images whose individual IDs could not be given to a species (questions.md §4).
     pub unresolved: Option<(u64, Vec<UnresolvedSpecies>)>,
     pub log_open: bool,
+    /// Where the log is scrolled, kept across redraws (results.rs).
+    pub log_scroll: gpui_kit::ScrollHandle,
     stop_requested: bool,
     process: Option<Running>,
 }
@@ -84,6 +86,7 @@ impl Run {
             needs: None,
             unresolved: None,
             log_open: false,
+            log_scroll: gpui_kit::ScrollHandle::new(),
             stop_requested: false,
             process: Some(process),
         }
@@ -154,6 +157,7 @@ impl Run {
             needs: None,
             unresolved: None,
             log_open: true,
+            log_scroll: gpui_kit::ScrollHandle::new(),
             stop_requested: false,
             process: None,
         };
