@@ -866,6 +866,7 @@ impl Waxbill {
                 .children(self.render_unresolved_banner(cx))
                 .children(results::warning_list(run, cx))
                 .children(results::output_list(run, cx))
+                .children(self.render_next_steps(cx))
                 .child(results::log(
                     run,
                     cx.listener(move |this, _, _, cx| {
@@ -874,6 +875,75 @@ impl Waxbill {
                             cx.notify();
                         }
                     }),
+                    cx,
+                )),
+        )
+    }
+
+    /// What to do with 标签获取's tags table next: open it in another screen, already filled in (data.md §5). This
+    /// is how a table made a minute ago is one click away, now that paths are not remembered across launches.
+    fn render_next_steps(&self, cx: &mut Context<Self>) -> Option<Div> {
+        if self.screen != ScreenId::Observe {
+            return None;
+        }
+        let run = self.runs.get(&self.screen)?;
+        let table = run.outputs.iter().map(|o| o.path.clone()).find(|path| {
+            path.file_name().is_some_and(|name| {
+                let name = name.to_string_lossy();
+                name.starts_with("tags_") && name.ends_with(".csv")
+            })
+        })?;
+        let tokens = cx.tokens().clone();
+        let step =
+            |id: &'static str, label: &'static str, screen: ScreenId, cx: &mut Context<Self>| {
+                let table = table.to_string_lossy().into_owned();
+                Button::new(id).outline().label(label).on_click(cx.listener(
+                    move |this, _, window, cx| {
+                        // A screen whose own command is running keeps its form as it is.
+                        if this.running_screen() != Some(screen) {
+                            let table = table.clone();
+                            match screen {
+                                ScreenId::Capture => this
+                                    .capture
+                                    .update(cx, |form, cx| form.set_csv(table, window, cx)),
+                                ScreenId::Extract => this
+                                    .extract
+                                    .update(cx, |form, cx| form.set_csv(table, window, cx)),
+                                _ => this
+                                    .browse
+                                    .update(cx, |browse, cx| browse.set_table(table, window, cx)),
+                            }
+                        }
+                        this.go(screen, cx);
+                    },
+                ))
+            };
+        Some(
+            h_flex()
+                .gap(tokens.px("space-2"))
+                .flex_wrap()
+                .text_size(tokens.px("text-sm"))
+                .child(
+                    div()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(t("用这张标签表继续：", "Continue with this tags table:")),
+                )
+                .child(step(
+                    "next-capture",
+                    t("独立捕获", "Independent captures"),
+                    ScreenId::Capture,
+                    cx,
+                ))
+                .child(step(
+                    "next-extract",
+                    t("媒体提取", "Extract media"),
+                    ScreenId::Extract,
+                    cx,
+                ))
+                .child(step(
+                    "next-browse",
+                    t("查看媒体", "View media"),
+                    ScreenId::Browse,
                     cx,
                 )),
         )

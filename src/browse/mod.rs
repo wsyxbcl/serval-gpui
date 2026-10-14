@@ -90,6 +90,13 @@ impl Browse {
         (!value.is_empty()).then(|| PathBuf::from(value))
     }
 
+    /// Open a table here (a next step from 标签获取's result).
+    pub fn set_table(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.csv
+            .update(cx, |input, cx| input.set_value(path, window, cx));
+        self.read(cx);
+    }
+
     fn read(&mut self, cx: &mut Context<Self>) {
         let path = self.csv_path(cx).filter(|p| p.is_file());
         self.table = path.map(|p| Csv::read(&p));
