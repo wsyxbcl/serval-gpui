@@ -833,23 +833,28 @@ impl Waxbill {
             .w(tokens.px("sidebar-w"))
             .flex_shrink_0()
             .h_full()
-            .px(tokens.px("space-2"))
             .pb(tokens.px("space-3"))
             .justify_between()
             .bg(cx.theme().sidebar)
             .text_color(cx.theme().sidebar_foreground)
             .border_r_1()
             .border_color(cx.theme().border)
-            // Twelve entries under five headings: on a short window the groups scroll, Settings stays put.
+            // Twelve entries under five headings: on a short window the groups scroll, Settings stays put. The
+            // side padding is inside the scroll area, which clips: the selected item's coral marker sits in it.
             .child(
                 div()
                     .id("nav")
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
+                    .px(tokens.px("space-2"))
                     .child(list),
             )
-            .child(self.sidebar_item(ScreenId::Settings, cx))
+            .child(
+                div()
+                    .px(tokens.px("space-2"))
+                    .child(self.sidebar_item(ScreenId::Settings, cx)),
+            )
     }
 
     fn render_results(&self, cx: &mut Context<Self>) -> Option<Div> {
