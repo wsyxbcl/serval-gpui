@@ -16,6 +16,7 @@ mod run_bar;
 mod run_dialogs;
 mod runner;
 mod screens;
+mod scroll_area;
 mod serval;
 mod settings;
 mod settings_screen;

@@ -15,6 +15,7 @@ use crate::screens::simple::{self, SimpleForm};
 use crate::screens::translate::TranslateForm;
 use crate::screens::update::UpdateForm;
 use crate::screens::{Form, ScreenId, groups};
+use crate::scroll_area::with_scrollbar;
 use crate::serval::{self, ServalStatus};
 use crate::settings::{Appearance, Settings};
 use crate::theme;
@@ -93,6 +94,9 @@ pub struct Waxbill {
     pub(crate) close_asked: bool,
     /// 停止并退出 was chosen: quit once the run has stopped.
     pub(crate) quit_when_stopped: bool,
+    /// Where the page and the sidebar are scrolled, for their scrollbars.
+    page_scroll: ScrollHandle,
+    nav_scroll: ScrollHandle,
     next_run_id: u64,
     focus: FocusHandle,
     pub(crate) icon: Arc<Image>,
@@ -165,6 +169,8 @@ impl Waxbill {
             cancel_ask: None,
             close_asked: false,
             quit_when_stopped: false,
+            page_scroll: ScrollHandle::new(),
+            nav_scroll: ScrollHandle::new(),
             next_run_id: 0,
             focus,
             icon: Arc::new(Image::from_bytes(ImageFormat::Png, APP_ICON.to_vec())),
@@ -841,15 +847,17 @@ impl Waxbill {
             .border_color(cx.theme().border)
             // Twelve entries under five headings: on a short window the groups scroll, Settings stays put. The
             // side padding is inside the scroll area, which clips: the selected item's coral marker sits in it.
-            .child(
+            .child(with_scrollbar(
+                div().flex_1().min_h_0(),
                 div()
                     .id("nav")
-                    .flex_1()
-                    .min_h_0()
+                    .size_full()
                     .overflow_y_scroll()
                     .px(tokens.px("space-2"))
                     .child(list),
-            )
+                &self.nav_scroll,
+                "nav",
+            ))
             .child(
                 div()
                     .px(tokens.px("space-2"))
@@ -1030,18 +1038,18 @@ impl Waxbill {
                     })
                 }))
         };
-        let body = div()
-            .id("screen")
-            .flex_1()
-            .min_h_0()
-            .overflow_y_scroll()
-            .child(
+        let body = with_scrollbar(
+            div().flex_1().min_h_0(),
+            div().id("screen").size_full().overflow_y_scroll().child(
                 div()
                     .max_w(tokens.px("content-max-w"))
                     .px(tokens.px("space-6"))
                     .py(tokens.px("space-5"))
                     .child(content),
-            );
+            ),
+            &self.page_scroll,
+            "page",
+        );
         let bar = form.as_ref().map(|form| self.bar(form, cx));
         v_flex()
             .flex_1()

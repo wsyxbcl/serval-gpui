@@ -32,6 +32,8 @@
   --primary-hover: #183b39;
   --primary-foreground: #ffffff;
   --accent: var(--brand-bill);    /* selected navigation marker, links in text */
+  --scrollbar-thumb: rgba(227, 93, 91, 0.45);  /* the bill, softened: shown only where a page is too long */
+  --scrollbar-thumb-hover: var(--brand-bill);
 
   /* Status */
   --success: #2f7d4f;
@@ -114,6 +116,8 @@
   --primary-hover: #95d3cd;
   --primary-foreground: #0f1717;
   --accent: #f07a73;
+  --scrollbar-thumb: rgba(240, 122, 115, 0.45);
+  --scrollbar-thumb-hover: #f07a73;
 
   --success: #6fbf8b;
   --success-soft: #1d2e24;

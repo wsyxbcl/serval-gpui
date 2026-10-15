@@ -35,6 +35,8 @@ Commands grouped by kind of work. Labels are the task, not the CLI name:
 | (bottom) | 设置 Settings | |
 
 - Order and names from the 2026-10-14 review. The groups scroll on a short window; Settings stays at the bottom.
+- Scrollbars (page, sidebar, log) appear wherever the content does not fit, in a softened coral
+  (`--scrollbar-thumb`, the full bill on hover); areas that fit show none. (2026-10-15)
 - Width `--sidebar-w`. The selected item has the `--sidebar-active` fill and a 3px `--accent` marker.
 - A running command shows a small spinner next to its item, so the user can look at other screens meanwhile.
   Only one command runs at a time; Run on another screen is disabled with "另一个命令正在运行".

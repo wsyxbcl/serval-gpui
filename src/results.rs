@@ -5,7 +5,6 @@ use crate::i18n::{count, t};
 use crate::run::{Outcome, Run};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{ActiveTheme, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -236,13 +235,12 @@ pub fn log(
                             cx.stop_propagation();
                         }
                     })
-                    .child(
+                    .child(crate::scroll_area::with_scrollbar(
+                        div(),
                         div()
                             .id("log")
                             .max_h(px(320.))
                             .overflow_y_scroll()
-                            .track_scroll(&scroll)
-                            .vertical_scrollbar(&scroll)
                             .p(tokens.px("space-3"))
                             .rounded(tokens.px("radius-sm"))
                             .bg(cx.theme().muted)
@@ -253,7 +251,9 @@ pub fn log(
                                     .debug_selector(move || format!("log-line-{i}"))
                                     .child(line.clone())
                             })),
-                    ),
+                        &scroll,
+                        "log",
+                    )),
             )
         })
 }
@@ -308,6 +308,8 @@ mod tests {
         let offset = |cx: &mut VisualTestContext| {
             cx.debug_bounds("log-line-2").unwrap().top() - cx.debug_bounds("above").unwrap().top()
         };
+        let bar = |cx: &mut VisualTestContext| cx.debug_bounds("scrollbar-log").unwrap();
+        let bar_before = bar(cx);
         for delta in [
             ScrollDelta::Pixels(point(px(0.), px(-60.))),
             ScrollDelta::Lines(point(0., -3.)),
@@ -337,6 +339,8 @@ mod tests {
                 "the page moved with the log"
             );
         }
+        // The scrollbar stays over the log's box while its content scrolls.
+        assert_eq!(bar(cx), bar_before, "the scrollbar moved with the content");
         // At the bottom of the log, the wheel scrolls the page again.
         let line = cx.debug_bounds("log-line-5").unwrap();
         for _ in 0..2 {

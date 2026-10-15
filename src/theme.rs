@@ -29,6 +29,8 @@ const THEME_KEYS: &[(&str, &str)] = &[
     ("accent.background", "muted"),
     ("accent.foreground", "foreground"),
     ("link", "accent"),
+    ("scrollbar.thumb.background", "scrollbar-thumb"),
+    ("scrollbar.thumb.hover.background", "scrollbar-thumb-hover"),
     ("link.hover", "accent"),
     ("link.active", "accent"),
     ("popover.background", "surface"),
@@ -214,6 +216,9 @@ pub fn init(mode: ThemeMode, cx: &mut App) {
     let theme = Theme::global_mut(cx);
     theme.light_theme = themes["Waxbill Light"].clone();
     theme.dark_theme = themes["Waxbill Dark"].clone();
+    // A scrollbar wherever something does not fit (page, sidebar, log), not only while scrolling: a long screen
+    // shows that there is more below. Areas that fit show none.
+    theme.scrollbar_mode = gpui_kit::component::scroll::ScrollbarMode::Always;
     set_mode(mode, cx);
 }
 
