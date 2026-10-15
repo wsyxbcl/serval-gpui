@@ -27,10 +27,12 @@ pub struct Check {
     pub encoding: Encoding,
     /// Tab-separated (Excel's "Unicode text").
     pub tabs: bool,
-    /// Time cells `xmp write` would refuse that can be rewritten, and whether some of them have no seconds.
+    /// Time cells `xmp write` would refuse that can be rewritten without losing anything (`2023/1/5 06:11:00`).
     pub times: usize,
-    pub no_seconds: bool,
-    /// Time cells that are not a date and time in year-month-day order (e.g. day first): not rewritten.
+    /// Time cells without seconds (Excel/WPS drop them when saving): reported, never filled in, since the real
+    /// seconds are lost.
+    pub missing_seconds: usize,
+    /// Time cells that are not a date and time in year-month-day order (e.g. day first): reported, not rewritten.
     pub unknown_times: usize,
 }
 
@@ -115,7 +117,7 @@ fn serval_writes(cell: &str) -> bool {
 }
 
 /// The table's rows and what was found; with `times`, the time cells `xmp write` would refuse are rewritten as
-/// `yyyy-MM-dd HH:mm:ss` (missing seconds become 00), and cells that are not year-month-day are counted, not changed.
+/// `yyyy-MM-dd HH:mm:ss` when nothing is lost, and the others (no seconds, not year-month-day) are counted only.
 fn read(path: &Path, times: bool) -> Result<(Vec<csv::StringRecord>, Check), String> {
     let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
     let (text, encoding) = decode(&bytes)?;
@@ -135,7 +137,7 @@ fn read(path: &Path, times: bool) -> Result<(Vec<csv::StringRecord>, Check), Str
         encoding,
         tabs,
         times: 0,
-        no_seconds: false,
+        missing_seconds: 0,
         unknown_times: 0,
     };
     let Some(header) = rows.first().cloned() else {
@@ -158,10 +160,10 @@ fn read(path: &Path, times: bool) -> Result<(Vec<csv::StringRecord>, Check), Str
                 continue;
             }
             match normal_time(cell) {
-                Some((normal, no_seconds)) => {
+                Some((_, true)) => check.missing_seconds += 1,
+                Some((normal, false)) => {
                     *cell = normal;
                     check.times += 1;
-                    check.no_seconds |= no_seconds;
                     changed = true;
                 }
                 None => check.unknown_times += 1,
@@ -387,17 +389,26 @@ impl TableCheck {
             );
         }
         if check.times > 0 {
-            let seconds = check.no_seconds;
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "{} 个时间无法写入 XMP，需要 yyyy-MM-dd HH:mm:ss 格式；修复时会改为该格式{}。",
-                    count(check.times),
-                    if seconds { "，缺少的秒数补为 00" } else { "" }
+                    "{} 个时间的格式无法写入 XMP（例如 2023/2/8 09:25:00）；修复时改为 yyyy-MM-dd HH:mm:ss。",
+                    count(check.times)
                 ),
                 Language::English => format!(
-                    "{} times cannot be written to XMP as they are (yyyy-MM-dd HH:mm:ss is needed); the repair rewrites them{}.",
-                    count(check.times),
-                    if seconds { ", with 00 for missing seconds" } else { "" }
+                    "{} times are in a format XMP cannot take (e.g. 2023/2/8 09:25:00); the repair rewrites them as yyyy-MM-dd HH:mm:ss.",
+                    count(check.times)
+                ),
+            });
+        }
+        if check.missing_seconds > 0 {
+            lines.push(match language() {
+                Language::Chinese => format!(
+                    "{} 个时间缺少秒数，可能是 Excel/WPS 保存时丢失的。建议在原表中把时间列的格式设为 yyyy-mm-dd hh:mm:ss 后重新保存；Waxbill 不会自动补 00。",
+                    count(check.missing_seconds)
+                ),
+                Language::English => format!(
+                    "{} times have no seconds, probably lost when Excel/WPS saved the table. Set the time column's format to yyyy-mm-dd hh:mm:ss in the original table and save again; Waxbill does not fill in 00.",
+                    count(check.missing_seconds)
                 ),
             });
         }
@@ -436,7 +447,9 @@ impl Render for TableCheck {
                 ),
             });
         let (lines, button) = match &self.state {
-            State::Checked(check) if check.needs_repair() || check.unknown_times > 0 => {
+            State::Checked(check)
+                if check.needs_repair() || check.missing_seconds > 0 || check.unknown_times > 0 =>
+            {
                 (Self::problems(check), check.needs_repair())
             }
             State::Repairing => (
@@ -479,12 +492,13 @@ mod tests {
     use super::{Encoding, check, repair};
 
     #[test]
-    fn repairs_a_gbk_table_with_times_changed_by_wps() {
+    fn repairs_a_gbk_table_and_never_fills_in_lost_seconds() {
         let dir = std::env::temp_dir().join(format!("waxbill-repair-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let table = dir.join("labels.csv");
-        // WPS without seconds (rewritten), unpadded with seconds (xmp write takes it), day first (only counted).
-        let text = "path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-1-5 6:09\n/data/雪豹/2.JPG,雪豹,2023-1-5 6:10:07\n/data/雪豹/3.JPG,雪豹,05/01/2023 06:12\n";
+        // WPS without seconds (reported, not filled in), unpadded with seconds (xmp write takes it), day first
+        // (reported), slashes with seconds (rewritten: nothing is lost).
+        let text = "path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-1-5 6:09\n/data/雪豹/2.JPG,雪豹,2023-1-5 6:10:07\n/data/雪豹/3.JPG,雪豹,05/01/2023 06:12\n/data/雪豹/4.JPG,雪豹,2023/1/5 06:11:00\n";
         let (gbk, _, _) = encoding_rs::GBK.encode(text);
         std::fs::write(&table, &gbk).unwrap();
 
@@ -493,10 +507,10 @@ mod tests {
             (
                 found.encoding,
                 found.times,
-                found.no_seconds,
+                found.missing_seconds,
                 found.unknown_times
             ),
-            (Encoding::Gbk, 1, true, 1)
+            (Encoding::Gbk, 1, 1, 1)
         );
         // Where Serval reads times leniently (Polars), they are not checked.
         assert_eq!(check(&table, false).unwrap().times, 0);
@@ -505,7 +519,7 @@ mod tests {
         let repaired = std::fs::read(&copy).unwrap();
         assert_eq!(
             String::from_utf8(repaired).unwrap(),
-            "\u{feff}path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-01-05 06:09:00\n/data/雪豹/2.JPG,雪豹,2023-1-5 6:10:07\n/data/雪豹/3.JPG,雪豹,05/01/2023 06:12\n"
+            "\u{feff}path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-1-5 6:09\n/data/雪豹/2.JPG,雪豹,2023-1-5 6:10:07\n/data/雪豹/3.JPG,雪豹,05/01/2023 06:12\n/data/雪豹/4.JPG,雪豹,2023-01-05 06:11:00\n"
         );
         assert_eq!(std::fs::read(&table).unwrap(), gbk.as_ref());
 

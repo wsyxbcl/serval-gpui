@@ -35,7 +35,7 @@ example data.
 | 版本过旧 | too old | `app.rs:705` |
 | 未找到 Serval | Serval not found | `app.rs:709` |
 | 用这张标签表继续： | Continue with this tags table: | `app.rs:943` |
-| 独立捕获 | Temporal-independence events | `app.rs:947` |
+| 独立捕获 | Events | `app.rs:947` |
 | 媒体提取 | Copy media | `app.rs:953` |
 | 查看媒体 | View media | `app.rs:959` |
 | 帮助 | Help | `app.rs:986` |
@@ -134,23 +134,23 @@ example data.
 | 中文 | English | Where |
 | --- | --- | --- |
 | 选择或拖入一个文件夹 | Choose or drop a folder | `screens/observe.rs:50` |
-| 选择媒体文件夹 | choose the media folder | `screens/observe.rs:233` |
-| 媒体文件夹不存在 | the media folder does not exist | `screens/observe.rs:235` |
-| 至少选择一种媒体类型 | choose at least one media type | `screens/observe.rs:238` |
-| 正在统计… | Counting… | `screens/observe.rs:269` |
-| 找不到这个文件夹 | This folder does not exist | `screens/observe.rs:272` |
-| 媒体文件夹 | Media folder | `screens/observe.rs:303` |
-| 选择… | Choose… | `screens/observe.rs:317` |
-| 读取来源 | Read from | `screens/observe.rs:330` |
-| 媒体文件 | Media files | `screens/observe.rs:332` |
-| 媒体类型 | Media types | `screens/observe.rs:342` |
-| 图片 | Images | `screens/observe.rs:347` |
-| 视频 | Videos | `screens/observe.rs:356` |
-| 高级选项 | Advanced options | `screens/observe.rs:383` |
-| 生成 debug 表格（raw.csv） | Write the debug table (raw.csv) | `screens/observe.rs:395` |
-| 包含位点和文件修改时间，可用于修正时间（xmp update --datetime）。 | Adds the deployment and file modification time, for fixing times (xmp update --datetime). | `screens/observe.rs:403` |
-| 将读取 {} 个文件 | (format!, written per language) | `screens/observe.rs:248` |
-| 找到 {} 张图片、{} 个视频、{} 个 XMP | (format!, written per language) | `screens/observe.rs:278` |
+| 选择媒体文件夹 | choose the media folder | `screens/observe.rs:234` |
+| 媒体文件夹不存在 | the media folder does not exist | `screens/observe.rs:236` |
+| 至少选择一种媒体类型 | choose at least one media type | `screens/observe.rs:239` |
+| 正在统计… | Counting… | `screens/observe.rs:270` |
+| 找不到这个文件夹 | This folder does not exist | `screens/observe.rs:273` |
+| 媒体文件夹 | Media folder | `screens/observe.rs:304` |
+| 选择… | Choose… | `screens/observe.rs:318` |
+| 读取来源 | Read from | `screens/observe.rs:331` |
+| 媒体文件 | Media files | `screens/observe.rs:333` |
+| 媒体类型 | Media types | `screens/observe.rs:343` |
+| 图片 | Images | `screens/observe.rs:348` |
+| 视频 | Videos | `screens/observe.rs:357` |
+| 高级选项 | Advanced options | `screens/observe.rs:384` |
+| 生成 debug 表格（raw.csv） | Write the debug table (raw.csv) | `screens/observe.rs:396` |
+| 包含位点和文件修改时间，可用于修正时间（xmp update --datetime）。 | Adds the deployment and file modification time, for fixing times (xmp update --datetime). | `screens/observe.rs:404` |
+| 将读取 {} 个文件 | (format!, written per language) | `screens/observe.rs:249` |
+| 找到 {} 张图片、{} 个视频、{} 个 XMP | (format!, written per language) | `screens/observe.rs:279` |
 
 ## 独立捕获 capture
 
@@ -175,7 +175,7 @@ example data.
 | 分钟 | min | `screens/capture.rs:471` |
 | 同一位点、同一物种的两条记录相隔不少于此时间，才算两次独立捕获。 | Two records of one species at one deployment count as two captures only this far apart. | `screens/capture.rs:475` |
 | 请输入至少 1 分钟的整数。 | Enter a whole number of minutes, at least 1. | `screens/capture.rs:484` |
-| 异常值。 | Unusual value. | `screens/capture.rs:487` |
+| 间隔超过一周，异常值。 | Over a week: an unusual value. | `screens/capture.rs:487` |
 | 间隔从哪条记录算起 | Measure the interval from | `screens/capture.rs:490` |
 | 上一条记录 | The previous record | `screens/capture.rs:494` |
 | 每条记录都重新计时（默认） | Every record restarts the clock (default) | `screens/capture.rs:495` |
@@ -353,7 +353,7 @@ example data.
 | （可选） |  (optional) | `screens/simple.rs:372` |
 | 选择… | Choose… | `screens/simple.rs:389` |
 | 选项 | Options | `screens/simple.rs:467` |
-| 为每个媒体文件建立 XMP sidecar（已有的不改动），并生成包含时间和 GPS 的表格。 | Creates an XMP sidecar for each media file (existing ones are kept) and a table of every file's time and GPS. | `screens/simple.rs:543` |
+| 为每个媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。 | Creates an XMP sidecar for each media file (existing ones are kept) and a table for checking the data. | `screens/simple.rs:543` |
 | 媒体文件夹 | Media folder | `screens/simple.rs:549` |
 | 按位点表把位点文件夹从名称改为编号。 | Renames deployment folders from their names to their IDs, from the deployments table. | `screens/simple.rs:585` |
 | 项目文件夹 | Project folder | `screens/simple.rs:591` |
@@ -374,20 +374,20 @@ example data.
 | 保留第一层子文件夹（摊平时） | Keep the first subfolder (when flattening) | `screens/simple.rs:672` |
 | 先预览，不复制 | Preview only, copy nothing | `screens/simple.rs:681` |
 | 按原目录结构复制文件夹中的 XMP sidecar，用于备份或交给他人。 | Copies a folder's XMP sidecars, keeping the folder structure, for a backup or to hand over. | `screens/simple.rs:713` |
-| 删除文件夹（含子文件夹）中所有的 XMP sidecar。删除前请先备份。 | Deletes every XMP sidecar in a folder and its subfolders. Make sure there is a backup first. | `screens/simple.rs:741` |
+| 删除文件夹（含子文件夹）中所有的 XMP sidecar。 | Deletes every XMP sidecar in a folder and its subfolders. | `screens/simple.rs:741` |
 | 文件夹 | Folder | `screens/simple.rs:747` |
-| 我确认要删除这些 XMP 文件 | I want to delete these XMP files | `screens/simple.rs:755` |
-| 标签和评分保存在 XMP 里，删除后无法恢复；可以先用 XMP 导出备份。 | Tags and ratings live in the XMP files and cannot be recovered; back them up with Export XMP first. | `screens/simple.rs:759` |
-| 这个文件夹里没有 XMP 文件 | there are no XMP files in this folder | `screens/simple.rs:772` |
-| 请先确认删除 | confirm the deletion first | `screens/simple.rs:778` |
-| 把 XMP sidecar 中的标签写入媒体文件，让不读取 XMP 的软件也能看到。 | Writes the tags in the XMP sidecars into the media files, so software that ignores XMP sees them too. | `screens/simple.rs:791` |
-| 同步文件夹中所有的 XMP，或用下面的表格只同步一部分。 | Syncs every XMP in the folder; or use a table below to sync some of them. | `screens/simple.rs:801` |
-| 表格 | Table | `screens/simple.rs:808` |
-| 只同步表格 path 列里的文件。 | Syncs only the files in the table's path column. | `screens/simple.rs:811` |
-| 文件夹和表格只选一个 | choose a folder or a table, not both | `screens/simple.rs:825` |
-| 选择文件夹或表格 | choose a folder or a table | `screens/simple.rs:830` |
+| 确认删除这些 XMP 文件 | Delete these XMP files | `screens/simple.rs:755` |
+| 标签和评分保存在 XMP 里，删除后无法恢复；可以先用 XMP 导出备份。 | Tags and ratings live in the XMP files and cannot be recovered; back them up with Export XMP first. | `screens/simple.rs:756` |
+| 这个文件夹里没有 XMP 文件 | there are no XMP files in this folder | `screens/simple.rs:769` |
+| 请先确认删除 | confirm the deletion first | `screens/simple.rs:775` |
+| 把 XMP sidecar 中的标签写入媒体文件，让不读取 XMP 的软件也能看到。 | Writes the tags in the XMP sidecars into the media files, so software that ignores XMP sees them too. | `screens/simple.rs:788` |
+| 同步文件夹中所有的 XMP，或用下面的表格只同步一部分。 | Syncs every XMP in the folder; or use a table below to sync some of them. | `screens/simple.rs:798` |
+| 表格 | Table | `screens/simple.rs:805` |
+| 只同步表格 path 列里的文件。 | Syncs only the files in the table's path column. | `screens/simple.rs:808` |
+| 文件夹和表格只选一个 | choose a folder or a table, not both | `screens/simple.rs:822` |
+| 选择文件夹或表格 | choose a folder or a table | `screens/simple.rs:827` |
 | 找到 {} 张图片、{} 个视频、{} 个 XMP | (format!, written per language) | `screens/simple.rs:343` |
-| 将删除 {} | (format!, written per language) | `screens/simple.rs:781` |
+| 将删除 {} | (format!, written per language) | `screens/simple.rs:778` |
 | {} 个媒体文件 | (fragment) | `screens/simple.rs:534` |
 | {} 个 XMP 文件 | (fragment) | `screens/simple.rs:535` |
 | {} 个媒体文件，已有 {} 个 XMP | (fragment) | `screens/simple.rs:568` |
@@ -397,28 +397,28 @@ example data.
 | 中文 | English | Where |
 | --- | --- | --- |
 | 选择或拖入 tags.csv | Choose or drop tags.csv | `screens/translate.rs:101` |
-| 选择标签表（例如 taglist_maze.csv） | Choose the taglist (e.g. taglist_maze.csv) | `screens/translate.rs:104` |
+| 选择物种名录（例如 taglist_maze.csv） | Choose the species list (e.g. taglist_maze.csv) | `screens/translate.rs:104` |
 | 选择要替换的表 | choose the table to translate | `screens/translate.rs:220` |
-| 选择标签表 | choose the taglist | `screens/translate.rs:221` |
+| 选择物种名录 | choose the species list | `screens/translate.rs:221` |
 | 表格无法读取： | cannot read: | `screens/translate.rs:223` |
 | 表格不存在 | a table does not exist | `screens/translate.rs:225` |
 | 选择两个不同的列 | choose two different columns | `screens/translate.rs:227` |
 | 选择列 | choose the columns | `screens/translate.rs:246` |
-| 可以在标签表里补上后重新检查。 | Add them to the taglist, then check again. | `screens/translate.rs:418` |
+| 可以在物种名录里补上后重新检查。 | Add them to the species list, then check again. | `screens/translate.rs:418` |
 | 重新检查 | Check again | `screens/translate.rs:429` |
 | 选择… | Choose… | `screens/translate.rs:457` |
 | 要替换的表 | Table to translate | `screens/translate.rs:496` |
-| 标签表 | Taglist | `screens/translate.rs:513` |
+| 物种名录 | Species list | `screens/translate.rs:513` |
 | 无法读取： | Cannot read: | `screens/translate.rs:531` |
 | 从这一列 | From the column | `screens/translate.rs:540` |
 | 换成这一列 | To the column | `screens/translate.rs:547` |
 | {} 个物种无法翻译 | (format!, written per language) | `screens/translate.rs:231` |
 | {} 个物种都能翻译 | (format!, written per language) | `screens/translate.rs:241` |
-| 表中 {} 个物种都能在标签表里找到翻译。 | (format!, written per language) | `screens/translate.rs:336` |
+| 表中 {} 个物种都能在物种名录里找到翻译。 | (format!, written per language) | `screens/translate.rs:336` |
 | {name}（{} 行） | (format!, written per language) | `screens/translate.rs:354` |
-| {} 个物种中有 {} 个不在标签表里：{} | (format!, written per language) | `screens/translate.rs:363` |
+| {} 个物种中有 {} 个不在物种名录里：{} | (format!, written per language) | `screens/translate.rs:363` |
 | {} 个物种在“到”这一列是空的：{} | (format!, written per language) | `screens/translate.rs:379` |
-| 标签表里重复出现：{}（每个名字只能有一个翻译） | (format!, written per language) | `screens/translate.rs:393` |
+| 物种名录里重复出现：{}（每个名字只能有一个翻译） | (format!, written per language) | `screens/translate.rs:393` |
 | {} 行 | (format!, written per language) | `screens/translate.rs:502` |
 | {} 个标签 | (format!, written per language) | `screens/translate.rs:519` |
 
@@ -444,7 +444,7 @@ example data.
 | XMP 初始化 | Initialise XMP | `screens/mod.rs:71` |
 | 查看媒体 | View media | `screens/mod.rs:72` |
 | 标签获取 | Get tags | `screens/mod.rs:73` |
-| 独立捕获 | Temporal-independence events | `screens/mod.rs:74` |
+| 独立捕获 | Events | `screens/mod.rs:74` |
 | 物种名替换 | Translate species | `screens/mod.rs:75` |
 | XMP 更新 | Update XMP | `screens/mod.rs:76` |
 | 元数据同步 | Sync metadata | `screens/mod.rs:77` |
@@ -452,7 +452,7 @@ example data.
 | XMP 导出 | Export XMP | `screens/mod.rs:79` |
 | XMP 删除 | Remove XMP | `screens/mod.rs:80` |
 | 设置 | Settings | `screens/mod.rs:81` |
-| 按标签表把物种名换成另一种写法（例如中文名、学名）。 | Rewrites species names another way (e.g. Chinese or scientific names) from a taglist. | `screens/mod.rs:129` |
+| 按物种名录把物种名换成另一种写法（例如中文名、学名）。 | Rewrites species names another way (e.g. Chinese or scientific names) from a species list. | `screens/mod.rs:129` |
 | 按表格修改 XMP 中的标签：按 xmp_update 列修改，或整表写入。 | Changes the tags in the XMP files from a table: by the xmp_update column, or the whole table. | `screens/mod.rs:133` |
 | 读取照片和视频中的标签，生成标签表（tags.csv）和物种统计。 | Reads species, individual and other tags from photos and videos into tags.csv and species counts. | `screens/mod.rs:137` |
 | 按标签筛选，把照片、视频和 XMP 一起复制到新文件夹。 | Copies the photos and videos you choose by tag, with their XMP, into a new folder. | `screens/mod.rs:141` |
@@ -462,17 +462,17 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 表格以 UTF-8 开头，但内容不是 UTF-8 | the table starts as UTF-8 but is not | `repair.rs:49` |
-| 无法识别表格的编码 | cannot tell the table's encoding | `repair.rs:64` |
-| 这个表格是 GBK 编码（Excel 另存的“CSV”），Serval 只能读取 UTF-8。 | This table is GBK-encoded (Excel's plain "CSV"); Serval reads UTF-8 only. | `repair.rs:366` |
-| 这个表格是 UTF-16 编码（Excel 的“Unicode 文本”），Serval 只能读取 UTF-8。 | This table is UTF-16 (Excel's "Unicode text"); Serval reads UTF-8 only. | `repair.rs:373` |
-| 列之间用制表符分隔，Serval 需要逗号。 | Columns are separated by tabs; Serval needs commas. | `repair.rs:382` |
-| 正在生成副本… | Writing the copy… | `repair.rs:443` |
-| 生成修复后的副本 | Write a repaired copy | `repair.rs:470` |
-| {} 个时间无法写入 XMP，需要 yyyy-MM-dd HH:mm:ss 格式；修复时会改为该格式{}。 | (format!, written per language) | `repair.rs:392` |
-| {} 个时间无法识别（例如日/月/年的顺序），请在表格软件中改为 yyyy-MM-dd HH:mm:ss。 | (format!, written per language) | `repair.rs:406` |
-| 已改用修复后的副本；原表 {} 未改动。 | (format!, written per language) | `repair.rs:429` |
-| ，缺少的秒数补为 00 | (fragment) | `repair.rs:395` |
+| 表格以 UTF-8 开头，但内容不是 UTF-8 | the table starts as UTF-8 but is not | `repair.rs:51` |
+| 无法识别表格的编码 | cannot tell the table's encoding | `repair.rs:66` |
+| 这个表格是 GBK 编码（Excel 另存的“CSV”），Serval 只能读取 UTF-8。 | This table is GBK-encoded (Excel's plain "CSV"); Serval reads UTF-8 only. | `repair.rs:368` |
+| 这个表格是 UTF-16 编码（Excel 的“Unicode 文本”），Serval 只能读取 UTF-8。 | This table is UTF-16 (Excel's "Unicode text"); Serval reads UTF-8 only. | `repair.rs:375` |
+| 列之间用制表符分隔，Serval 需要逗号。 | Columns are separated by tabs; Serval needs commas. | `repair.rs:384` |
+| 正在生成副本… | Writing the copy… | `repair.rs:456` |
+| 生成修复后的副本 | Write a repaired copy | `repair.rs:483` |
+| {} 个时间的格式无法写入 XMP（例如 2023/2/8 09:25:00）；修复时改为 yyyy-MM-dd HH:mm:ss。 | (format!, written per language) | `repair.rs:393` |
+| {} 个时间缺少秒数，可能是 Excel/WPS 保存时丢失的。建议在原表中把时间列的格式设为 yyyy-mm-dd hh:mm:ss 后重新保存；Waxbill 不会自动补 00。 | (format!, written per language) | `repair.rs:405` |
+| {} 个时间无法识别（例如日/月/年的顺序），请在表格软件中改为 yyyy-MM-dd HH:mm:ss。 | (format!, written per language) | `repair.rs:417` |
+| 已改用修复后的副本；原表 {} 未改动。 | (format!, written per language) | `repair.rs:440` |
 | 表格不是 UTF-8 编码 | the table is not UTF-8 | `table.rs:206` |
 
 ## Settings
@@ -481,27 +481,27 @@ example data.
 | --- | --- | --- |
 | 兼容 | compatible | `settings_screen.rs:52` |
 | 更换程序… | Change program… | `settings_screen.rs:54` |
-| Waxbill 需要 Serval 0.8 或以上，请向项目组获取新版本。 | Waxbill needs Serval 0.8 or later. Ask the project team for a newer version. | `settings_screen.rs:73` |
-| 选择其他程序… | Choose another… | `settings_screen.rs:78` |
-| 自定义程序 | custom program | `settings_screen.rs:80` |
-| 正在检查 Serval… | Checking Serval… | `settings_screen.rs:82` |
-| 选择 Serval 程序 | Choose the Serval program | `settings_screen.rs:92` |
-| 没有找到 Serval。请选择 Serval 程序（serval.exe / serval），Waxbill 会检查版本并记住它。 | Serval was not found. Choose the Serval program (serval.exe / serval); Waxbill checks its version and remembers it. | `settings_screen.rs:94` |
-| 选择… | Choose… | `settings_screen.rs:105` |
-| 需要 Serval 0.8 或以上。 | Serval 0.8 or later is needed. | `settings_screen.rs:109` |
-| 欢迎使用 Waxbill | Welcome to Waxbill | `settings_screen.rs:120` |
-| Waxbill 是 Serval 的图形界面。开始之前需要一个 Serval 程序。 | Waxbill is the desktop app for Serval. It needs a Serval program to start. | `settings_screen.rs:122` |
-| 界面 | Interface | `settings_screen.rs:145` |
-| 语言 | Language | `settings_screen.rs:147` |
-| 外观 | Appearance | `settings_screen.rs:167` |
-| 跟随系统 | System | `settings_screen.rs:171` |
-| 浅色 | Light | `settings_screen.rs:172` |
-| 深色 | Dark | `settings_screen.rs:173` |
-| 允许 Caracal 从本机读取所选表格和媒体 | Let Caracal read the chosen table and its media from this computer | `settings_screen.rs:193` |
-| 在 Caracal 中打开时，表格和其中的媒体直接从本机读取，无需在浏览器中选择，也不会上传。浏览器首次会询问是否允许访问本地网络。 | When opening in Caracal, the table and its media are read straight from this computer: nothing to pick in the browser, nothing uploaded. The browser asks once to allow local network access. | `settings_screen.rs:209` |
-| 关于 | About | `settings_screen.rs:218` |
-| Apache-2.0 许可 · | Licensed under Apache-2.0 · | `settings_screen.rs:225` |
-| 源代码 | Source code | `settings_screen.rs:231` |
-| 图标设计 @timber3 · © 2026 山水自然保护中心 | Icon by @timber3 · © 2026 Shan Shui Conservation Center | `settings_screen.rs:236` |
+| 选择其他程序… | Choose another… | `settings_screen.rs:84` |
+| 自定义程序 | custom program | `settings_screen.rs:86` |
+| 正在检查 Serval… | Checking Serval… | `settings_screen.rs:88` |
+| 选择 Serval 程序 | Choose the Serval program | `settings_screen.rs:101` |
+| 没有找到 Serval。请选择 Serval 程序（serval.exe / serval）。 | Serval was not found. Choose the Serval program (serval.exe / serval). | `settings_screen.rs:104` |
+| 选择… | Choose… | `settings_screen.rs:115` |
+| 欢迎使用 Waxbill | Welcome to Waxbill | `settings_screen.rs:148` |
+| Waxbill 是 Serval 的图形界面，需要搭配 Serval 使用。 | Waxbill is the desktop app for Serval and works together with it. | `settings_screen.rs:151` |
+| 界面 | Interface | `settings_screen.rs:178` |
+| 语言 | Language | `settings_screen.rs:180` |
+| 外观 | Appearance | `settings_screen.rs:200` |
+| 跟随系统 | System | `settings_screen.rs:204` |
+| 浅色 | Light | `settings_screen.rs:205` |
+| 深色 | Dark | `settings_screen.rs:206` |
+| 允许 Caracal 从本机读取所选表格和媒体 | Let Caracal read the chosen table and its media from this computer | `settings_screen.rs:226` |
+| 在 Caracal 中打开时，表格和对应的媒体直接从本机读取，纯离线。浏览器首次会询问是否允许访问本地网络。 | When opening in Caracal, the table and its media are read straight from this computer and never leave it. The browser asks once to allow local network access. | `settings_screen.rs:242` |
+| 关于 | About | `settings_screen.rs:251` |
+| Apache-2.0 许可 · | Licensed under Apache-2.0 · | `settings_screen.rs:258` |
+| 源代码 | Source code | `settings_screen.rs:264` |
+| 图标设计 @timber3 · © 2026 山水自然保护中心 | Icon by @timber3 · © 2026 Shan Shui Conservation Center | `settings_screen.rs:269` |
 | 这个 Serval 版本太旧（{version}） | (format!, written per language) | `settings_screen.rs:69` |
-| 中文 | (fragment) | `settings_screen.rs:150` |
+| Waxbill 需要 Serval {} 或以上，请向项目组获取新版本。 | (format!, written per language) | `settings_screen.rs:74` |
+| 需要 Serval {} 或以上。 | (format!, written per language) | `settings_screen.rs:123` |
+| 中文 | (fragment) | `settings_screen.rs:183` |

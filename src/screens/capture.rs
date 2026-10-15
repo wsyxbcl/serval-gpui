@@ -484,7 +484,7 @@ impl Render for CaptureForm {
                 f.child(help_line(t("请输入至少 1 分钟的整数。", "Enter a whole number of minutes, at least 1."), Tone::Danger, cx))
             })
             .when(gap.is_some_and(|g| g > ONE_WEEK_MINUTES), |f| {
-                f.child(help_line(t("异常值。", "Unusual value."), Tone::Quiet, cx))
+                f.child(help_line(t("间隔超过一周，异常值。", "Over a week: an unusual value."), Tone::Quiet, cx))
             });
 
         let measure = field(t("间隔从哪条记录算起", "Measure the interval from"), cx).children(

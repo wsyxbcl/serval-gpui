@@ -541,8 +541,8 @@ fn files_line(found: Option<FolderCount>, sidecars: bool) -> String {
 pub static XMP_INIT: Spec = Spec {
     key: "xmp_init",
     summary: (
-        "为每个媒体文件建立 XMP sidecar（已有的不改动），并生成包含时间和 GPS 的表格。",
-        "Creates an XMP sidecar for each media file (existing ones are kept) and a table of every file's time and GPS.",
+        "为每个媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。",
+        "Creates an XMP sidecar for each media file (existing ones are kept) and a table for checking the data.",
     ),
     paths: &[PathSpec {
         key: "dir",
@@ -739,8 +739,8 @@ pub static XMP_COPY: Spec = Spec {
 pub static XMP_REMOVE: Spec = Spec {
     key: "xmp_remove",
     summary: (
-        "删除文件夹（含子文件夹）中所有的 XMP sidecar。删除前请先备份。",
-        "Deletes every XMP sidecar in a folder and its subfolders. Make sure there is a backup first.",
+        "删除文件夹（含子文件夹）中所有的 XMP sidecar。",
+        "Deletes every XMP sidecar in a folder and its subfolders.",
     ),
     paths: &[PathSpec {
         key: "dir",
@@ -752,10 +752,7 @@ pub static XMP_REMOVE: Spec = Spec {
     choices: &[],
     flags: &[FlagSpec {
         key: "confirm",
-        label: (
-            "我确认要删除这些 XMP 文件",
-            "I want to delete these XMP files",
-        ),
+        label: ("确认删除这些 XMP 文件", "Delete these XMP files"),
         help: Some((
             "标签和评分保存在 XMP 里，删除后无法恢复；可以先用 XMP 导出备份。",
             "Tags and ratings live in the XMP files and cannot be recovered; back them up with Export XMP first.",

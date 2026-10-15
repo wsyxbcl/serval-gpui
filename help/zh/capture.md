@@ -19,7 +19,7 @@
 
 ## 输出
 
-结果放在表格所在的 `…_serval_output/serval_capture/` 里。文件名带上分析对象、间隔和计时方式，例如 `_species_30m_LR`（LR 表示上一条记录，LIR 表示上一条独立记录），不同设置的结果不会互相覆盖：
+结果放在表格所在的 `…_serval_output/serval_capture/` 里：
 
 - `temporal-independence_….csv`：所有独立捕获记录。
 - `events_….csv`（生成事件编号时）：每条原始记录及它所属的独立捕获（`event_id`）。

@@ -6,6 +6,12 @@ use std::path::{Path, PathBuf};
 
 pub const MIN_VERSION: (u32, u32, u32) = (0, 8, 0);
 
+/// "0.8.0": the version messages name, from the one constant the check uses.
+pub fn min_version() -> String {
+    let (major, minor, patch) = MIN_VERSION;
+    format!("{major}.{minor}.{patch}")
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ServalStatus {
     Checking,

@@ -70,10 +70,16 @@ impl Waxbill {
                                         Language::English => format!("This Serval is too old ({version})"),
                                     },
                                 ))
-                                .child(div().text_size(tokens.px("text-sm")).child(t(
-                                    "Waxbill 需要 Serval 0.8 或以上，请向项目组获取新版本。",
-                                    "Waxbill needs Serval 0.8 or later. Ask the project team for a newer version.",
-                                ))),
+                                .child(div().text_size(tokens.px("text-sm")).child(match language() {
+                                    Language::Chinese => format!(
+                                        "Waxbill 需要 Serval {} 或以上，请向项目组获取新版本。",
+                                        crate::serval::min_version()
+                                    ),
+                                    Language::English => format!(
+                                        "Waxbill needs Serval {} or later. Ask the project team for a newer version.",
+                                        crate::serval::min_version()
+                                    ),
+                                })),
                         )
                         .child(choose(t("选择其他程序…", "Choose another…"), cx)),
                 )
@@ -89,11 +95,15 @@ impl Waxbill {
         let tokens = cx.tokens().clone();
         v_flex()
             .gap(tokens.px("space-2"))
-            .child(div().font_medium().child(t("选择 Serval 程序", "Choose the Serval program")))
+            .child(
+                div()
+                    .font_medium()
+                    .child(t("选择 Serval 程序", "Choose the Serval program")),
+            )
             .child(help_line(
                 t(
-                    "没有找到 Serval。请选择 Serval 程序（serval.exe / serval），Waxbill 会检查版本并记住它。",
-                    "Serval was not found. Choose the Serval program (serval.exe / serval); Waxbill checks its version and remembers it.",
+                    "没有找到 Serval。请选择 Serval 程序（serval.exe / serval）。",
+                    "Serval was not found. Choose the Serval program (serval.exe / serval).",
                 ),
                 Tone::Quiet,
                 cx,
@@ -103,10 +113,24 @@ impl Waxbill {
                     Button::new("choose-serval")
                         .outline()
                         .label(t("选择…", "Choose…"))
-                        .on_click(cx.listener(|this, _, window, cx| this.choose_serval(window, cx))),
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.choose_serval(window, cx)),
+                        ),
                 ),
             )
-            .child(help_line(t("需要 Serval 0.8 或以上。", "Serval 0.8 or later is needed."), Tone::Quiet, cx))
+            .child(help_line(
+                match language() {
+                    Language::Chinese => {
+                        format!("需要 Serval {} 或以上。", crate::serval::min_version())
+                    }
+                    Language::English => format!(
+                        "Serval {} or later is needed.",
+                        crate::serval::min_version()
+                    ),
+                },
+                Tone::Quiet,
+                cx,
+            ))
     }
 
     /// The first-run content of a command screen: there is no Serval yet.
@@ -117,17 +141,26 @@ impl Waxbill {
             .child(
                 v_flex()
                     .gap(tokens.px("space-1"))
-                    .child(div().text_size(tokens.px("text-xl")).font_semibold().child(t("欢迎使用 Waxbill", "Welcome to Waxbill")))
+                    .child(
+                        div()
+                            .text_size(tokens.px("text-xl"))
+                            .font_semibold()
+                            .child(t("欢迎使用 Waxbill", "Welcome to Waxbill")),
+                    )
                     .child(help_line(
                         t(
-                            "Waxbill 是 Serval 的图形界面。开始之前需要一个 Serval 程序。",
-                            "Waxbill is the desktop app for Serval. It needs a Serval program to start.",
+                            "Waxbill 是 Serval 的图形界面，需要搭配 Serval 使用。",
+                            "Waxbill is the desktop app for Serval and works together with it.",
                         ),
                         Tone::Quiet,
                         cx,
                     )),
             )
-            .child(card(cx).child(section_title("SERVAL", cx)).child(self.choose_serval_field(cx)))
+            .child(
+                card(cx)
+                    .child(section_title("SERVAL", cx))
+                    .child(self.choose_serval_field(cx)),
+            )
     }
 
     pub(crate) fn render_settings(&self, cx: &mut Context<Self>) -> Div {
@@ -207,8 +240,8 @@ impl Waxbill {
             )
             .child(help_line(
                 t(
-                    "在 Caracal 中打开时，表格和其中的媒体直接从本机读取，无需在浏览器中选择，也不会上传。浏览器首次会询问是否允许访问本地网络。",
-                    "When opening in Caracal, the table and its media are read straight from this computer: nothing to pick in the browser, nothing uploaded. The browser asks once to allow local network access.",
+                    "在 Caracal 中打开时，表格和对应的媒体直接从本机读取，纯离线。浏览器首次会询问是否允许访问本地网络。",
+                    "When opening in Caracal, the table and its media are read straight from this computer and never leave it. The browser asks once to allow local network access.",
                 ),
                 Tone::Quiet,
                 cx,

@@ -102,8 +102,8 @@ impl TranslateForm {
         });
         let taglist = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t(
-                "选择标签表（例如 taglist_maze.csv）",
-                "Choose the taglist (e.g. taglist_maze.csv)",
+                "选择物种名录（例如 taglist_maze.csv）",
+                "Choose the species list (e.g. taglist_maze.csv)",
             ))
         });
         let subscriptions = [&table, &taglist]
@@ -218,7 +218,7 @@ impl TranslateForm {
         let coverage = self.coverage();
         let ready = match (&table, &taglist, &self.files) {
             (None, _, _) => Err(t("选择要替换的表", "choose the table to translate").to_string()),
-            (_, None, _) => Err(t("选择标签表", "choose the taglist").to_string()),
+            (_, None, _) => Err(t("选择物种名录", "choose the species list").to_string()),
             (_, _, Files::Failed(err)) => {
                 Err(format!("{} {err}", t("表格无法读取：", "cannot read:")))
             }
@@ -334,7 +334,7 @@ impl TranslateForm {
             return Some(help_line(
                 match language() {
                     Language::Chinese => format!(
-                        "表中 {} 个物种都能在标签表里找到翻译。",
+                        "表中 {} 个物种都能在物种名录里找到翻译。",
                         count(coverage.species)
                     ),
                     Language::English => format!(
@@ -361,13 +361,13 @@ impl TranslateForm {
         if !coverage.missing.is_empty() {
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "{} 个物种中有 {} 个不在标签表里：{}",
+                    "{} 个物种中有 {} 个不在物种名录里：{}",
                     count(coverage.species),
                     coverage.missing.len(),
                     list(&coverage.missing)
                 ),
                 Language::English => format!(
-                    "{} of {} species are not in the taglist: {}",
+                    "{} of {} species are not in the species list: {}",
                     coverage.missing.len(),
                     count(coverage.species),
                     list(&coverage.missing)
@@ -391,11 +391,11 @@ impl TranslateForm {
         if !coverage.repeated.is_empty() {
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "标签表里重复出现：{}（每个名字只能有一个翻译）",
+                    "物种名录里重复出现：{}（每个名字只能有一个翻译）",
                     coverage.repeated.join("、")
                 ),
                 Language::English => format!(
-                    "Listed more than once in the taglist: {} (each needs one translation)",
+                    "Listed more than once in the species list: {} (each needs one translation)",
                     coverage.repeated.join(", ")
                 ),
             });
@@ -416,8 +416,8 @@ impl TranslateForm {
                         .gap(tokens.px("space-2"))
                         .child(help_line(
                             t(
-                                "可以在标签表里补上后重新检查。",
-                                "Add them to the taglist, then check again.",
+                                "可以在物种名录里补上后重新检查。",
+                                "Add them to the species list, then check again.",
                             ),
                             Tone::Quiet,
                             cx,
@@ -510,7 +510,7 @@ impl Render for TranslateForm {
                 cx,
             ))
             .child(accept_drop(
-                field(t("标签表", "Taglist"), cx)
+                field(t("物种名录", "Species list"), cx)
                     .child(path_row(&self.taglist, "choose-taglist", 1, cx))
                     .child(self.checks[1].clone())
                     .when_some(read, |f, (_, tags)| {

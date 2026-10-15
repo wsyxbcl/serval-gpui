@@ -944,7 +944,7 @@ impl Waxbill {
                 )
                 .child(step(
                     "next-capture",
-                    t("独立捕获", "Temporal-independence events"),
+                    t("独立捕获", "Events"),
                     ScreenId::Capture,
                     cx,
                 ))

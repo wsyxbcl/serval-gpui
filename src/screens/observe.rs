@@ -56,7 +56,8 @@ impl ObserveForm {
         });
         ObserveForm {
             input,
-            read_sidecars: false,
+            // XMP sidecars by default: media metadata, videos especially, is read less reliably.
+            read_sidecars: true,
             images: true,
             videos: true,
             found: Found::Nothing,
@@ -100,7 +101,7 @@ impl ObserveForm {
     pub fn restore(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = cx.default_global::<crate::settings::Settings>().clone();
         let value = |field: &str| settings.form_value("observe", field);
-        self.read_sidecars = value("xmp") == Some("1");
+        self.read_sidecars = value("xmp") != Some("0");
         self.images = value("images") != Some("0");
         self.videos = value("videos") != Some("0");
     }
