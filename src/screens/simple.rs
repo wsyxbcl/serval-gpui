@@ -341,7 +341,7 @@ impl SimpleForm {
         Some(help_line(
             match language() {
                 Language::Chinese => format!(
-                    "找到 {} 张图片、{} 个视频、{} 个 XMP 旁注文件",
+                    "找到 {} 张图片、{} 个视频、{} 个 XMP",
                     count(found.images),
                     count(found.videos),
                     count(found.sidecars)
@@ -541,7 +541,7 @@ fn files_line(found: Option<FolderCount>, sidecars: bool) -> String {
 pub static XMP_INIT: Spec = Spec {
     key: "xmp_init",
     summary: (
-        "为每个媒体文件建立 XMP 旁注文件（已有的不改动），并生成每个文件的时间和 GPS 表格。",
+        "为每个媒体文件建立 XMP sidecar（已有的不改动），并生成包含时间和 GPS 的表格。",
         "Creates an XMP sidecar for each media file (existing ones are kept) and a table of every file's time and GPS.",
     ),
     paths: &[PathSpec {
@@ -583,7 +583,7 @@ pub static XMP_INIT: Spec = Spec {
 pub static RENAME: Spec = Spec {
     key: "rename",
     summary: (
-        "按部署表把部署文件夹从部署名改为部署编号。",
+        "按位点表把位点文件夹从名称改为编号。",
         "Renames deployment folders from their names to their IDs, from the deployments table.",
     ),
     paths: &[PathSpec {
@@ -592,7 +592,7 @@ pub static RENAME: Spec = Spec {
         kind: PathKind::Folder,
         optional: false,
         help: Some((
-            "包含部署文件夹和部署表的项目文件夹。",
+            "包含位点文件夹和位点表的项目文件夹。",
             "The project folder with the deployment folders and the deployments table.",
         )),
     }],
@@ -628,7 +628,7 @@ pub static RENAME: Spec = Spec {
 pub static ALIGN: Spec = Spec {
     key: "align",
     summary: (
-        "有部署表时，把各部署的文件整理到统一的目录；没有时，把文件夹里的文件摊平到一个目录。",
+        "有位点表时，把各位点的文件整理到统一的目录；没有时，把文件夹中的文件摊平到一个目录。",
         "With a deployments table, arranges each deployment's files into one layout; without, flattens a folder into one.",
     ),
     paths: &[
@@ -641,11 +641,11 @@ pub static ALIGN: Spec = Spec {
         },
         PathSpec {
             key: "deploy_table",
-            label: ("部署表", "Deployments table"),
+            label: ("位点表", "Deployments table"),
             kind: PathKind::File("csv"),
             optional: true,
             help: Some((
-                "给出 deployments.csv 时按部署对齐，不给时摊平文件夹。",
+                "提供 deployments.csv 时按位点对齐，否则摊平文件夹。",
                 "With deployments.csv, aligns deployments; without, flattens the folder.",
             )),
         },
@@ -711,7 +711,7 @@ pub static ALIGN: Spec = Spec {
 pub static XMP_COPY: Spec = Spec {
     key: "xmp_copy",
     summary: (
-        "把文件夹里的 XMP 旁注文件按原目录结构复制出来，用于备份或交给他人。",
+        "按原目录结构复制文件夹中的 XMP sidecar，用于备份或交给他人。",
         "Copies a folder's XMP sidecars, keeping the folder structure, for a backup or to hand over.",
     ),
     paths: &[PathSpec {
@@ -739,7 +739,7 @@ pub static XMP_COPY: Spec = Spec {
 pub static XMP_REMOVE: Spec = Spec {
     key: "xmp_remove",
     summary: (
-        "删除文件夹里所有的 XMP 旁注文件（包括子文件夹）。删除前请确认已经备份。",
+        "删除文件夹（含子文件夹）中所有的 XMP sidecar。删除前请先备份。",
         "Deletes every XMP sidecar in a folder and its subfolders. Make sure there is a backup first.",
     ),
     paths: &[PathSpec {
@@ -789,7 +789,7 @@ pub static XMP_REMOVE: Spec = Spec {
 pub static XMP_SYNC: Spec = Spec {
     key: "xmp_sync",
     summary: (
-        "把 XMP 旁注文件里的标签写回媒体文件本身，让不读 XMP 的软件也能看到。",
+        "把 XMP sidecar 中的标签写入媒体文件，让不读取 XMP 的软件也能看到。",
         "Writes the tags in the XMP sidecars into the media files, so software that ignores XMP sees them too.",
     ),
     paths: &[
@@ -799,7 +799,7 @@ pub static XMP_SYNC: Spec = Spec {
             kind: PathKind::Folder,
             optional: true,
             help: Some((
-                "同步文件夹里所有的 XMP；或者用下面的表格只同步其中一部分。",
+                "同步文件夹中所有的 XMP，或用下面的表格只同步一部分。",
                 "Syncs every XMP in the folder; or use a table below to sync some of them.",
             )),
         },

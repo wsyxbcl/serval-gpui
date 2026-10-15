@@ -504,7 +504,7 @@ impl ExtractForm {
                 _ => help_line(
                     t(
                         "标签获取生成的 tags.csv，或标注员填好的表格",
-                        "The tags.csv from 标签获取, or a table filled in by labellers",
+                        "The tags.csv from Get tags, or a table filled in by labellers",
                     ),
                     Tone::Quiet,
                     cx,
@@ -531,7 +531,7 @@ impl ExtractForm {
                 });
                 if self.level.is_some() {
                     parts.push(match language() {
-                        Language::Chinese => format!("{} 个部署", count(deployments)),
+                        Language::Chinese => format!("{} 个位点", count(deployments)),
                         Language::English => format!("{} deployments", count(deployments)),
                     });
                 }
@@ -701,7 +701,7 @@ impl ExtractForm {
         if self.level.is_some() {
             row = row.child(div().text_color(cx.theme().muted_foreground).child(
                 match language() {
-                    Language::Chinese => format!("来自 {} 个部署", count(self.matched.deployments)),
+                    Language::Chinese => format!("来自 {} 个位点", count(self.matched.deployments)),
                     Language::English => {
                         format!("from {} deployments", count(self.matched.deployments))
                     }
@@ -947,7 +947,7 @@ impl Render for ExtractForm {
                         f.child(help_line(
                             t(
                                 "文件名格式：物种__个体__原文件名，多个值用 + 连接，例如 雪豹+岩羊__SL01__IMG_0001.JPG",
-                                "Names: species__individuals__original name, values joined by +, e.g. 雪豹+岩羊__SL01__IMG_0001.JPG",
+                                "Names: species__individuals__original name, values joined by +, e.g. Snow leopard+Blue sheep__SL01__IMG_0001.JPG",
                             ),
                             Tone::Quiet,
                             cx,

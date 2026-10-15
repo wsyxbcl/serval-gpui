@@ -370,7 +370,7 @@ impl Render for Browse {
             None => help_line(
                 t(
                     "标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表",
-                    "A tags.csv from 标签获取, a table filled in by labellers, or one exported from Caracal",
+                    "A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal",
                 ),
                 Tone::Quiet,
                 cx,
@@ -471,8 +471,8 @@ impl Render for Browse {
             self.action(
                 t("在 Caracal 中查看和编辑", "View and edit in Caracal"),
                 t(
-                    "在浏览器中打开 Caracal 的 Review：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
-                    "Opens Caracal's Review in the browser: view, rate and fix species, export tags.csv, then come back to 应用表格到文件.",
+                    "在浏览器中打开 Caracal：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
+                    "Opens Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files.",
                 ),
                 Button::new("open-caracal")
                     .outline()
@@ -496,9 +496,9 @@ impl Render for Browse {
                         .child(help_line(
                             match language() {
                                 Language::Chinese => {
-                                    format!("已建立 {} 个文件的查看文件夹（硬链接，不占额外空间），已在资源管理器中打开。", count(*n))
+                                    format!("已建立 {} 个文件的查看文件夹，已在资源管理器中打开。", count(*n))
                                 }
-                                Language::English => format!("Made a review folder of {} files (hard links, no extra space) and opened it.", count(*n)),
+                                Language::English => format!("Made a review folder of {} files and opened it.", count(*n)),
                             },
                             Tone::Quiet,
                             cx,
@@ -519,8 +519,8 @@ impl Render for Browse {
                             .bg(tokens.color("warning-soft"))
                             .text_size(tokens.px("text-sm"))
                             .child(t(
-                                "这里的文件就是原文件：在这里旋转或编辑会改动原文件；删除只删除这里的链接，原文件不受影响。",
-                                "These are the original files: rotating or editing them here changes the originals; deleting only removes the link here, the originals stay.",
+                                "生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。",
+                                "These are links to the original files: editing them here changes the originals; deleting removes only the link.",
                             )),
                     ),
                 )
@@ -530,15 +530,15 @@ impl Render for Browse {
                     .gap(tokens.px("space-2"))
                     .child(help_line(
                         t(
-                            "媒体在另一个磁盘或网络位置，不能建立链接。可以用媒体提取复制这些文件。",
-                            "The media are on another drive or a network share, where links cannot be made. Copy them with 媒体提取 instead.",
+                            "链接异常，可使用 Caracal 或用媒体提取复制文件后查看。",
+                            "Links cannot be made here. View the files in Caracal, or copy them with Copy media.",
                         ),
                         Tone::Danger,
                         cx,
                     ))
                     .child({
                         let (csv, species, rating) = (path.clone(), self.species.clone(), self.rating);
-                        Button::new("to-extract").outline().compact().label(t("用媒体提取复制", "Copy with 媒体提取")).on_click(
+                        Button::new("to-extract").outline().compact().label(t("用媒体提取复制", "Copy them instead")).on_click(
                             cx.listener(move |_, _, _, cx| {
                                 cx.emit(BrowseEvent::Extract { csv: csv.clone(), species: species.clone(), rating })
                             }),
@@ -550,8 +550,8 @@ impl Render for Browse {
         let explorer = self.action(
             t("在资源管理器中查看所选", "Look at the choice in the file manager"),
             t(
-                "把选中的照片和视频（连同 XMP）以硬链接放进一个查看文件夹并打开：缩略图、照片应用和系统播放器都可直接使用，复制出去的是原文件。",
-                "Puts the chosen photos and videos (with their XMP) into a review folder as hard links and opens it: thumbnails, the Photos app and the system player work as usual, and copying out copies the real files.",
+                "生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。",
+                "Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage.",
             ),
             Button::new("make-review")
                 .outline()
@@ -567,8 +567,8 @@ impl Render for Browse {
             self.action(
                 t("应用表格到文件", "Write the table into the files"),
                 t(
-                    "把这张表（例如从 Caracal 导出的）原样写入 XMP：先检查会改什么，再写入。",
-                    "Writes this table (for example one exported from Caracal) into the XMP files as it is: first a check of what will change, then the write.",
+                    "将标签表信息（例如从 Caracal 导出的）写回 XMP 文件。",
+                    "Writes the table (for example one exported from Caracal) back into the XMP files.",
                 ),
                 Button::new("apply-table")
                     .outline()

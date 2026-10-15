@@ -244,18 +244,18 @@ impl CaptureForm {
                 t("表格无法读取：", "cannot read the table:")
             )),
             _ if gap.is_none() => Err(t(
-                "独立性间隔应为至少 1 分钟的整数",
-                "the interval must be a whole number of minutes, at least 1",
+                "时间间隔应为至少 1 分钟的整数",
+                "the time interval must be a whole number of minutes, at least 1",
             )
             .to_string()),
             _ if !self.camtrap_dp && self.level.is_none() => Err(t(
-                "请在路径中选择部署所在的一层",
+                "请在路径中选择位点所在的一层",
                 "choose the deployment's level in the path",
             )
             .to_string()),
             _ => Ok(match language() {
                 Language::Chinese => format!(
-                    "{} 个部署 · {} 分钟 · {}",
+                    "{} 个位点 · {} 分钟 · {}",
                     count(self.deployments),
                     gap.unwrap_or(DEFAULT_GAP),
                     if self.by_individual {
@@ -354,7 +354,7 @@ impl CaptureForm {
                         format!("{rows} 行 · 也可以选择 Camtrap DP 的 observations.csv")
                     }
                     (Language::Chinese, true) => {
-                        format!("{rows} 行 · Camtrap DP 观测表，部署来自 deploymentID")
+                        format!("{rows} 行 · Camtrap DP 观测表，位点来自 deploymentID")
                     }
                     (Language::English, false) => {
                         format!("{rows} rows · a Camtrap DP observations.csv works too")
@@ -371,7 +371,7 @@ impl CaptureForm {
     fn render_level(&self, table: &TagTable, cx: &mut Context<Self>) -> Div {
         let sample = table.sample_path().unwrap_or("").to_string();
         let mut note = match (self.level, language()) {
-            (None, Language::Chinese) => "点选路径中代表部署的一层".to_string(),
+            (None, Language::Chinese) => "点选路径中代表位点的一层".to_string(),
             (None, Language::English) => "Click the folder that is the deployment".to_string(),
             (Some(level), lang) => {
                 let name = sample
@@ -382,7 +382,7 @@ impl CaptureForm {
                 let auto = self.detected == Some(level);
                 match lang {
                     Language::Chinese => format!(
-                        "点选路径中代表部署的一层。已选 {name}{} · 表中共有 {} 个部署",
+                        "点选路径中代表位点的一层。已选 {name}{} · 表中共有 {} 个位点",
                         if auto { "（自动识别）" } else { "" },
                         count(self.deployments)
                     ),
@@ -400,7 +400,7 @@ impl CaptureForm {
                 ". Paths have different depths; levels follow the sample",
             ));
         }
-        field(t("部署所在的文件夹层级", "Deployment folder level"), cx)
+        field(t("位点所在的文件夹层级", "Deployment folder level"), cx)
             .child(level_picker(
                 &sample,
                 self.level,
@@ -458,7 +458,7 @@ impl Render for CaptureForm {
                 card.child(self.render_level(&table, cx))
             });
 
-        let gap_field = field(t("独立性间隔", "Independence interval"), cx)
+        let gap_field = field(t("时间间隔", "Time interval"), cx)
             .child(
                 h_flex()
                     .gap(tokens.px("space-3"))
@@ -473,7 +473,7 @@ impl Render for CaptureForm {
                     )
                     .child(help_line(
                         t(
-                            "同一部署、同一物种两条记录相隔不少于此时间，才算两次独立捕获。",
+                            "同一位点、同一物种的两条记录相隔不少于此时间，才算两次独立捕获。",
                             "Two records of one species at one deployment count as two captures only this far apart.",
                         ),
                         Tone::Quiet,
@@ -484,7 +484,7 @@ impl Render for CaptureForm {
                 f.child(help_line(t("请输入至少 1 分钟的整数。", "Enter a whole number of minutes, at least 1."), Tone::Danger, cx))
             })
             .when(gap.is_some_and(|g| g > ONE_WEEK_MINUTES), |f| {
-                f.child(help_line(t("超过一周（10,080 分钟），通常过大。", "More than a week (10,080 minutes) is unusually large."), Tone::Quiet, cx))
+                f.child(help_line(t("异常值。", "Unusual value."), Tone::Quiet, cx))
             });
 
         let measure = field(t("间隔从哪条记录算起", "Measure the interval from"), cx).children(

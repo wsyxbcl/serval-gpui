@@ -20,7 +20,7 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
             tokens.color("success-soft"),
             t("预览完成", "Preview finished").to_string(),
             t(
-                "没有改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。",
+                "未改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。",
                 "Nothing was changed. The planned changes are listed in the run log below; when they look right, press Run it for real.",
             )
             .to_string(),
@@ -56,8 +56,8 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
             tokens.color("info-soft"),
             t("已暂停", "Paused").to_string(),
             t(
-                "已写入的文件都是完整的。继续会跳过已完成的部分；取消则回到就绪。",
-                "Files written so far are complete. Continue skips finished work; Cancel goes back to Ready.",
+                "已完成部分文件。继续会跳过该部分。",
+                "Some files are done. Continue skips them.",
             )
             .to_string(),
         ),

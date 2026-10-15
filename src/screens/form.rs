@@ -212,8 +212,8 @@ pub fn output_field<V: 'static>(
                         )
                     } else {
                         t(
-                            "默认放在输入文件夹旁边，不会混进媒体文件夹。",
-                            "By default next to the input folder, never inside it.",
+                            "默认放在输入文件夹旁边。",
+                            "By default next to the input folder.",
                         )
                     },
                     Tone::Quiet,

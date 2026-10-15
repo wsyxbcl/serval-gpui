@@ -144,15 +144,15 @@ impl Waxbill {
                 Language::English => format!("Unclear individuals in {} images", count(*images as usize)),
             }))
             .child(div().text_size(tokens.px("text-sm")).child(t(
-                "这些图片里同时有多个物种和个体编号，XMP 没有记录编号属于哪个物种。勾选做了个体识别的物种，编号就会归到它们。",
-                "These images have several species and individual IDs, and the XMP does not say which species an ID belongs to. Check the species that were individually identified; the IDs go to them.",
+                "这些图片里同时有多个物种和个体编号，XMP 没有记录编号属于哪个物种。需确定个体编号对应的物种。",
+                "These images have several species and individual IDs, and the XMP does not say which species an ID belongs to. Choose the species the IDs belong to.",
             )))
             .child(list)
             .child(
                 div()
                     .text_size(tokens.px("text-sm"))
                     .text_color(cx.theme().muted_foreground)
-                    .child(t("选择会记住，下次处理这个文件夹时直接使用。", "The choice is remembered for this folder.")),
+                    .child(t("选择会被记忆，下次处理这个文件夹时直接使用。", "The choice is remembered for this folder.")),
             )
             .child(
                 h_flex()

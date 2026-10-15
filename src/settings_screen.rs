@@ -71,8 +71,8 @@ impl Waxbill {
                                     },
                                 ))
                                 .child(div().text_size(tokens.px("text-sm")).child(t(
-                                    "Waxbill 需要 Serval 0.8 或以上，否则无法传入运行参数。请向项目组获取新版本。",
-                                    "Waxbill needs Serval 0.8 or later to pass its settings. Ask the project team for a newer version.",
+                                    "Waxbill 需要 Serval 0.8 或以上，请向项目组获取新版本。",
+                                    "Waxbill needs Serval 0.8 or later. Ask the project team for a newer version.",
                                 ))),
                         )
                         .child(choose(t("选择其他程序…", "Choose another…"), cx)),
@@ -92,8 +92,8 @@ impl Waxbill {
             .child(div().font_medium().child(t("选择 Serval 程序", "Choose the Serval program")))
             .child(help_line(
                 t(
-                    "Serval 程序由项目组提供（serval.exe / serval）。选择后 Waxbill 会检查版本并记住它。",
-                    "The project team provides the Serval program (serval.exe / serval). Waxbill checks its version and remembers it.",
+                    "没有找到 Serval。请选择 Serval 程序（serval.exe / serval），Waxbill 会检查版本并记住它。",
+                    "Serval was not found. Choose the Serval program (serval.exe / serval); Waxbill checks its version and remembers it.",
                 ),
                 Tone::Quiet,
                 cx,
@@ -207,8 +207,8 @@ impl Waxbill {
             )
             .child(help_line(
                 t(
-                    "在 Caracal 中打开时，表格和其中列出的照片、视频直接从 Waxbill 读取，不用在浏览器里再选择；只在本机可见，不会上传。浏览器第一次会询问是否允许访问本地网络。",
-                    "When opening in Caracal, the table and the photos and videos it lists are read straight from Waxbill, with nothing to pick in the browser; visible only on this computer, nothing is uploaded. The browser asks once to allow local network access.",
+                    "在 Caracal 中打开时，表格和其中的媒体直接从本机读取，无需在浏览器中选择，也不会上传。浏览器首次会询问是否允许访问本地网络。",
+                    "When opening in Caracal, the table and its media are read straight from this computer: nothing to pick in the browser, nothing uploaded. The browser asks once to allow local network access.",
                 ),
                 Tone::Quiet,
                 cx,

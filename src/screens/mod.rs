@@ -71,11 +71,11 @@ impl ScreenId {
             XmpInit => t("XMP 初始化", "Initialise XMP"),
             Browse => t("查看媒体", "View media"),
             Observe => t("标签获取", "Get tags"),
-            Capture => t("独立捕获", "Independent captures"),
+            Capture => t("独立捕获", "Temporal-independence events"),
             Translate => t("物种名替换", "Translate species"),
             XmpUpdate => t("XMP 更新", "Update XMP"),
             XmpSync => t("元数据同步", "Sync metadata"),
-            Extract => t("媒体提取", "Extract media"),
+            Extract => t("媒体提取", "Copy media"),
             XmpCopy => t("XMP 导出", "Export XMP"),
             XmpRemove => t("XMP 删除", "Remove XMP"),
             Settings => t("设置", "Settings"),
@@ -131,11 +131,11 @@ impl Form {
                 "Rewrites species names another way (e.g. Chinese or scientific names) from a taglist.",
             ),
             Form::Update(_) => t(
-                "按表修改 XMP 里的标签：按 xmp_update 列改旧值，或把整张表写入；每个文件只写一次，并保留备份。",
-                "Changes the tags in the XMP files from a table: old values by the xmp_update column, or the whole table; each file written once, with a backup.",
+                "按表格修改 XMP 中的标签：按 xmp_update 列修改，或整表写入。",
+                "Changes the tags in the XMP files from a table: by the xmp_update column, or the whole table.",
             ),
             Form::Observe(_) => t(
-                "读取照片和视频里的物种、个体等标签，生成 tags.csv 与物种统计。",
+                "读取照片和视频中的标签，生成标签表（tags.csv）和物种统计。",
                 "Reads species, individual and other tags from photos and videos into tags.csv and species counts.",
             ),
             Form::Extract(_) => t(
@@ -143,7 +143,7 @@ impl Form {
                 "Copies the photos and videos you choose by tag, with their XMP, into a new folder.",
             ),
             Form::Capture(_) => t(
-                "按时间间隔把连续拍到的记录合并为独立捕获，统计每个部署、每个物种的捕获次数。",
+                "按时间间隔合并连续拍到的记录，统计每个位点、每个物种的独立捕获次数。",
                 "Merges records close in time into independent captures and counts them per deployment and species.",
             ),
         }

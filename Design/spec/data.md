@@ -30,7 +30,7 @@ rows are not built yet.
 | Problem (seen in real files) | Detection | Repair |
 | --- | --- | --- |
 | Encoding is not UTF-8 (Excel's "CSV" on Chinese Windows saves GBK; "Unicode text" is UTF-16) | BOM; strict UTF-8 decode; else GB18030 decode succeeds | Re-encode to UTF-8 with BOM (Serval reads it; Excel opens it correctly) |
-| Times reformatted by Excel/WPS (`2023/10/5 06:09`, `2023-10-05 6:09`) | the time columns the command uses do not all match `yyyy-MM-dd HH:mm:ss` | Rewrite to `yyyy-MM-dd HH:mm:ss`; missing seconds become `00` (said in the banner) |
+| Times reformatted by Excel/WPS (`2023/10/5 06:09`, `2023-10-5 06:09`) | Only where Serval is strict: 整表写入 with 时间 (`xmp write` takes year-month-day with `-`, a space or `T`, and seconds; padding optional). Elsewhere Serval reads times with Polars, which takes every Excel/WPS form tested (2026-10-15: slashes, no seconds, no padding, day first, a mixed column), so nothing is checked. | Rewrite to `yyyy-MM-dd HH:mm:ss`, missing seconds become `00`; times not in year-month-day order (day first) are counted and left for the user, never guessed |
 | Required column missing or renamed | per command (e.g. capture: `path`, `datetime`/`datetime_original`, `species`; update: `path`, `xmp_update`, the tag column) | none; the banner names the column |
 | IDs that look like numbers (`1` where `001` was likely) | `individual`/ID columns all digits with differing widths, or all short | warning only; leading zeros cannot be restored |
 | Paths that do not exist (data moved to another drive or computer, e.g. `G:\…` → `/mnt/nas/…`) | the first 200 paths checked; most missing but a common prefix replacement makes them exist | "替换路径前缀" with the detected old and new prefix, then the repaired copy |

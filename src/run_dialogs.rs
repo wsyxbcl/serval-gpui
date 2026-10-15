@@ -179,8 +179,8 @@ impl Waxbill {
         let body = dialog(
             t("取消这次运行？", "Cancel this run?"),
             t(
-                "已写入的文件都是完整的，默认保留。取消后不能再继续这次运行。",
-                "Files written so far are complete and are kept unless you choose otherwise. A cancelled run cannot be continued.",
+                "已完成部分文件，默认保留。",
+                "Files already done are kept unless you choose otherwise.",
             ),
             cx,
         )
@@ -266,8 +266,8 @@ impl Waxbill {
         let body = dialog(
             t("命令还在运行", "A command is still running"),
             t(
-                "停止后，已写入的文件都是完整的，下次运行同样的命令会跳过已完成的部分。",
-                "After stopping, files written so far are complete; running the same command again skips finished work.",
+                "已完成部分文件，停止后，重新执行相同命令会跳过该部分。",
+                "Files already done stay; running the same command again skips them.",
             ),
             cx,
         )

@@ -330,7 +330,7 @@ impl Render for ObserveForm {
                 field(t("读取来源", "Read from"), cx).child(
                     RadioGroup::horizontal("source")
                         .child(Radio::new("source-media").label(t("媒体文件", "Media files")))
-                        .child(Radio::new("source-xmp").label(t("XMP 旁注文件", "XMP sidecars")))
+                        .child(Radio::new("source-xmp").label(t("XMP sidecar", "XMP sidecars")))
                         .selected_index(Some(self.read_sidecars as usize))
                         .on_click(cx.listener(|this, index: &usize, _, cx| {
                             this.read_sidecars = *index == 1;
@@ -392,7 +392,7 @@ impl Render for ObserveForm {
                         .gap(tokens.px("space-1"))
                         .child(
                             Checkbox::new("debug")
-                                .label(t("同时生成调试表格（raw.csv）", "Also write the debug table (raw.csv)"))
+                                .label(t("生成 debug 表格（raw.csv）", "Write the debug table (raw.csv)"))
                                 .checked(self.debug)
                                 .on_click(cx.listener(|this, checked: &bool, _, cx| {
                                     this.debug = *checked;
@@ -401,7 +401,7 @@ impl Render for ObserveForm {
                         )
                         .child(help_line(
                             t(
-                                "包含部署和文件修改时间，可用于修正时间（xmp update --datetime）。",
+                                "包含位点和文件修改时间，可用于修正时间（xmp update --datetime）。",
                                 "Adds the deployment and file modification time, for fixing times (xmp update --datetime).",
                             ),
                             Tone::Quiet,

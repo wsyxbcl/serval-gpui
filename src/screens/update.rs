@@ -249,6 +249,10 @@ impl UpdateForm {
 
     /// Run the dry run again a moment after the table or the options change.
     pub fn recheck(&mut self, cx: &mut Context<Self>) {
+        // Times matter only when the whole table is written with 时间: there Serval takes yyyy-MM-dd HH:mm:ss only.
+        let times = self.write && self.fields[3];
+        self.csv_check
+            .update(cx, |check, cx| check.set_check_times(times, cx));
         self.check_generation += 1;
         let generation = self.check_generation;
         let program = cx
@@ -545,11 +549,11 @@ impl UpdateForm {
         if !preview.media_rows.is_empty() {
             summary.push_str(&match language() {
                 Language::Chinese => format!(
-                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP 旁注文件」生成表格",
+                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP sidecar」生成表格",
                     count(preview.media_rows.len())
                 ),
                 Language::English => format!(
-                    "; {} rows point at media files, not XMP; this changes XMP files only: make the table with 标签获取 reading XMP sidecars",
+                    "; {} rows point at media files, not XMP; this changes XMP files only: make the table with Get tags reading XMP sidecars",
                     count(preview.media_rows.len())
                 ),
             });
@@ -628,7 +632,7 @@ impl Render for UpdateForm {
                 .child(help_line(
                     if self.write {
                         t(
-                            "标注员填好的表，或从 Caracal 导出的表：表中的标签原样写入 XMP；空白的单元格不会改动文件。",
+                            "标注好的表或从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。",
                             "A table filled in by labellers, or exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged.",
                         )
                     } else {
@@ -753,7 +757,7 @@ impl UpdateForm {
         let preview: Div = match &self.check {
             WriteCheck::Idle => help_line(
                 t(
-                    "选择表格后自动检查（--dry-run，不写入）。",
+                    "选择表格后自动检查，不会写入。",
                     "Checked automatically once a table is chosen (--dry-run, nothing written).",
                 ),
                 Tone::Quiet,
@@ -824,7 +828,7 @@ impl UpdateForm {
                 let mut notes = Vec::new();
                 notes.push(match language() {
                     Language::Chinese => format!(
-                        "已检查 {} 个文件，{} 个已经与表格一致。表格中的值会覆盖文件里的值；空白的单元格不会改动文件。每个文件保留一份原始备份。",
+                        "已检查 {} 个文件，{} 个已与表格一致。表格中的值覆盖文件中的值，空白单元格不改动；每个文件保留一份原始备份。",
                         count(number(summary, "changed") + number(summary, "already")),
                         count(number(summary, "already"))
                     ),
@@ -836,7 +840,7 @@ impl UpdateForm {
                 });
                 if number(summary, "created_sidecars") > 0 {
                     notes.push(match language() {
-                        Language::Chinese => format!("还有 {} 个文件没有 XMP 旁注文件，将从媒体文件创建。", count(number(summary, "created_sidecars"))),
+                        Language::Chinese => format!("还有 {} 个文件没有 XMP sidecar，将从媒体文件创建。", count(number(summary, "created_sidecars"))),
                         Language::English => format!("{} files have no XMP sidecar yet; they are created from the media files.", count(number(summary, "created_sidecars"))),
                     });
                 }

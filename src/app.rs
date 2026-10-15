@@ -589,7 +589,7 @@ impl Waxbill {
                 (false, why) if !serval_ready => {
                     idle(t("需要 Serval", "Serval needed"), why, false)
                 }
-                (false, why) => idle(t("还不能运行", "Not ready"), why, false),
+                (false, why) => idle(t("未就绪", "Not ready"), why, false),
             };
         };
         let warnings = run.warnings.len() + run.errors.iter().filter(|(_, p)| p.is_some()).count();
@@ -616,7 +616,7 @@ impl Waxbill {
                 Tone::Success,
                 t("预览完成", "Preview finished").to_string(),
                 t(
-                    "没有改动任何文件；计划见运行日志",
+                    "未改动任何文件；计划见运行日志",
                     "nothing was changed; the plan is in the run log",
                 )
                 .to_string(),
@@ -639,7 +639,7 @@ impl Waxbill {
             ),
             Outcome::NeedsDecision => (
                 Tone::Warning,
-                t("需要你的选择", "Needs your decision").to_string(),
+                t("需要选择", "Decision needed").to_string(),
                 t("还没有写入任何文件", "nothing has been written yet").to_string(),
                 t("运行", "Run"),
             ),
@@ -804,7 +804,8 @@ impl Waxbill {
                     .size(px(15.))
                     .text_color(cx.theme().muted_foreground),
             )
-            .child(id.label())
+            // A long name (English) ends in "…" rather than running past the sidebar.
+            .child(div().flex_1().min_w_0().truncate().child(id.label()))
             .when(self.running_screen() == Some(id), |item| {
                 item.child(
                     div()
@@ -943,13 +944,13 @@ impl Waxbill {
                 )
                 .child(step(
                     "next-capture",
-                    t("独立捕获", "Independent captures"),
+                    t("独立捕获", "Temporal-independence events"),
                     ScreenId::Capture,
                     cx,
                 ))
                 .child(step(
                     "next-extract",
-                    t("媒体提取", "Extract media"),
+                    t("媒体提取", "Copy media"),
                     ScreenId::Extract,
                     cx,
                 ))
@@ -997,8 +998,8 @@ impl Waxbill {
                 .gap(tokens.px("space-5"))
                 .child(self.render_heading(
                     t(
-                        "打开标签表，按物种和评分选出要看的记录，再在 Caracal、资源管理器中查看，或把改好的表写入文件。",
-                        "Open a tags table, choose records by species and rating, then look at them in Caracal or the file manager, or write an edited table into the files.",
+                        "打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。",
+                        "Open a tags table, filter it, and view the media in Caracal or your file manager.",
                     ),
                     false,
                     cx,

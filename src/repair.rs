@@ -27,9 +27,11 @@ pub struct Check {
     pub encoding: Encoding,
     /// Tab-separated (Excel's "Unicode text").
     pub tabs: bool,
-    /// Time cells in another format that can be rewritten, and whether some of them have no seconds.
+    /// Time cells `xmp write` would refuse that can be rewritten, and whether some of them have no seconds.
     pub times: usize,
     pub no_seconds: bool,
+    /// Time cells that are not a date and time in year-month-day order (e.g. day first): not rewritten.
+    pub unknown_times: usize,
 }
 
 impl Check {
@@ -103,8 +105,18 @@ fn normal_time(cell: &str) -> Option<(String, bool)> {
     })
 }
 
-/// The table's rows, with the time cells rewritten, and what was found.
-fn read(path: &Path) -> Result<(Vec<csv::StringRecord>, Check), String> {
+/// Whether `xmp write` takes the cell as it is: year-month-day with `-`, a space or `T`, and seconds; zero-padding
+/// is optional (Serval parses `%Y-%m-%dT%H:%M:%S`). Polars, which reads times everywhere else (capture, `xmp update`),
+/// takes much more, so only 整表写入 checks times.
+fn serval_writes(cell: &str) -> bool {
+    let cell = cell.trim();
+    let date = cell.split([' ', 'T']).next().unwrap_or("");
+    !date.contains(['/', '.']) && normal_time(cell).is_some_and(|(_, no_seconds)| !no_seconds)
+}
+
+/// The table's rows and what was found; with `times`, the time cells `xmp write` would refuse are rewritten as
+/// `yyyy-MM-dd HH:mm:ss` (missing seconds become 00), and cells that are not year-month-day are counted, not changed.
+fn read(path: &Path, times: bool) -> Result<(Vec<csv::StringRecord>, Check), String> {
     let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
     let (text, encoding) = decode(&bytes)?;
     let text = text.trim_start_matches('\u{feff}');
@@ -124,6 +136,7 @@ fn read(path: &Path) -> Result<(Vec<csv::StringRecord>, Check), String> {
         tabs,
         times: 0,
         no_seconds: false,
+        unknown_times: 0,
     };
     let Some(header) = rows.first().cloned() else {
         return Ok((rows, check));
@@ -131,7 +144,7 @@ fn read(path: &Path) -> Result<(Vec<csv::StringRecord>, Check), String> {
     let time_columns: Vec<usize> = header
         .iter()
         .enumerate()
-        .filter(|(_, name)| TIME_COLUMNS.contains(&name.trim()))
+        .filter(|(_, name)| times && TIME_COLUMNS.contains(&name.trim()))
         .map(|(i, _)| i)
         .collect();
     for row in rows.iter_mut().skip(1) {
@@ -141,13 +154,17 @@ fn read(path: &Path) -> Result<(Vec<csv::StringRecord>, Check), String> {
             let Some(cell) = cells.get_mut(column) else {
                 continue;
             };
-            if let Some((normal, no_seconds)) = normal_time(cell)
-                && normal != *cell
-            {
-                *cell = normal;
-                check.times += 1;
-                check.no_seconds |= no_seconds;
-                changed = true;
+            if cell.trim().is_empty() || serval_writes(cell) {
+                continue;
+            }
+            match normal_time(cell) {
+                Some((normal, no_seconds)) => {
+                    *cell = normal;
+                    check.times += 1;
+                    check.no_seconds |= no_seconds;
+                    changed = true;
+                }
+                None => check.unknown_times += 1,
             }
         }
         if changed {
@@ -166,7 +183,7 @@ pub fn text(path: &Path) -> Result<String, String> {
 
 /// The cells of one column as written, in any encoding the check reads.
 pub fn column(path: &Path, name: &str) -> Result<Vec<String>, String> {
-    let (rows, _) = read(path)?;
+    let (rows, _) = read(path, false)?;
     let Some(index) = rows
         .first()
         .and_then(|header| header.iter().position(|h| h.trim() == name))
@@ -180,13 +197,14 @@ pub fn column(path: &Path, name: &str) -> Result<Vec<String>, String> {
         .collect())
 }
 
-pub fn check(path: &Path) -> Result<Check, String> {
-    read(path).map(|(_, check)| check)
+/// What a repaired copy would change; `times` also checks the time columns as `xmp write` reads them.
+pub fn check(path: &Path, times: bool) -> Result<Check, String> {
+    read(path, times).map(|(_, check)| check)
 }
 
 /// Write the repaired copy as UTF-8 with a BOM (Serval reads it, Excel opens it correctly) and return its path.
-pub fn repair(path: &Path) -> Result<PathBuf, String> {
-    let (rows, _) = read(path)?;
+pub fn repair(path: &Path, times: bool) -> Result<PathBuf, String> {
+    let (rows, _) = read(path, times)?;
     let mut writer = csv::WriterBuilder::new()
         .flexible(true)
         .from_writer(b"\xEF\xBB\xBF".to_vec());
@@ -241,6 +259,8 @@ pub struct TableCheck {
     state: State,
     /// The original, while the field shows the copy made from it.
     repaired_from: Option<(PathBuf, PathBuf)>,
+    /// Check the time columns too: only where Serval is strict about them (整表写入 writing times).
+    times: bool,
     generation: usize,
     _subscription: Subscription,
 }
@@ -260,8 +280,17 @@ impl TableCheck {
             value: SharedString::default(),
             state: State::Nothing,
             repaired_from: None,
+            times: false,
             generation: 0,
             _subscription: subscription,
+        }
+    }
+
+    /// Whether the times in the table matter to the command; set by the form.
+    pub fn set_check_times(&mut self, times: bool, cx: &mut Context<Self>) {
+        if self.times != times {
+            self.times = times;
+            self.recheck(cx);
         }
     }
 
@@ -278,10 +307,11 @@ impl TableCheck {
         {
             return;
         }
+        let times = self.times;
         cx.spawn(async move |this, cx| {
             let checked = cx
                 .background_executor()
-                .spawn(async move { check(&path) })
+                .spawn(async move { check(&path, times) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 if this.generation == generation {
@@ -303,11 +333,12 @@ impl TableCheck {
         self.state = State::Repairing;
         cx.notify();
         let input = self.input.clone();
+        let times = self.times;
         cx.spawn_in(window, async move |this, cx| {
             let source = original.clone();
             let repaired = cx
                 .background_executor()
-                .spawn(async move { repair(&source) })
+                .spawn(async move { repair(&source, times) })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match repaired {
                 _ if this.generation != generation => {}
@@ -359,22 +390,26 @@ impl TableCheck {
             let seconds = check.no_seconds;
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "{} 个时间不是 yyyy-MM-dd HH:mm:ss 格式（表格软件保存时改动了）{}。",
+                    "{} 个时间无法写入 XMP，需要 yyyy-MM-dd HH:mm:ss 格式；修复时会改为该格式{}。",
                     count(check.times),
-                    if seconds {
-                        "，修复时没有的秒数补为 00"
-                    } else {
-                        ""
-                    }
+                    if seconds { "，缺少的秒数补为 00" } else { "" }
                 ),
                 Language::English => format!(
-                    "{} times are not yyyy-MM-dd HH:mm:ss (a spreadsheet program changed them){}.",
+                    "{} times cannot be written to XMP as they are (yyyy-MM-dd HH:mm:ss is needed); the repair rewrites them{}.",
                     count(check.times),
-                    if seconds {
-                        "; missing seconds become 00"
-                    } else {
-                        ""
-                    }
+                    if seconds { ", with 00 for missing seconds" } else { "" }
+                ),
+            });
+        }
+        if check.unknown_times > 0 {
+            lines.push(match language() {
+                Language::Chinese => format!(
+                    "{} 个时间无法识别（例如日/月/年的顺序），请在表格软件中改为 yyyy-MM-dd HH:mm:ss。",
+                    count(check.unknown_times)
+                ),
+                Language::English => format!(
+                    "{} times are not recognised (e.g. day first); change them to yyyy-MM-dd HH:mm:ss in the spreadsheet.",
+                    count(check.unknown_times)
                 ),
             });
         }
@@ -401,7 +436,9 @@ impl Render for TableCheck {
                 ),
             });
         let (lines, button) = match &self.state {
-            State::Checked(check) if check.needs_repair() => (Self::problems(check), true),
+            State::Checked(check) if check.needs_repair() || check.unknown_times > 0 => {
+                (Self::problems(check), check.needs_repair())
+            }
             State::Repairing => (
                 vec![t("正在生成副本…", "Writing the copy…").to_string()],
                 false,
@@ -446,28 +483,36 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("waxbill-repair-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let table = dir.join("labels.csv");
-        let text = "path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-1-5 6:09\n/data/雪豹/2.JPG,雪豹,2023-01-05 06:10:07\n";
+        // WPS without seconds (rewritten), unpadded with seconds (xmp write takes it), day first (only counted).
+        let text = "path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-1-5 6:09\n/data/雪豹/2.JPG,雪豹,2023-1-5 6:10:07\n/data/雪豹/3.JPG,雪豹,05/01/2023 06:12\n";
         let (gbk, _, _) = encoding_rs::GBK.encode(text);
         std::fs::write(&table, &gbk).unwrap();
 
-        let found = check(&table).unwrap();
+        let found = check(&table, true).unwrap();
         assert_eq!(
-            (found.encoding, found.times, found.no_seconds),
-            (Encoding::Gbk, 1, true)
+            (
+                found.encoding,
+                found.times,
+                found.no_seconds,
+                found.unknown_times
+            ),
+            (Encoding::Gbk, 1, true, 1)
         );
-        let copy = repair(&table).unwrap();
+        // Where Serval reads times leniently (Polars), they are not checked.
+        assert_eq!(check(&table, false).unwrap().times, 0);
+        let copy = repair(&table, true).unwrap();
         assert_eq!(copy, dir.join("labels.utf8.csv"));
         let repaired = std::fs::read(&copy).unwrap();
         assert_eq!(
             String::from_utf8(repaired).unwrap(),
-            "\u{feff}path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-01-05 06:09:00\n/data/雪豹/2.JPG,雪豹,2023-01-05 06:10:07\n"
+            "\u{feff}path,species,datetime\n/data/雪豹/1.JPG,雪豹,2023-01-05 06:09:00\n/data/雪豹/2.JPG,雪豹,2023-1-5 6:10:07\n/data/雪豹/3.JPG,雪豹,05/01/2023 06:12\n"
         );
         assert_eq!(std::fs::read(&table).unwrap(), gbk.as_ref());
 
         // Repairs at the same time each get their own copy.
         let copies: std::collections::HashSet<_> = std::thread::scope(|scope| {
             let repairs: Vec<_> = (0..16)
-                .map(|_| scope.spawn(|| repair(&table).unwrap()))
+                .map(|_| scope.spawn(|| repair(&table, true).unwrap()))
                 .collect();
             repairs.into_iter().map(|r| r.join().unwrap()).collect()
         });
