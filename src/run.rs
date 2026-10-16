@@ -345,6 +345,62 @@ impl Run {
     }
 }
 
+/// The commonest Serval errors in one sentence with what to do (the raw message stays beside it and in the log).
+/// `None` for anything else: then the raw message is the best there is.
+pub fn plain_error(raw: &str) -> Option<&'static str> {
+    let raw = raw.to_lowercase();
+    let has = |needles: &[&str]| needles.iter().any(|n| raw.contains(n));
+    Some(if has(&["os error 32", "being used by another process"]) {
+        t(
+            "文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。",
+            "A file is in use by another program (e.g. open in Excel). Close it and run again.",
+        )
+    } else if has(&[
+        "os error 28",
+        "os error 112",
+        "no space left",
+        "not enough space",
+    ]) {
+        t(
+            "磁盘空间不足。清理空间或更换输出位置后重新运行。",
+            "The disk is full. Free some space or choose another output location, then run again.",
+        )
+    } else if has(&["os error 13", "permission denied", "access is denied"]) {
+        t(
+            "没有权限读写这个位置。检查文件夹权限，或更换输出位置。",
+            "No permission to read or write this location. Check the folder's permissions, or choose another output location.",
+        )
+    } else if has(&[
+        "os error 2",
+        "os error 3",
+        "no such file or directory",
+        "cannot find the",
+    ]) {
+        t(
+            "找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。",
+            "A file or folder was not found. Check the path, and that the drive or network location is connected.",
+        )
+    } else if has(&["datetime column"]) {
+        t(
+            "表格中的时间有空值或无法读取。检查 datetime 列。",
+            "The table's times are empty or cannot be read. Check the datetime column.",
+        )
+    } else if has(&["deploymentid"]) {
+        t(
+            "位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。",
+            "A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first.",
+        )
+    } else if has(&["columnnotfound", "unable to find column"]) || raw.starts_with("not found: \"")
+    {
+        t(
+            "表格缺少需要的列。检查列名（见下方原文）。",
+            "The table is missing a column it needs. Check the column names (see the message below).",
+        )
+    } else {
+        return None;
+    })
+}
+
 const SUMMARY_WORDS: &[(&str, &str, &str)] = &[
     ("written", "写入", "written"),
     ("updated", "更新", "updated"),
@@ -393,4 +449,31 @@ pub fn took(duration: Duration) -> String {
 
 fn is_preview(command: &str) -> bool {
     command.split(' ').any(|arg| arg == "--dryrun")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::plain_error;
+
+    #[test]
+    fn common_serval_errors_get_a_plain_sentence() {
+        // Messages as Serval writes them (collected 2026-10-16), and Windows' wording.
+        for (raw, starts) in [
+            ("Permission denied (os error 13)", "没有权限"),
+            ("not found: \"datetime\" not found", "表格缺少"),
+            (
+                "Datetime column contains empty values, please fill them before proceeding.",
+                "表格中的时间",
+            ),
+            (
+                "The process cannot access the file because it is being used by another process. (os error 32)",
+                "文件正被",
+            ),
+            ("No such file or directory (os error 2)", "找不到"),
+        ] {
+            let plain = plain_error(raw).unwrap_or_default();
+            assert!(plain.starts_with(starts), "{raw} → {plain}");
+        }
+        assert_eq!(plain_error("something Serval has never said"), None);
+    }
 }

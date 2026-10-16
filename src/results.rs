@@ -45,12 +45,14 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
             t("失败", "Failed").to_string(),
             format!(
                 "{} {}",
-                run.failure(),
+                crate::run::plain_error(&run.failure()).unwrap_or(""),
                 t(
                     "修正后重新运行；已完成的部分会被识别并跳过。",
                     "Fix this and run again; finished work is recognised and skipped."
                 )
-            ),
+            )
+            .trim_start()
+            .to_string(),
         ),
         Outcome::Stopped => (
             tokens.color("info-soft"),
@@ -69,7 +71,17 @@ pub fn banner(run: &Run, cx: &App) -> Option<Div> {
             .rounded(tokens.px("radius-md"))
             .bg(fill)
             .child(div().font_semibold().child(title))
-            .child(div().text_size(tokens.px("text-sm")).child(body)),
+            .child(div().text_size(tokens.px("text-sm")).child(body))
+            // A failure also shows Serval's own words, for a search or a bug report.
+            .when(run.outcome == Outcome::Failed, |banner| {
+                banner.child(
+                    div()
+                        .text_size(tokens.px("text-xs"))
+                        .font_family(cx.theme().mono_font_family.clone())
+                        .text_color(cx.theme().muted_foreground)
+                        .child(run.failure()),
+                )
+            }),
     )
 }
 

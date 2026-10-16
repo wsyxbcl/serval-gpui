@@ -649,7 +649,9 @@ impl Waxbill {
             Outcome::Failed => (
                 Tone::Danger,
                 t("失败", "Failed").to_string(),
-                run.failure(),
+                crate::run::plain_error(&run.failure())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| run.failure()),
                 t("重新运行", "Run again"),
             ),
             Outcome::Stopped => (

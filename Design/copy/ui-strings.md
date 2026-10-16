@@ -9,86 +9,93 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 运行 | Run | `app.rs:556` |
-| 选择程序后即可运行 | choose the program to run | `app.rs:564` |
-| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:568` |
-| 另一个命令正在运行 | another command is running | `app.rs:576` |
-| 就绪 | Ready | `app.rs:585` |
-| 需要 Serval | Serval needed | `app.rs:590` |
-| 未就绪 | Not ready | `app.rs:592` |
-| 正在暂停… | Pausing… | `app.rs:601` |
-| 运行中 | Running | `app.rs:603` |
-| 暂停 | Pause | `app.rs:609` |
-| 预览完成 | Preview finished | `app.rs:617` |
-| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:618` |
-| 按此执行 | Run it for real | `app.rs:623` |
-| 完成 | Finished | `app.rs:627` |
-| 再次运行 | Run again | `app.rs:629` |
-| 需要选择 | Decision needed | `app.rs:642` |
-| 还没有写入任何文件 | nothing has been written yet | `app.rs:643` |
-| 失败 | Failed | `app.rs:648` |
-| 重新运行 | Run again | `app.rs:650` |
-| 已暂停 | Paused | `app.rs:654` |
-| 继续 | Continue | `app.rs:656` |
-| 取消 | Cancel | `app.rs:673` |
-| 正在查找 Serval… | Looking for Serval… | `app.rs:698` |
-| 版本过旧 | too old | `app.rs:705` |
-| 未找到 Serval | Serval not found | `app.rs:709` |
-| 用这张标签表继续： | Continue with this tags table: | `app.rs:943` |
-| 独立捕获 | Events | `app.rs:947` |
-| 媒体提取 | Copy media | `app.rs:953` |
-| 查看媒体 | View media | `app.rs:959` |
-| 帮助 | Help | `app.rs:986` |
-| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1000` |
-| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1012` |
-| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1024` |
-| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:634` |
+| 运行 | Run | `app.rs:559` |
+| 选择程序后即可运行 | choose the program to run | `app.rs:567` |
+| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:571` |
+| 另一个命令正在运行 | another command is running | `app.rs:579` |
+| 就绪 | Ready | `app.rs:588` |
+| 需要 Serval | Serval needed | `app.rs:593` |
+| 未就绪 | Not ready | `app.rs:595` |
+| 正在暂停… | Pausing… | `app.rs:604` |
+| 运行中 | Running | `app.rs:606` |
+| 暂停 | Pause | `app.rs:612` |
+| 预览完成 | Preview finished | `app.rs:620` |
+| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:621` |
+| 按此执行 | Run it for real | `app.rs:626` |
+| 完成 | Finished | `app.rs:630` |
+| 再次运行 | Run again | `app.rs:632` |
+| 需要选择 | Decision needed | `app.rs:645` |
+| 还没有写入任何文件 | nothing has been written yet | `app.rs:646` |
+| 失败 | Failed | `app.rs:651` |
+| 重新运行 | Run again | `app.rs:655` |
+| 已暂停 | Paused | `app.rs:659` |
+| 继续 | Continue | `app.rs:661` |
+| 取消 | Cancel | `app.rs:678` |
+| 正在查找 Serval… | Looking for Serval… | `app.rs:703` |
+| 版本过旧 | too old | `app.rs:710` |
+| 未找到 Serval | Serval not found | `app.rs:714` |
+| 用这张标签表继续： | Continue with this tags table: | `app.rs:948` |
+| 独立捕获 | Events | `app.rs:952` |
+| 媒体提取 | Copy media | `app.rs:958` |
+| 查看媒体 | View media | `app.rs:964` |
+| 帮助 | Help | `app.rs:993` |
+| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1008` |
+| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1020` |
+| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1032` |
+| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:637` |
 | 正在启动… | Starting… | `run.rs:265` |
 | 剩余约 | about | `run.rs:288` |
 | Serval 意外退出 | Serval exited unexpectedly | `run.rs:344` |
-| 正在扫描 | Scanning | `run.rs:363` |
-| 正在读取 | Reading | `run.rs:364` |
-| 正在检查 | Checking | `run.rs:365` |
-| 正在复制 | Copying | `run.rs:366` |
-| 正在移动 | Moving | `run.rs:367` |
-| 正在写入 | Writing | `run.rs:368` |
-| 正在删除 | Removing | `run.rs:369` |
-| 正在分析 | Analysing | `run.rs:370` |
-| 运行中 | Running | `run.rs:371` |
+| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:354` |
+| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:364` |
+| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:369` |
+| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:379` |
+| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:384` |
+| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:389` |
+| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:395` |
+| 正在扫描 | Scanning | `run.rs:419` |
+| 正在读取 | Reading | `run.rs:420` |
+| 正在检查 | Checking | `run.rs:421` |
+| 正在复制 | Copying | `run.rs:422` |
+| 正在移动 | Moving | `run.rs:423` |
+| 正在写入 | Writing | `run.rs:424` |
+| 正在删除 | Removing | `run.rs:425` |
+| 正在分析 | Analysing | `run.rs:426` |
+| 运行中 | Running | `run.rs:427` |
 | 生成 {} 个结果 | (format!, written per language) | `run.rs:317` |
 | 用时 {} | (format!, written per language) | `run.rs:322` |
-| {seconds} 秒 | (format!, written per language) | `run.rs:386` |
+| {seconds} 秒 | (format!, written per language) | `run.rs:442` |
 | 雪豹 | (fragment) | `run.rs:135` |
 | 岩羊 | (fragment) | `run.rs:136` |
 | 赤狐 | (fragment) | `run.rs:137` |
 |  · {done} / {} 个文件 | (fragment) | `run.rs:272` |
 |  · {done} 个文件 | (fragment) | `run.rs:277` |
-| 写入 | (fragment) | `run.rs:349` |
-| 更新 | (fragment) | `run.rs:350` |
-| 新建 | (fragment) | `run.rs:351` |
-| 修改 | (fragment) | `run.rs:352` |
-| 完成 | (fragment) | `run.rs:353` |
-| 替换 | (fragment) | `run.rs:354` |
-| 已是最新 | (fragment) | `run.rs:355` |
-| 已存在 | (fragment) | `run.rs:356` |
-| 跳过 | (fragment) | `run.rs:357` |
-| 失败 | (fragment) | `run.rs:358` |
+| 写入 | (fragment) | `run.rs:405` |
+| 更新 | (fragment) | `run.rs:406` |
+| 新建 | (fragment) | `run.rs:407` |
+| 修改 | (fragment) | `run.rs:408` |
+| 完成 | (fragment) | `run.rs:409` |
+| 替换 | (fragment) | `run.rs:410` |
+| 已是最新 | (fragment) | `run.rs:411` |
+| 已存在 | (fragment) | `run.rs:412` |
+| 跳过 | (fragment) | `run.rs:413` |
+| 失败 | (fragment) | `run.rs:414` |
 | 复制命令 | Copy command | `run_bar.rs:112` |
 | 预览完成 | Preview finished | `results.rs:21` |
 | 未改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。 | Nothing was changed. The planned changes are listed in the run log below; when they look right, press Run it for real. | `results.rs:22` |
 | 完成 | Finished | `results.rs:30` |
 | 失败 | Failed | `results.rs:45` |
 | 修正后重新运行；已完成的部分会被识别并跳过。 | Fix this and run again; finished work is recognised and skipped. | `results.rs:49` |
-| 已暂停 | Paused | `results.rs:57` |
-| 已完成部分文件。继续会跳过该部分。 | Some files are done. Continue skips them. | `results.rs:58` |
-| 文件夹 | folder | `results.rs:145` |
-| 在 Caracal 中打开 | Open in Caracal | `results.rs:174` |
-| 打开 | Open | `results.rs:180` |
-| 运行日志 | Run log | `results.rs:206` |
-| 复制日志 | Copy log | `results.rs:213` |
+| 已暂停 | Paused | `results.rs:59` |
+| 已完成部分文件。继续会跳过该部分。 | Some files are done. Continue skips them. | `results.rs:60` |
+| 文件夹 | folder | `results.rs:157` |
+| 在 Caracal 中打开 | Open in Caracal | `results.rs:186` |
+| 打开 | Open | `results.rs:192` |
+| 运行日志 | Run log | `results.rs:218` |
+| 复制日志 | Copy log | `results.rs:225` |
 | 完成，有 {} 条警告 | (format!, written per language) | `results.rs:36` |
-| 另外 {} 条见运行日志 | (format!, written per language) | `results.rs:113` |
-| {} 行 | (format!, written per language) | `results.rs:142` |
+| 另外 {} 条见运行日志 | (format!, written per language) | `results.rs:125` |
+| {} 行 | (format!, written per language) | `results.rs:154` |
 | 删除失败： | Could not delete: | `run_dialogs.rs:165` |
 | 取消这次运行？ | Cancel this run? | `run_dialogs.rs:180` |
 | 已完成部分文件，默认保留。 | Files already done are kept unless you choose otherwise. | `run_dialogs.rs:181` |
@@ -355,9 +362,9 @@ example data.
 | 选项 | Options | `screens/simple.rs:467` |
 | 为每个媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。 | Creates an XMP sidecar for each media file (existing ones are kept) and a table for checking the data. | `screens/simple.rs:543` |
 | 媒体文件夹 | Media folder | `screens/simple.rs:549` |
-| 按位点表把位点文件夹从名称改为编号。 | Renames deployment folders from their names to their IDs, from the deployments table. | `screens/simple.rs:585` |
+| 把项目中的位点文件夹统一改名为「位点_样区」（小写），与位点表中的 deploymentID 一致。 | Renames the deployment folders in a project to <deployment>_<collection> in lower case, matching deploymentID in the deployments table. | `screens/simple.rs:585` |
 | 项目文件夹 | Project folder | `screens/simple.rs:591` |
-| 包含位点文件夹和位点表的项目文件夹。 | The project folder with the deployment folders and the deployments table. | `screens/simple.rs:594` |
+| 项目文件夹：其下是各样区文件夹，样区下是位点文件夹。 | The project folder: a folder per collection, with the deployment folders inside. | `screens/simple.rs:594` |
 | 先预览，不改名 | Preview only, rename nothing | `screens/simple.rs:602` |
 | 在运行日志里列出将要做的改名。 | Lists the renames in the run log. | `screens/simple.rs:603` |
 | 预览改名 | preview the renames | `screens/simple.rs:619` |
@@ -505,3 +512,14 @@ example data.
 | Waxbill 需要 Serval {} 或以上，请向项目组获取新版本。 | (format!, written per language) | `settings_screen.rs:74` |
 | 需要 Serval {} 或以上。 | (format!, written per language) | `settings_screen.rs:123` |
 | 中文 | (fragment) | `settings_screen.rs:183` |
+
+## Other
+
+| 中文 | English | Where |
+| --- | --- | --- |
+| 命令行参数 | Command-line options | `help.rs:132` |
+| 需要 Serval 才能显示。 | Shown once Serval is found. | `help.rs:137` |
+| 正在读取… | Reading… | `help.rs:139` |
+| 帮助 | Help | `help.rs:160` |
+| 隐藏命令行参数 | Hide command-line options | `help.rs:201` |
+| 显示命令行参数 | Show command-line options | `help.rs:203` |
