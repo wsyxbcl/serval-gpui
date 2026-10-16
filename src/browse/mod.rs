@@ -281,7 +281,8 @@ impl Browse {
             .iter()
             .filter(|&&i| self.records.all[i].video)
             .count();
-        card(cx)
+        v_flex()
+            .gap(tokens.px("space-3"))
             .child(
                 h_flex()
                     .items_start()
@@ -471,8 +472,8 @@ impl Render for Browse {
             self.action(
                 t("在 Caracal 中查看和编辑", "View and edit in Caracal"),
                 t(
-                    "在浏览器中打开 Caracal：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
-                    "Opens Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files.",
+                    "在浏览器中打开整张表：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
+                    "Opens the whole table in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files.",
                 ),
                 Button::new("open-caracal")
                     .outline()
@@ -547,28 +548,41 @@ impl Render for Browse {
             ),
             Review::Failed(err) => Some(help_line(err.clone(), Tone::Danger, cx)),
         };
-        let explorer = self.action(
-            t("在资源管理器中查看所选", "Look at the choice in the file manager"),
-            t(
-                "生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。",
-                "Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage.",
-            ),
-            Button::new("make-review")
-                .outline()
-                .label(t("建立查看文件夹", "Make a review folder"))
-                .disabled(chosen == 0 || matches!(self.review, Review::Making))
-                .on_click(cx.listener(|this, _, _, cx| this.make_review(cx)))
-                .into_any_element(),
-            review_status,
-            cx,
-        );
+        // The choice feeds only the review folder, so it lives in that card; Caracal and 应用表格到文件 take the
+        // whole table.
+        let explorer = card(cx)
+            .gap(tokens.px("space-3"))
+            .child(
+                v_flex()
+                    .gap(tokens.px("space-1"))
+                    .child(div().font_semibold().child(t("在资源管理器中查看所选", "Look at a choice in the file manager")))
+                    .child(help_line(
+                        t(
+                            "生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。",
+                            "Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage.",
+                        ),
+                        Tone::Quiet,
+                        cx,
+                    )),
+            )
+            .child(self.render_choice(cx))
+            .child(
+                h_flex().child(
+                    Button::new("make-review")
+                        .outline()
+                        .label(t("建立查看文件夹", "Make a review folder"))
+                        .disabled(chosen == 0 || matches!(self.review, Review::Making))
+                        .on_click(cx.listener(|this, _, _, cx| this.make_review(cx))),
+                ),
+            )
+            .children(review_status);
         let apply = {
             let path = path.clone();
             self.action(
                 t("应用表格到文件", "Write the table into the files"),
                 t(
-                    "将标签表信息（例如从 Caracal 导出的）写回 XMP 文件。",
-                    "Writes the table (for example one exported from Caracal) back into the XMP files.",
+                    "将整张标签表（例如从 Caracal 导出的）写回 XMP 文件。",
+                    "Writes the whole table (for example one exported from Caracal) back into the XMP files.",
                 ),
                 Button::new("apply-table")
                     .outline()
@@ -582,7 +596,6 @@ impl Render for Browse {
         v_flex()
             .gap(tokens.px("space-4"))
             .child(table_card)
-            .child(self.render_choice(cx))
             .child(explorer)
             .child(caracal)
             .child(apply)
