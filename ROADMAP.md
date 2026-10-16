@@ -130,7 +130,7 @@ Rules:
 - [x] 在 Caracal 中打开 (2026-10-13, level b): links name the mode and the table's full path (`#review|#species|#time&table=<path>`), no clipboard; browse, observe's tags table and xmp init's table. Caracal still has to read the fragment (in progress): `~/Downloads/caracal-waxbill-links-2026-10-13.md` for the Caracal side.
 - [x] Progress says what it counts ("正在检查 · 37 / 126 个文件"), so 整表写入's check over every file no longer reads as 126 writes.
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
-- [ ] Tie Serval's lifetime to Waxbill's (a Windows Job Object): a Waxbill that is killed or crashes leaves a running Serval going until it finishes; a normal close asks and stops it.
+- [x] Serval ends with Waxbill, also when Waxbill is killed or crashes: a Job Object on Windows (to be tested there), the parent-death signal on Linux (tested); macOS keeps finishing the run.
 - [x] Ship Serval with Waxbill (W08 revised): `serval.exe` next to `waxbill.exe` in the archive is found without setup; a chosen program still wins while it works.
 - [ ] Release builds for Windows, Linux and macOS (Waxbill and Serval as separate downloads), plus a full zip for internal users with Waxbill, Serval and future dependencies side by side; hosted where users can reach them (decided 2026-10-14).
 - [ ] Update check and download from the project's own server (manifest, checksums, signature); Waxbill itself notify-only at first. Later.
