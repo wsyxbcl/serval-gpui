@@ -93,6 +93,20 @@ impl TagTable {
         (level < components.len().saturating_sub(1)).then(|| components[level])
     }
 
+    /// The deployments a level gives, with their record counts, by name: for checking the level.
+    pub fn deployments(&self, level: Option<usize>) -> Vec<(String, usize)> {
+        let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+        for record in &self.records {
+            if let Some(deployment) = self.deployment(record, level) {
+                *counts.entry(deployment).or_default() += 1;
+            }
+        }
+        counts
+            .into_iter()
+            .map(|(name, n)| (name.to_string(), n))
+            .collect()
+    }
+
     pub fn deployment_count(&self, level: Option<usize>) -> usize {
         self.records
             .iter()

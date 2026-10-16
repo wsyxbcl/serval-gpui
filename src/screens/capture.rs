@@ -45,6 +45,9 @@ pub struct CaptureForm {
     custom_output: Option<PathBuf>,
     /// The deployment count, recomputed when the level changes.
     deployments: usize,
+    /// The deployments the level gives, with record counts, shown on request to check the level.
+    deployment_list: Vec<(String, usize)>,
+    show_deployments: bool,
     read_generation: usize,
     /// Its command is running: the inputs are disabled (the app also blocks the mouse).
     pub locked: bool,
@@ -86,6 +89,8 @@ impl CaptureForm {
             camtrap_dp: false,
             custom_output: None,
             deployments: 0,
+            deployment_list: Vec::new(),
+            show_deployments: false,
             read_generation: 0,
             locked: false,
             _subscriptions: subscriptions,
@@ -158,8 +163,10 @@ impl CaptureForm {
     fn refresh(&mut self, cx: &mut Context<Self>) {
         if let TableState::Read(table) = &self.table {
             let level = if self.camtrap_dp { None } else { self.level };
-            self.deployments = table.deployment_count(level);
+            self.deployment_list = table.deployments(level);
+            self.deployments = self.deployment_list.len();
         } else {
+            self.deployment_list.clear();
             self.deployments = 0;
         }
         cx.notify();
@@ -411,6 +418,68 @@ impl CaptureForm {
                 },
             ))
             .child(help_line(note, Tone::Quiet, cx))
+            .when(
+                self.level.is_some() && !self.deployment_list.is_empty(),
+                |field| field.child(self.render_deployments(cx)),
+            )
+    }
+
+    /// 查看位点: the deployment names the chosen level gives, with record counts, so a wrong level shows.
+    fn render_deployments(&self, cx: &mut Context<Self>) -> Div {
+        const SHOWN: usize = 300;
+        let tokens = cx.tokens().clone();
+        let toggle = div()
+            .id("show-deployments")
+            .cursor_pointer()
+            .text_size(tokens.px("text-sm"))
+            .text_color(tokens.color("accent"))
+            .child(match (self.show_deployments, language()) {
+                (false, Language::Chinese) => format!("▸ 查看位点（{}）", count(self.deployments)),
+                (false, Language::English) => {
+                    format!("▸ Show the deployments ({})", count(self.deployments))
+                }
+                (true, Language::Chinese) => "▾ 收起位点".to_string(),
+                (true, Language::English) => "▾ Hide the deployments".to_string(),
+            })
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.show_deployments = !this.show_deployments;
+                cx.notify();
+            }));
+        let mut list = v_flex().gap(tokens.px("space-2")).child(toggle);
+        if self.show_deployments {
+            let hidden = self.deployment_list.len().saturating_sub(SHOWN);
+            list = list.child(
+                h_flex()
+                    .flex_wrap()
+                    .gap(tokens.px("space-2"))
+                    .text_size(tokens.px("text-sm"))
+                    .children(self.deployment_list.iter().take(SHOWN).map(|(name, n)| {
+                        h_flex()
+                            .gap(tokens.px("space-1"))
+                            .px(tokens.px("space-2"))
+                            .py(px(2.))
+                            .rounded(tokens.px("radius-sm"))
+                            .bg(cx.theme().muted)
+                            .child(name.clone())
+                            .child(
+                                div()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(count(*n)),
+                            )
+                    }))
+                    .when(hidden > 0, |row| {
+                        row.child(help_line(
+                            match language() {
+                                Language::Chinese => format!("… 另外 {} 个", count(hidden)),
+                                Language::English => format!("… {} more", count(hidden)),
+                            },
+                            Tone::Quiet,
+                            cx,
+                        ))
+                    }),
+            );
+        }
+        list
     }
 }
 
