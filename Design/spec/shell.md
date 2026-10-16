@@ -80,3 +80,6 @@ Rules:
 - No embedded terminal. The run log is plain text (see [run §4](run.md#4-log)); Serval's questions are fields or
   a dialog ([questions](questions.md)).
 - No help mode toggle: help is a link per screen and a one-line description under fields that need one.
+- 帮助 (or F1) opens a panel on the right with the screen's text (`help/zh/<screen>.md`: one line on what it does,
+  输入, 输出, 注意) and, on request, Serval's own `--help` for the command. English shows the Chinese text with a
+  note until English texts exist. (2026-10-16)

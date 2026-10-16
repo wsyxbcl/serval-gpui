@@ -6,6 +6,7 @@ mod bridge;
 mod browse;
 mod caracal;
 mod conflicts;
+mod help;
 mod i18n;
 mod id_species;
 mod output;

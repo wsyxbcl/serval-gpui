@@ -32,13 +32,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-actions!(waxbill, [RunCommand, StopCommand, OpenSettings]);
+actions!(waxbill, [RunCommand, StopCommand, OpenSettings, ToggleHelp]);
 
 pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-enter", RunCommand, None),
         KeyBinding::new("secondary-.", StopCommand, None),
         KeyBinding::new("secondary-,", OpenSettings, None),
+        KeyBinding::new("f1", ToggleHelp, None),
     ]);
 }
 
@@ -98,6 +99,7 @@ pub struct Waxbill {
     page_scroll: ScrollHandle,
     nav_scroll: ScrollHandle,
     next_run_id: u64,
+    pub(crate) help: crate::help::HelpState,
     focus: FocusHandle,
     pub(crate) icon: Arc<Image>,
 }
@@ -172,6 +174,7 @@ impl Waxbill {
             page_scroll: ScrollHandle::new(),
             nav_scroll: ScrollHandle::new(),
             next_run_id: 0,
+            help: Default::default(),
             focus,
             icon: Arc::new(Image::from_bytes(ImageFormat::Png, APP_ICON.to_vec())),
         };
@@ -963,7 +966,7 @@ impl Waxbill {
         )
     }
 
-    fn render_heading(&self, summary: &'static str, help: bool, cx: &App) -> Div {
+    fn render_heading(&self, summary: &'static str, help: bool, cx: &mut Context<Self>) -> Div {
         let tokens = cx.tokens();
         v_flex()
             .gap(tokens.px("space-1"))
@@ -982,8 +985,11 @@ impl Waxbill {
                     .when(help, |line| {
                         line.child(
                             div()
+                                .id("help-link")
+                                .cursor_pointer()
                                 .text_color(tokens.color("accent"))
-                                .child(t("帮助", "Help")),
+                                .child(t("帮助", "Help"))
+                                .on_click(cx.listener(|this, _, _, cx| this.toggle_help(cx))),
                         )
                     }),
             )
@@ -1001,7 +1007,7 @@ impl Waxbill {
                         "打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。",
                         "Open a tags table, filter it, and view the media in Caracal or your file manager.",
                     ),
-                    false,
+                    true,
                     cx,
                 ))
                 .child(self.browse.clone())
@@ -1082,6 +1088,7 @@ impl Render for Waxbill {
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &RunCommand, _, cx| this.run_or_stop(cx)))
             .on_action(cx.listener(|this, _: &StopCommand, _, cx| this.stop(cx)))
+            .on_action(cx.listener(|this, _: &ToggleHelp, _, cx| this.toggle_help(cx)))
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| {
                 this.go(ScreenId::Settings, cx);
                 cx.notify();
@@ -1095,7 +1102,8 @@ impl Render for Waxbill {
                     .min_h_0()
                     .items_start()
                     .child(self.render_sidebar(cx))
-                    .child(self.render_screen(cx)),
+                    .child(self.render_screen(cx))
+                    .children(self.render_help(cx)),
             )
             .children(dialog)
     }

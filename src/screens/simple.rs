@@ -583,8 +583,8 @@ pub static XMP_INIT: Spec = Spec {
 pub static RENAME: Spec = Spec {
     key: "rename",
     summary: (
-        "按位点表把位点文件夹从名称改为编号。",
-        "Renames deployment folders from their names to their IDs, from the deployments table.",
+        "把项目中的位点文件夹统一改名为「位点_样区」（小写），与位点表中的 deploymentID 一致。",
+        "Renames the deployment folders in a project to <deployment>_<collection> in lower case, matching deploymentID in the deployments table.",
     ),
     paths: &[PathSpec {
         key: "dir",
@@ -592,8 +592,8 @@ pub static RENAME: Spec = Spec {
         kind: PathKind::Folder,
         optional: false,
         help: Some((
-            "包含位点文件夹和位点表的项目文件夹。",
-            "The project folder with the deployment folders and the deployments table.",
+            "项目文件夹：其下是各样区文件夹，样区下是位点文件夹。",
+            "The project folder: a folder per collection, with the deployment folders inside.",
         )),
     }],
     choices: &[],

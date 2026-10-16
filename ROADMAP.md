@@ -135,7 +135,7 @@ Rules:
 - [ ] Release builds for Windows, Linux and macOS (Waxbill and Serval as separate downloads), plus a full zip for internal users with Waxbill, Serval and future dependencies side by side; hosted where users can reach them (decided 2026-10-14).
 - [ ] Update check and download from the project's own server (manifest, checksums, signature); Waxbill itself notify-only at first. Later.
 - [x] 2026-10-14 review: the run log scrolls (the page takes the wheel only at the log's ends; a rendering test); Chinese in one font on Linux; sidebar in five groups (查看媒体, XMP 更新 renamed); a larger logo and the logo in 关于; paths not remembered across launches; capture event IDs on; rename/align start as a preview with 按此执行; next steps from 标签获取's tags table (独立捕获, 媒体提取, 查看媒体).
-- [ ] Help (帮助): a side panel per screen with written texts (what it does, what you need, what comes out, an example, common mistakes) and the `serval … --help` text; the capture illustration lives there.
+- [x] Help (帮助, F1): a panel per screen with the written texts (help/zh, drafts for review) and Serval's `--help` on request. English texts to follow.
 - [ ] 在 Caracal 中打开 for 独立捕获's results (with deployment and eventID), once Caracal confirms the table and mode.
 - [ ] Copy diagnostics in 关于 (versions, OS, settings) for bug reports; layout at 1366×768; plain-language messages for the commonest Serval errors.
 - [ ] Draw the board for the hand-off screen.
