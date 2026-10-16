@@ -49,6 +49,8 @@ next run):
 - Paused always says the run can be continued: Serval's writes are complete-or-absent (temp files and rename),
   and a rerun skips finished work.
 - Warnings: the count in the banner title, the list (path, reason) below it, at most 200 rows with "另外 N 条".
+- 打开输出文件夹 above the files opens the folder the run wrote into (its `-o`, else the results' folder), with
+  everything in it, not only the tables listed. (2026-10-16)
 - Files: one row per `output` event — name, size or row count, "预览" (CSV: a table view), "打开". A folder row
   opens the folder.
 - Extra notices that need an action get their own banner with that action, e.g. unresolved identified species:

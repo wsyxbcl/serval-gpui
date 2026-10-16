@@ -5,7 +5,7 @@ use crate::i18n::{count, t};
 use crate::run::{Outcome, Run};
 use crate::theme::TokensExt;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme, StyledExt, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme, Sizable as _, StyledExt, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -140,9 +140,32 @@ pub fn output_list(run: &Run, cx: &App) -> Option<Div> {
         return None;
     }
     let tokens = cx.tokens();
+    let folder = run.output_folder();
     Some(
         v_flex()
             .gap(tokens.px("space-1"))
+            // The folder with everything the run wrote, not only the tables listed below.
+            .children(folder.map(|folder| {
+                let shown = folder.to_string_lossy().into_owned();
+                h_flex()
+                    .gap(tokens.px("space-2"))
+                    .pb(tokens.px("space-1"))
+                    .child(
+                        Button::new("open-output-folder")
+                            .outline()
+                            .small()
+                            .label(t("打开输出文件夹", "Open the output folder"))
+                            .on_click(move |_, _, cx| cx.open_with_system(&folder)),
+                    )
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .text_size(tokens.px("text-xs"))
+                            .text_color(cx.theme().muted_foreground)
+                            .child(shown),
+                    )
+            }))
             .children(run.outputs.iter().enumerate().map(|(i, file)| {
                 let path = file.path.clone();
                 let name = path

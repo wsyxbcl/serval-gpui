@@ -48,6 +48,8 @@ pub struct Run {
     /// The output folder this run (and the paused runs it continues) created, offered for deletion on cancel when
     /// the command only copies into it.
     pub created_output: Option<crate::run_dialogs::CreatedOutput>,
+    /// The folder the command writes into (its `-o`), for 打开输出文件夹.
+    pub output_dir: Option<PathBuf>,
     pub started: Instant,
     pub elapsed: Duration,
     pub outcome: Outcome,
@@ -77,6 +79,7 @@ impl Run {
             form_command: String::new(),
             id: 0,
             created_output: None,
+            output_dir: None,
             started: Instant::now(),
             elapsed: Duration::ZERO,
             outcome: Outcome::Running,
@@ -148,6 +151,7 @@ impl Run {
             form_command: String::new(),
             id: 0,
             created_output: None,
+            output_dir: None,
             started: Instant::now(),
             elapsed: Duration::ZERO,
             outcome: Outcome::Failed,
@@ -324,6 +328,25 @@ impl Run {
         };
         parts.push(took);
         parts.join(t("，", ", "))
+    }
+
+    /// Where the results are: the `-o` folder, else the folder a result was written to.
+    pub fn output_folder(&self) -> Option<PathBuf> {
+        self.output_dir
+            .clone()
+            .filter(|dir| dir.is_dir())
+            .or_else(|| {
+                self.outputs
+                    .iter()
+                    .find(|o| o.kind == "folder")
+                    .map(|o| o.path.clone())
+            })
+            .or_else(|| {
+                self.outputs
+                    .first()
+                    .and_then(|o| o.path.parent())
+                    .map(|p| p.to_path_buf())
+            })
     }
 
     /// The first error, for a failed run.

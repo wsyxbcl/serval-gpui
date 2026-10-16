@@ -492,6 +492,12 @@ impl Waxbill {
             Err(err) => Run::failed_to_start(command, format!("{}: {err}", program.display())),
         };
         run.form_command = form_command;
+        run.output_dir = plan
+            .args
+            .iter()
+            .position(|a| a == "-o")
+            .and_then(|i| plan.args.get(i + 1))
+            .map(PathBuf::from);
         run.created_output = created_output;
         self.next_run_id += 1;
         let id = self.next_run_id;

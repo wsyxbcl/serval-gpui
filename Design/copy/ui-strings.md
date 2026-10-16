@@ -9,77 +9,77 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 运行 | Run | `app.rs:559` |
-| 选择程序后即可运行 | choose the program to run | `app.rs:567` |
-| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:571` |
-| 另一个命令正在运行 | another command is running | `app.rs:579` |
-| 就绪 | Ready | `app.rs:588` |
-| 需要 Serval | Serval needed | `app.rs:593` |
-| 未就绪 | Not ready | `app.rs:595` |
-| 正在暂停… | Pausing… | `app.rs:604` |
-| 运行中 | Running | `app.rs:606` |
-| 暂停 | Pause | `app.rs:612` |
-| 预览完成 | Preview finished | `app.rs:620` |
-| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:621` |
-| 按此执行 | Run it for real | `app.rs:626` |
-| 完成 | Finished | `app.rs:630` |
-| 再次运行 | Run again | `app.rs:632` |
-| 需要选择 | Decision needed | `app.rs:645` |
-| 还没有写入任何文件 | nothing has been written yet | `app.rs:646` |
-| 失败 | Failed | `app.rs:651` |
-| 重新运行 | Run again | `app.rs:655` |
-| 已暂停 | Paused | `app.rs:659` |
-| 继续 | Continue | `app.rs:661` |
-| 取消 | Cancel | `app.rs:678` |
-| 正在查找 Serval… | Looking for Serval… | `app.rs:703` |
-| 版本过旧 | too old | `app.rs:710` |
-| 未找到 Serval | Serval not found | `app.rs:714` |
-| 用这张标签表继续： | Continue with this tags table: | `app.rs:948` |
-| 独立捕获 | Events | `app.rs:952` |
-| 媒体提取 | Copy media | `app.rs:958` |
-| 查看媒体 | View media | `app.rs:964` |
-| 帮助 | Help | `app.rs:993` |
-| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1008` |
-| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1020` |
-| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1032` |
-| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:637` |
-| 正在启动… | Starting… | `run.rs:265` |
-| 剩余约 | about | `run.rs:288` |
-| Serval 意外退出 | Serval exited unexpectedly | `run.rs:344` |
-| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:354` |
-| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:364` |
-| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:369` |
-| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:379` |
-| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:384` |
-| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:389` |
-| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:395` |
-| 正在扫描 | Scanning | `run.rs:419` |
-| 正在读取 | Reading | `run.rs:420` |
-| 正在检查 | Checking | `run.rs:421` |
-| 正在复制 | Copying | `run.rs:422` |
-| 正在移动 | Moving | `run.rs:423` |
-| 正在写入 | Writing | `run.rs:424` |
-| 正在删除 | Removing | `run.rs:425` |
-| 正在分析 | Analysing | `run.rs:426` |
-| 运行中 | Running | `run.rs:427` |
-| 生成 {} 个结果 | (format!, written per language) | `run.rs:317` |
-| 用时 {} | (format!, written per language) | `run.rs:322` |
-| {seconds} 秒 | (format!, written per language) | `run.rs:442` |
-| 雪豹 | (fragment) | `run.rs:135` |
-| 岩羊 | (fragment) | `run.rs:136` |
-| 赤狐 | (fragment) | `run.rs:137` |
-|  · {done} / {} 个文件 | (fragment) | `run.rs:272` |
-|  · {done} 个文件 | (fragment) | `run.rs:277` |
-| 写入 | (fragment) | `run.rs:405` |
-| 更新 | (fragment) | `run.rs:406` |
-| 新建 | (fragment) | `run.rs:407` |
-| 修改 | (fragment) | `run.rs:408` |
-| 完成 | (fragment) | `run.rs:409` |
-| 替换 | (fragment) | `run.rs:410` |
-| 已是最新 | (fragment) | `run.rs:411` |
-| 已存在 | (fragment) | `run.rs:412` |
-| 跳过 | (fragment) | `run.rs:413` |
-| 失败 | (fragment) | `run.rs:414` |
+| 运行 | Run | `app.rs:565` |
+| 选择程序后即可运行 | choose the program to run | `app.rs:573` |
+| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:577` |
+| 另一个命令正在运行 | another command is running | `app.rs:585` |
+| 就绪 | Ready | `app.rs:594` |
+| 需要 Serval | Serval needed | `app.rs:599` |
+| 未就绪 | Not ready | `app.rs:601` |
+| 正在暂停… | Pausing… | `app.rs:610` |
+| 运行中 | Running | `app.rs:612` |
+| 暂停 | Pause | `app.rs:618` |
+| 预览完成 | Preview finished | `app.rs:626` |
+| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:627` |
+| 按此执行 | Run it for real | `app.rs:632` |
+| 完成 | Finished | `app.rs:636` |
+| 再次运行 | Run again | `app.rs:638` |
+| 需要选择 | Decision needed | `app.rs:651` |
+| 还没有写入任何文件 | nothing has been written yet | `app.rs:652` |
+| 失败 | Failed | `app.rs:657` |
+| 重新运行 | Run again | `app.rs:661` |
+| 已暂停 | Paused | `app.rs:665` |
+| 继续 | Continue | `app.rs:667` |
+| 取消 | Cancel | `app.rs:684` |
+| 正在查找 Serval… | Looking for Serval… | `app.rs:709` |
+| 版本过旧 | too old | `app.rs:716` |
+| 未找到 Serval | Serval not found | `app.rs:720` |
+| 用这张标签表继续： | Continue with this tags table: | `app.rs:954` |
+| 独立捕获 | Events | `app.rs:958` |
+| 媒体提取 | Copy media | `app.rs:964` |
+| 查看媒体 | View media | `app.rs:970` |
+| 帮助 | Help | `app.rs:999` |
+| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1014` |
+| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1026` |
+| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1038` |
+| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:643` |
+| 正在启动… | Starting… | `run.rs:269` |
+| 剩余约 | about | `run.rs:292` |
+| Serval 意外退出 | Serval exited unexpectedly | `run.rs:367` |
+| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:377` |
+| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:387` |
+| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:392` |
+| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:402` |
+| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:407` |
+| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:412` |
+| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:418` |
+| 正在扫描 | Scanning | `run.rs:442` |
+| 正在读取 | Reading | `run.rs:443` |
+| 正在检查 | Checking | `run.rs:444` |
+| 正在复制 | Copying | `run.rs:445` |
+| 正在移动 | Moving | `run.rs:446` |
+| 正在写入 | Writing | `run.rs:447` |
+| 正在删除 | Removing | `run.rs:448` |
+| 正在分析 | Analysing | `run.rs:449` |
+| 运行中 | Running | `run.rs:450` |
+| 生成 {} 个结果 | (format!, written per language) | `run.rs:321` |
+| 用时 {} | (format!, written per language) | `run.rs:326` |
+| {seconds} 秒 | (format!, written per language) | `run.rs:465` |
+| 雪豹 | (fragment) | `run.rs:138` |
+| 岩羊 | (fragment) | `run.rs:139` |
+| 赤狐 | (fragment) | `run.rs:140` |
+|  · {done} / {} 个文件 | (fragment) | `run.rs:276` |
+|  · {done} 个文件 | (fragment) | `run.rs:281` |
+| 写入 | (fragment) | `run.rs:428` |
+| 更新 | (fragment) | `run.rs:429` |
+| 新建 | (fragment) | `run.rs:430` |
+| 修改 | (fragment) | `run.rs:431` |
+| 完成 | (fragment) | `run.rs:432` |
+| 替换 | (fragment) | `run.rs:433` |
+| 已是最新 | (fragment) | `run.rs:434` |
+| 已存在 | (fragment) | `run.rs:435` |
+| 跳过 | (fragment) | `run.rs:436` |
+| 失败 | (fragment) | `run.rs:437` |
 | 复制命令 | Copy command | `run_bar.rs:112` |
 | 预览完成 | Preview finished | `results.rs:21` |
 | 未改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。 | Nothing was changed. The planned changes are listed in the run log below; when they look right, press Run it for real. | `results.rs:22` |
@@ -88,14 +88,15 @@ example data.
 | 修正后重新运行；已完成的部分会被识别并跳过。 | Fix this and run again; finished work is recognised and skipped. | `results.rs:49` |
 | 已暂停 | Paused | `results.rs:59` |
 | 已完成部分文件。继续会跳过该部分。 | Some files are done. Continue skips them. | `results.rs:60` |
-| 文件夹 | folder | `results.rs:157` |
-| 在 Caracal 中打开 | Open in Caracal | `results.rs:186` |
-| 打开 | Open | `results.rs:192` |
-| 运行日志 | Run log | `results.rs:218` |
-| 复制日志 | Copy log | `results.rs:225` |
+| 打开输出文件夹 | Open the output folder | `results.rs:157` |
+| 文件夹 | folder | `results.rs:180` |
+| 在 Caracal 中打开 | Open in Caracal | `results.rs:209` |
+| 打开 | Open | `results.rs:215` |
+| 运行日志 | Run log | `results.rs:241` |
+| 复制日志 | Copy log | `results.rs:248` |
 | 完成，有 {} 条警告 | (format!, written per language) | `results.rs:36` |
 | 另外 {} 条见运行日志 | (format!, written per language) | `results.rs:125` |
-| {} 行 | (format!, written per language) | `results.rs:154` |
+| {} 行 | (format!, written per language) | `results.rs:177` |
 | 删除失败： | Could not delete: | `run_dialogs.rs:165` |
 | 取消这次运行？ | Cancel this run? | `run_dialogs.rs:180` |
 | 已完成部分文件，默认保留。 | Files already done are kept unless you choose otherwise. | `run_dialogs.rs:181` |
@@ -163,50 +164,53 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 选择 tags.csv 或 Camtrap DP 的 observations.csv | Choose tags.csv or a Camtrap DP observations.csv | `screens/capture.rs:57` |
-| 选择标签表 | choose the tags table | `screens/capture.rs:235` |
-| 找不到这个表格 | the table does not exist | `screens/capture.rs:237` |
-| 正在读取表格… | reading the table… | `screens/capture.rs:240` |
-| 表格无法读取： | cannot read the table: | `screens/capture.rs:244` |
-| 时间间隔应为至少 1 分钟的整数 | the time interval must be a whole number of minutes, at least 1 | `screens/capture.rs:246` |
-| 请在路径中选择位点所在的一层 | choose the deployment's level in the path | `screens/capture.rs:251` |
-| 找不到这个表格 | This table does not exist | `screens/capture.rs:331` |
-| 也可以选择 Camtrap DP 的 observations.csv | A Camtrap DP observations.csv works too | `screens/capture.rs:336` |
-| 正在读取… | Reading… | `screens/capture.rs:344` |
-| 无法读取： | Cannot read: | `screens/capture.rs:346` |
-| 。路径深度不一致，按样例的层级计算 | . Paths have different depths; levels follow the sample | `screens/capture.rs:398` |
-| 位点所在的文件夹层级 | Deployment folder level | `screens/capture.rs:403` |
-| 标签表 | Tags table | `screens/capture.rs:430` |
-| 选择… | Choose… | `screens/capture.rs:444` |
-| 时间间隔 | Time interval | `screens/capture.rs:461` |
-| 分钟 | min | `screens/capture.rs:471` |
-| 同一位点、同一物种的两条记录相隔不少于此时间，才算两次独立捕获。 | Two records of one species at one deployment count as two captures only this far apart. | `screens/capture.rs:475` |
-| 请输入至少 1 分钟的整数。 | Enter a whole number of minutes, at least 1. | `screens/capture.rs:484` |
-| 间隔超过一周，异常值。 | Over a week: an unusual value. | `screens/capture.rs:487` |
-| 间隔从哪条记录算起 | Measure the interval from | `screens/capture.rs:490` |
-| 上一条记录 | The previous record | `screens/capture.rs:494` |
-| 每条记录都重新计时（默认） | Every record restarts the clock (default) | `screens/capture.rs:495` |
-| 上一条独立记录 | The previous independent record | `screens/capture.rs:502` |
-| 只在已计为独立的记录处重新计时 | Only records already counted as independent restart it | `screens/capture.rs:503` |
-| 分析对象 | Analyse by | `screens/capture.rs:530` |
-| 物种 | Species | `screens/capture.rs:532` |
-| 个体 | Individual | `screens/capture.rs:532` |
-| 其他选项 | Other options | `screens/capture.rs:546` |
-| 生成事件编号 | Add event IDs | `screens/capture.rs:549` |
-| 排除默认标签 | Leave out the default tags | `screens/capture.rs:561` |
-| 不计入分析 | are not counted | `screens/capture.rs:569` |
-| 输入是 Camtrap DP 的观测表 | The input is a Camtrap DP observations table | `screens/capture.rs:576` |
-| {} 个位点 · {} 分钟 · {} | (format!, written per language) | `screens/capture.rs:257` |
-| 点选路径中代表位点的一层。已选 {name}{} · 表中共有 {} 个位点 | (format!, written per language) | `screens/capture.rs:384` |
-| 按个体 | (fragment) | `screens/capture.rs:262` |
-| 按物种 | (fragment) | `screens/capture.rs:264` |
-| {rows} 行 · 也可以选择 Camtrap DP 的 observations.csv | (fragment) | `screens/capture.rs:354` |
-| {rows} 行 · Camtrap DP 观测表，位点来自 deploymentID | (fragment) | `screens/capture.rs:357` |
-| 点选路径中代表位点的一层 | (fragment) | `screens/capture.rs:374` |
-| （自动识别） | (fragment) | `screens/capture.rs:386` |
-| 岩羊 | (fragment) | `screens/capture.rs:622` |
-| 赤狐 | (fragment) | `screens/capture.rs:622` |
-| 雪豹 | (fragment) | `screens/capture.rs:622` |
+| 选择 tags.csv 或 Camtrap DP 的 observations.csv | Choose tags.csv or a Camtrap DP observations.csv | `screens/capture.rs:60` |
+| 选择标签表 | choose the tags table | `screens/capture.rs:242` |
+| 找不到这个表格 | the table does not exist | `screens/capture.rs:244` |
+| 正在读取表格… | reading the table… | `screens/capture.rs:247` |
+| 表格无法读取： | cannot read the table: | `screens/capture.rs:251` |
+| 时间间隔应为至少 1 分钟的整数 | the time interval must be a whole number of minutes, at least 1 | `screens/capture.rs:253` |
+| 请在路径中选择位点所在的一层 | choose the deployment's level in the path | `screens/capture.rs:258` |
+| 找不到这个表格 | This table does not exist | `screens/capture.rs:338` |
+| 也可以选择 Camtrap DP 的 observations.csv | A Camtrap DP observations.csv works too | `screens/capture.rs:343` |
+| 正在读取… | Reading… | `screens/capture.rs:351` |
+| 无法读取： | Cannot read: | `screens/capture.rs:353` |
+| 。路径深度不一致，按样例的层级计算 | . Paths have different depths; levels follow the sample | `screens/capture.rs:405` |
+| 位点所在的文件夹层级 | Deployment folder level | `screens/capture.rs:410` |
+| 标签表 | Tags table | `screens/capture.rs:499` |
+| 选择… | Choose… | `screens/capture.rs:513` |
+| 时间间隔 | Time interval | `screens/capture.rs:530` |
+| 分钟 | min | `screens/capture.rs:540` |
+| 同一位点、同一物种的两条记录相隔不少于此时间，才算两次独立捕获。 | Two records of one species at one deployment count as two captures only this far apart. | `screens/capture.rs:544` |
+| 请输入至少 1 分钟的整数。 | Enter a whole number of minutes, at least 1. | `screens/capture.rs:553` |
+| 间隔超过一周，异常值。 | Over a week: an unusual value. | `screens/capture.rs:556` |
+| 间隔从哪条记录算起 | Measure the interval from | `screens/capture.rs:559` |
+| 上一条记录 | The previous record | `screens/capture.rs:563` |
+| 每条记录都重新计时（默认） | Every record restarts the clock (default) | `screens/capture.rs:564` |
+| 上一条独立记录 | The previous independent record | `screens/capture.rs:571` |
+| 只在已计为独立的记录处重新计时 | Only records already counted as independent restart it | `screens/capture.rs:572` |
+| 分析对象 | Analyse by | `screens/capture.rs:599` |
+| 物种 | Species | `screens/capture.rs:601` |
+| 个体 | Individual | `screens/capture.rs:601` |
+| 其他选项 | Other options | `screens/capture.rs:615` |
+| 生成事件编号 | Add event IDs | `screens/capture.rs:618` |
+| 排除默认标签 | Leave out the default tags | `screens/capture.rs:630` |
+| 不计入分析 | are not counted | `screens/capture.rs:638` |
+| 输入是 Camtrap DP 的观测表 | The input is a Camtrap DP observations table | `screens/capture.rs:645` |
+| {} 个位点 · {} 分钟 · {} | (format!, written per language) | `screens/capture.rs:264` |
+| 点选路径中代表位点的一层。已选 {name}{} · 表中共有 {} 个位点 | (format!, written per language) | `screens/capture.rs:391` |
+| … 另外 {} 个 | (format!, written per language) | `screens/capture.rs:473` |
+| 按个体 | (fragment) | `screens/capture.rs:269` |
+| 按物种 | (fragment) | `screens/capture.rs:271` |
+| {rows} 行 · 也可以选择 Camtrap DP 的 observations.csv | (fragment) | `screens/capture.rs:361` |
+| {rows} 行 · Camtrap DP 观测表，位点来自 deploymentID | (fragment) | `screens/capture.rs:364` |
+| 点选路径中代表位点的一层 | (fragment) | `screens/capture.rs:381` |
+| （自动识别） | (fragment) | `screens/capture.rs:393` |
+| ▸ 查看位点（{}） | (fragment) | `screens/capture.rs:437` |
+| ▾ 收起位点 | (fragment) | `screens/capture.rs:441` |
+| 岩羊 | (fragment) | `screens/capture.rs:691` |
+| 赤狐 | (fragment) | `screens/capture.rs:691` |
+| 雪豹 | (fragment) | `screens/capture.rs:691` |
 
 ## 查看媒体 browse
 
@@ -214,33 +218,33 @@ example data.
 | --- | --- | --- |
 | 选择或拖入 tags.csv | Choose or drop tags.csv | `browse/mod.rs:67` |
 | 全部 | All | `browse/mod.rs:269` |
-| 物种 | Species | `browse/mod.rs:289` |
-| 评分 | Rating | `browse/mod.rs:291` |
-| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:298` |
-| 找不到这个表格 | This table does not exist | `browse/mod.rs:366` |
-| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:371` |
-| 无法读取： | Cannot read: | `browse/mod.rs:379` |
-| 至 | to | `browse/mod.rs:411` |
-| 标签表 | Tags table | `browse/mod.rs:419` |
-| 选择… | Choose… | `browse/mod.rs:430` |
-| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:472` |
-| 在浏览器中打开 Caracal：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:473` |
-| 打开 Caracal | Open Caracal | `browse/mod.rs:479` |
-| 正在建立… | Making it… | `browse/mod.rs:489` |
-| 再次打开 | Open again | `browse/mod.rs:510` |
-| 生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。 | These are links to the original files: editing them here changes the originals; deleting removes only the link. | `browse/mod.rs:521` |
-| 链接异常，可使用 Caracal 或用媒体提取复制文件后查看。 | Links cannot be made here. View the files in Caracal, or copy them with Copy media. | `browse/mod.rs:532` |
-| 用媒体提取复制 | Copy them instead | `browse/mod.rs:541` |
-| 在资源管理器中查看所选 | Look at the choice in the file manager | `browse/mod.rs:551` |
-| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:552` |
-| 建立查看文件夹 | Make a review folder | `browse/mod.rs:558` |
-| 应用表格到文件 | Write the table into the files | `browse/mod.rs:568` |
-| 将标签表信息（例如从 Caracal 导出的）写回 XMP 文件。 | Writes the table (for example one exported from Caracal) back into the XMP files. | `browse/mod.rs:569` |
-| 检查并写入… | Check and write… | `browse/mod.rs:575` |
+| 物种 | Species | `browse/mod.rs:290` |
+| 评分 | Rating | `browse/mod.rs:292` |
+| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:299` |
+| 找不到这个表格 | This table does not exist | `browse/mod.rs:367` |
+| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:372` |
+| 无法读取： | Cannot read: | `browse/mod.rs:380` |
+| 至 | to | `browse/mod.rs:412` |
+| 标签表 | Tags table | `browse/mod.rs:420` |
+| 选择… | Choose… | `browse/mod.rs:431` |
+| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:473` |
+| 在浏览器中打开整张表：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the whole table in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:474` |
+| 打开 Caracal | Open Caracal | `browse/mod.rs:480` |
+| 正在建立… | Making it… | `browse/mod.rs:490` |
+| 再次打开 | Open again | `browse/mod.rs:511` |
+| 生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。 | These are links to the original files: editing them here changes the originals; deleting removes only the link. | `browse/mod.rs:522` |
+| 链接异常，可使用 Caracal 或用媒体提取复制文件后查看。 | Links cannot be made here. View the files in Caracal, or copy them with Copy media. | `browse/mod.rs:533` |
+| 用媒体提取复制 | Copy them instead | `browse/mod.rs:542` |
+| 在资源管理器中查看所选 | Look at a choice in the file manager | `browse/mod.rs:558` |
+| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:560` |
+| 建立查看文件夹 | Make a review folder | `browse/mod.rs:573` |
+| 应用表格到文件 | Write the table into the files | `browse/mod.rs:582` |
+| 将整张标签表（例如从 Caracal 导出的）写回 XMP 文件。 | Writes the whole table (for example one exported from Caracal) back into the XMP files. | `browse/mod.rs:583` |
+| 检查并写入… | Check and write… | `browse/mod.rs:589` |
 | … 另外 {hidden} 个 | (format!, written per language) | `browse/mod.rs:257` |
-| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:301` |
-| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:394` |
-| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:498` |
+| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:302` |
+| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:395` |
+| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:499` |
 
 ## XMP 更新 update
 
@@ -480,7 +484,7 @@ example data.
 | {} 个时间缺少秒数，可能是 Excel/WPS 保存时丢失的。建议在原表中把时间列的格式设为 yyyy-mm-dd hh:mm:ss 后重新保存；Waxbill 不会自动补 00。 | (format!, written per language) | `repair.rs:405` |
 | {} 个时间无法识别（例如日/月/年的顺序），请在表格软件中改为 yyyy-MM-dd HH:mm:ss。 | (format!, written per language) | `repair.rs:417` |
 | 已改用修复后的副本；原表 {} 未改动。 | (format!, written per language) | `repair.rs:440` |
-| 表格不是 UTF-8 编码 | the table is not UTF-8 | `table.rs:206` |
+| 表格不是 UTF-8 编码 | the table is not UTF-8 | `table.rs:220` |
 
 ## Settings
 
