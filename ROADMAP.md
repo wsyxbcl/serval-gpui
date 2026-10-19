@@ -132,15 +132,15 @@ Rules:
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [x] Serval ends with Waxbill, also when Waxbill is killed or crashes: a Job Object on Windows (to be tested there), the parent-death signal on Linux (tested); macOS keeps finishing the run.
 - [x] Ship Serval with Waxbill (W08 revised): `serval.exe` next to `waxbill.exe` in the archive is found without setup; a chosen program still wins while it works.
-- [ ] Release builds for Windows, Linux and macOS (Waxbill and Serval as separate downloads), plus a full zip for internal users with Waxbill, Serval and future dependencies side by side; hosted where users can reach them (decided 2026-10-14).
+- [ ] Release builds for Windows, Linux and macOS (Waxbill and Serval as separate downloads; no full zip in CI, decided 2026-10-19); hosted where users can reach them.
 - [ ] Update check and download from the project's own server (manifest, checksums, signature); Waxbill itself notify-only at first. Later.
 - [x] 2026-10-14 review: the run log scrolls (the page takes the wheel only at the log's ends; a rendering test); Chinese in one font on Linux; sidebar in five groups (查看媒体, XMP 更新 renamed); a larger logo and the logo in 关于; paths not remembered across launches; capture event IDs on; rename/align start as a preview with 按此执行; next steps from 标签获取's tags table (独立捕获, 媒体提取, 查看媒体).
 - [x] Help (帮助, F1): a panel per screen with the written texts (help/zh, drafts for review) and Serval's `--help` on request. English texts to follow.
 - [ ] 在 Caracal 中打开 for 独立捕获's results (with deployment and eventID), once Caracal confirms the table and mode.
 - [x] Layout at 1366×768 (also with help open): fits, with the sidebar and page scrolling. Plain-language messages for the commonest Serval errors (missing file or folder, permission, file in use, disk full, missing column, bad times, bad deploymentID), Serval's own words beside them. (Copy diagnostics: not needed, 2026-10-16.)
-- [ ] Serval: `observe` on a folder that does not exist exits 0 with empty tables; it should be an error. (Waxbill does not run it then.)
+- [x] Serval 0.8.1 (2026-10-19): transfer and sidecar fixes, and `observe` on a missing folder is an error. Binaries: run Serval's "Build Release Binaries" with v0.8.1.
 - [ ] Draw the board for the hand-off screen.
-- [ ] CI for the new dependency set: the workflows are unchanged and still apply; `cargo check --target x86_64-pc-windows-msvc` passes from Linux (the icon is embedded only on a Windows host); the macOS build needs the macOS runner (Metal shaders) and has not been run yet.
+- [ ] One `release` workflow builds Windows, Linux (Ubuntu 22.04) and both macOS targets on a v* tag or by hand, and drafts a GitHub Release on a tag; it replaces windows-release and macos-build. Not run yet: the Linux packages and the first macOS build are confirmed only by a real run.
 
 ---
 
