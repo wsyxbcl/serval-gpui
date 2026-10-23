@@ -61,13 +61,15 @@ The current direction (see `Design/spec/decisions.md`):
 
 ## Notes for decision making
 
-- Serval is a separate program the user chooses (W08); Waxbill needs Serval 0.8.0 or later.
+- Serval is a separate program shipped next to Waxbill and found there, or chosen in Settings (W08); Waxbill needs
+  Serval 0.8.0 or later (0.8.2 recommended: its capture tables name the time column `datetime`).
 - Messages between them are JSON lines with lenient readers (W18).
 - Screenshots for review come from an isolated headless KWin session (`Design/README.md`), never the desktop.
 - Do not block useful progress on speculative future architecture.
 
 ## Agent reminder
-Use `serval --help` or `serval <command> --help` (0.8.0 or later) to check options and arguments.
+Use `serval --help` or `serval <command> --help` (0.8.0 or later) to check options and arguments. The contract
+with Caracal is `Design/spec/caracal-bridge.md` (and the shared spec sent to the Caracal side).
 
 Whenever resuming work, start by reading:
 - `AGENTS.md`

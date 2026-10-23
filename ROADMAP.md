@@ -146,12 +146,19 @@ Rules:
 
 ## User Work
 
+- Release 2.0.0 (2026-10): code review, manual test on Windows (title bar, drag and drop, killing Waxbill mid-run
+  ends Serval, the Caracal end-to-end list in the shared spec §9), wording review (`Design/copy/ui-strings.md`,
+  `help/zh/`); then merge `redesign` into `master`, tag `v2.0.0` (the release workflow drafts the GitHub Release),
+  and build Serval 0.8.2 (Serval's "Build Release Binaries").
 - Decide which subcommands beyond the initial set deserve first-class GUI forms.
-- Refine i18n translations for Chinese.
 
 ---
 
 ## Future Work
+
+- After 2.0.0: gpui-kit 0.8 (Waxbill pins 0.7.1; a breaking upgrade of the toolkit), Polars 0.55 in Serval, and the
+  routine lock-file updates in both, each with a full test pass.
+- English help texts (help/en), once the Chinese ones are final.
 
 - Add more polished forms for all Serval subcommands, e.g. pre-read CSV input to offer more advanced options in `translate` or pre-read species values in CSV for `extract`.
 - Revisit adaptive sizing/scaling for very small windows after the core workflows settle.
