@@ -15,6 +15,34 @@ use std::collections::BTreeSet;
 
 impl Waxbill {
     /// Open the question, with the species that have individual IDs preselected.
+    /// Run observe again with the chosen species. The answer changes the command, so this is not
+    /// `start_decided_run`; it still belongs to the observe run that asked: its form must be unchanged until now.
+    fn rerun_with_id_species(
+        &mut self,
+        chosen: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let observe_command = |this: &Self, cx: &mut Context<Self>| {
+            this.form_of(ScreenId::Observe)
+                .map(|form| crate::screens::display_command(&form.plan(cx).args))
+        };
+        let asked = self
+            .runs
+            .get(&ScreenId::Observe)
+            .map(|run| run.form_command.clone());
+        let unchanged = asked.is_some() && asked == observe_command(self, cx);
+        self.observe
+            .update(cx, |form, cx| form.set_id_species(chosen, window, cx));
+        if !unchanged || self.run_question_open() || self.running_screen().is_some() {
+            cx.notify();
+            return;
+        }
+        self.go(ScreenId::Observe, cx);
+        self.runs.remove(&ScreenId::Observe);
+        self.start_run_after(None, &[], &[], cx);
+    }
+
     pub(crate) fn ask_id_species(&mut self, cx: &mut Context<Self>) {
         let Some((_, species)) = self
             .runs
@@ -164,8 +192,7 @@ impl Waxbill {
                     })))
                     .child(Button::new("id-rerun").primary().label(rerun_label).on_click(cx.listener(|this, _, window, cx| {
                         let chosen: BTreeSet<String> = this.id_species.take().unwrap_or_default();
-                        this.observe.update(cx, |form, cx| form.set_id_species(chosen.into_iter().collect(), window, cx));
-                        this.start_decided_run(&[], cx);
+                        this.rerun_with_id_species(chosen.into_iter().collect(), window, cx);
                     }))),
             );
         Some(

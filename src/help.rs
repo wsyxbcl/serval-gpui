@@ -90,6 +90,12 @@ impl Waxbill {
 
     fn toggle_serval_help(&mut self, cx: &mut Context<Self>) {
         self.help.serval_open = !self.help.serval_open;
+        self.load_serval_help(cx);
+    }
+
+    /// Read this screen's `serval … --help` once, when the command-line options are open: on opening them, and on
+    /// going to another screen while they are.
+    pub(crate) fn load_serval_help(&mut self, cx: &mut Context<Self>) {
         let screen = self.screen;
         if self.help.serval_open
             && !self.help.serval.contains_key(&screen)

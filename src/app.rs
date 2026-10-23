@@ -396,12 +396,13 @@ impl Waxbill {
     }
 
     /// Show a screen; it is also where the next launch opens.
-    fn go(&mut self, screen: ScreenId, cx: &mut Context<Self>) {
+    pub(crate) fn go(&mut self, screen: ScreenId, cx: &mut Context<Self>) {
         // Each screen opens at its top (its results, if any), not where the last screen was scrolled to.
         if self.screen != screen {
             self.page_scroll.set_offset(point(px(0.), px(0.)));
         }
         self.screen = screen;
+        self.load_serval_help(cx);
         Settings::update(cx, |settings| {
             settings.set_value("screen", format!("{screen:?}"))
         });
@@ -416,7 +417,7 @@ impl Waxbill {
     }
 
     /// A question about a run is open (cancel, close): nothing starts or stops until it is answered.
-    fn run_question_open(&self) -> bool {
+    pub(crate) fn run_question_open(&self) -> bool {
         self.cancel_ask.is_some() || self.close_asked
     }
 
@@ -453,18 +454,36 @@ impl Waxbill {
         if self.run_question_open() || asked != now {
             return;
         }
-        self.runs.remove(&self.screen);
-        self.start_run(extra, cx);
-    }
-
-    /// Start the current screen's command, with `extra` arguments (a decision such as `--on-existing skip`).
-    fn start_run(&mut self, extra: &[&str], cx: &mut Context<Self>) {
-        self.start_run_with(extra, &[], cx);
+        let last = self
+            .runs
+            .remove(&self.screen)
+            .filter(|run| run.outcome != Outcome::Finished)
+            .map(|run| (run.form_command, run.args));
+        self.start_run_after(last, extra, &[], cx);
     }
 
     /// Start the current screen's command with `extra` arguments added and `without` ones left out (`--dryrun` when
     /// a preview is run for real).
     fn start_run_with(&mut self, extra: &[&str], without: &[&str], cx: &mut Context<Self>) {
+        let last = self
+            .runs
+            .get(&self.screen)
+            .filter(|run| run.outcome != Outcome::Finished)
+            .map(|run| (run.form_command.clone(), run.args.clone()));
+        self.start_run_after(last, extra, without, cx);
+    }
+
+    /// Start after `last`, the screen's previous run (its form command and arguments) unless it finished: continuing,
+    /// retrying or answering repeats its arguments while the form is unchanged (a run for real stays for real, an
+    /// answer stays given); otherwise the form's. `extra` (an answer such as `--on-existing skip`) replaces an earlier
+    /// answer to the same question.
+    pub(crate) fn start_run_after(
+        &mut self,
+        last: Option<(String, Vec<String>)>,
+        extra: &[&str],
+        without: &[&str],
+        cx: &mut Context<Self>,
+    ) {
         if self.running_screen().is_some() {
             return;
         }
@@ -477,18 +496,9 @@ impl Waxbill {
             return;
         }
         form.remember(cx);
-        let mut args = plan.args.clone();
-        args.retain(|arg| !without.contains(&arg.as_str()));
-        // Decisions go before the positional arguments at the end (`-o <dir> <input>`).
-        let at = args
-            .iter()
-            .position(|a| a == "--progress")
-            .unwrap_or(args.len());
-        for (i, arg) in extra.iter().enumerate() {
-            args.insert(at + i, arg.to_string());
-        }
-        let command = crate::screens::display_command(&args);
         let form_command = crate::screens::display_command(&plan.args);
+        let args = run_args(last, &form_command, &plan.args, extra, without);
+        let command = crate::screens::display_command(&args);
         let screen = self.screen;
         // Before Serval starts, which may create the folder at once. Continuing a paused run keeps the folder the
         // first run created.
@@ -503,6 +513,7 @@ impl Waxbill {
             Err(err) => Run::failed_to_start(command, format!("{}: {err}", program.display())),
         };
         run.form_command = form_command;
+        run.args = args;
         run.output_dir = plan
             .args
             .iter()
@@ -550,6 +561,10 @@ impl Waxbill {
                         }
                         if !running && this.quit_when_stopped {
                             cx.quit();
+                        }
+                        // A close asked while it ran has nothing left to ask about: the window stays open.
+                        if !running && this.running_screen().is_none() {
+                            this.close_asked = false;
                         }
                         if !running && let Some(form) = this.form_of(screen) {
                             form.set_locked(false, cx);
@@ -718,7 +733,7 @@ impl Waxbill {
         self.form_of(self.screen)
     }
 
-    fn form_of(&self, screen: ScreenId) -> Option<Form> {
+    pub(crate) fn form_of(&self, screen: ScreenId) -> Option<Form> {
         match screen {
             ScreenId::Observe => Some(Form::Observe(self.observe.clone())),
             ScreenId::Capture => Some(Form::Capture(self.capture.clone())),
@@ -1143,5 +1158,70 @@ impl Render for Waxbill {
                     .children(self.render_help(cx)),
             )
             .children(dialog)
+    }
+}
+
+/// The arguments of a run: the last run's (`last`: its form command and arguments) while the form still says
+/// `form_command`, else the form's; without `without`; with `extra`, an answer such as `--on-existing skip`, in place
+/// of an earlier answer to the same question and before the positional arguments at the end (`-o <dir> <input>`).
+fn run_args(
+    last: Option<(String, Vec<String>)>,
+    form_command: &str,
+    form_args: &[String],
+    extra: &[&str],
+    without: &[&str],
+) -> Vec<String> {
+    let mut args = last
+        .filter(|(command, args)| command == form_command && !args.is_empty())
+        .map(|(_, args)| args)
+        .unwrap_or_else(|| form_args.to_vec());
+    args.retain(|arg| !without.contains(&arg.as_str()));
+    for answer in extra.chunks(2) {
+        if let Some(i) = args.iter().position(|a| a == answer[0]) {
+            args.drain(i..(i + answer.len()).min(args.len()));
+        }
+    }
+    let at = args
+        .iter()
+        .position(|a| a == "--progress")
+        .unwrap_or(args.len());
+    for (i, arg) in extra.iter().enumerate() {
+        args.insert(at + i, arg.to_string());
+    }
+    args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_args;
+
+    #[test]
+    fn a_run_for_real_stays_for_real_when_continued_or_answered() {
+        let form: Vec<String> = ["align", "--dryrun", "--progress", "json", "/in"]
+            .map(String::from)
+            .to_vec();
+        let command = crate::screens::display_command(&form);
+        let real = run_args(None, &command, &form, &[], &["--dryrun"]);
+        assert_eq!(real.join(" "), "align --progress json /in");
+        // Continued after a pause, then a conflict answered twice.
+        let continued = run_args(Some((command.clone(), real)), &command, &form, &[], &[]);
+        let answered = run_args(
+            Some((command.clone(), continued)),
+            &command,
+            &form,
+            &["--on-existing", "skip"],
+            &[],
+        );
+        let again = run_args(
+            Some((command.clone(), answered)),
+            &command,
+            &form,
+            &["--on-existing", "replace"],
+            &[],
+        );
+        assert_eq!(
+            again.join(" "),
+            "align --on-existing replace --progress json /in"
+        );
     }
 }

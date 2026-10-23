@@ -137,16 +137,8 @@ impl Browse {
         self.records.filter(&self.filters())
     }
 
-    /// Where the choice goes (a review folder, or a table for Caracal), without an extension: `<date>_<species>` in
-    /// `serval_review` next to the data.
-    fn choice_target(&self, chosen: &[usize]) -> Option<PathBuf> {
-        let first = &self.records.all[*chosen.first()?];
-        let data = first
-            .media
-            .parent()
-            .and_then(Path::parent)
-            .unwrap_or(Path::new("."))
-            .to_path_buf();
+    /// The choice's name: `<date>_<species>` (up to three), or `<date>_review` for a rating alone.
+    fn choice_name(&self) -> String {
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
@@ -158,7 +150,7 @@ impl Browse {
             .cloned()
             .collect::<Vec<_>>()
             .join("+");
-        let folder_name = format!(
+        format!(
             "{}_{}",
             date_of(stamp).replace('-', ""),
             if label.is_empty() {
@@ -166,8 +158,19 @@ impl Browse {
             } else {
                 safe(&label)
             }
-        );
-        Some(output::command_dir(&output::default_root(&data), "review").join(folder_name))
+        )
+    }
+
+    /// The review folder for the choice: in `serval_review` next to the data.
+    fn choice_target(&self, chosen: &[usize]) -> Option<PathBuf> {
+        let first = &self.records.all[*chosen.first()?];
+        let data = first
+            .media
+            .parent()
+            .and_then(Path::parent)
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
+        Some(output::command_dir(&output::default_root(&data), "review").join(self.choice_name()))
     }
 
     /// Build the review folder next to the data and open it in the file manager.
@@ -228,12 +231,18 @@ impl Browse {
         .detach();
     }
 
-    /// Open Caracal on the choice (its rows saved as a table next to the review folders), or on the whole table when
+    /// Open Caracal on the choice (its rows saved as a table next to this one), or on the whole table when
     /// nothing is chosen.
     fn open_caracal(&mut self, table: &Path, cx: &mut Context<Self>) {
         use crate::caracal::{Mode, open};
         let chosen = self.chosen();
-        let (Some(stem), Some(Ok(csv))) = (self.choice_target(&chosen), &self.table) else {
+        // Next to the table, as `<table>_<date>_<species>.csv`: relative paths in it still lead to the media, and the
+        // media's folder need not be writable (a read-only NAS, a disk not connected).
+        let stem = (!chosen.is_empty()).then(|| {
+            let name = table.file_stem().unwrap_or_default().to_string_lossy();
+            table.with_file_name(format!("{name}_{}", self.choice_name()))
+        });
+        let (Some(stem), Some(Ok(csv))) = (stem, &self.table) else {
             self.caracal = None;
             open(Mode::Review, table, cx);
             return;

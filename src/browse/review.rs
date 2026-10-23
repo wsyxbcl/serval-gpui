@@ -80,12 +80,14 @@ pub fn prefix(species: &[String], individuals: &[String], deployment: &str) -> S
     prefix
 }
 
-/// Link each `(media, sidecar, prefix)` into `folder` as `<prefix>__<name>`; a name used twice gets `_1`, `_2`, as
-/// Serval and Caracal name their copies.
+/// Link each `(media, sidecar, prefix)` into a new folder, `folder` or `folder_2` … (the same name is no proof of the
+/// same choice: another rating, more than three species, an edited table), as `<prefix>__<name>`; a name used twice
+/// gets `_1`, `_2`, as Serval and Caracal name their copies.
 pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
-    if let Err(err) = std::fs::create_dir_all(folder) {
-        return Outcome::Failed(format!("{}: {err}", folder.display()));
-    }
+    let folder = &match new_folder(folder) {
+        Ok(folder) => folder,
+        Err(err) => return Outcome::Failed(format!("{}: {err}", folder.display())),
+    };
     let mut used: HashSet<String> = HashSet::new();
     let mut made = 0;
     let mut missing: Vec<&Path> = Vec::new();
@@ -131,7 +133,11 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
                 .extension()
                 .map(|e| e.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            let _ = std::fs::hard_link(found, folder.join(format!("{target}.{ext}")));
+            // A media file without its labels would show the wrong ones: not made at all, and said.
+            if let Err(err) = std::fs::hard_link(found, folder.join(format!("{target}.{ext}"))) {
+                let _ = std::fs::remove_file(&link);
+                return Outcome::Failed(format!("{}: {err}", found.display()));
+            }
         }
     }
     if made == 0
@@ -145,6 +151,26 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
         files: made,
         missing: missing.len(),
     }
+}
+
+fn new_folder(folder: &Path) -> std::io::Result<PathBuf> {
+    if let Some(parent) = folder.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let name = folder.file_name().unwrap_or_default().to_string_lossy();
+    for n in 1.. {
+        let candidate = if n == 1 {
+            folder.to_path_buf()
+        } else {
+            folder.with_file_name(format!("{name}_{n}"))
+        };
+        match std::fs::create_dir(&candidate) {
+            Ok(()) => return Ok(candidate),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(err) => return Err(err),
+        }
+    }
+    unreachable!()
 }
 
 /// The chosen rows of `table` as a table of their own, for Caracal: `<stem>.csv`, or `<stem>_2.csv` … when that
@@ -282,14 +308,32 @@ fn is_cross_device(err: &std::io::Error) -> bool {
     matches!(
         err.kind(),
         std::io::ErrorKind::CrossesDevices | std::io::ErrorKind::Unsupported
-    ) || matches!(
-        err.raw_os_error(),
-        Some(17 /* Windows ERROR_NOT_SAME_DEVICE */)
-            | Some(1 /* Windows ERROR_INVALID_FUNCTION on SMB */)
-            | Some(18 /* EXDEV */)
-            | Some(95 /* EOPNOTSUPP */)
-    )
+    ) || err
+        .raw_os_error()
+        .is_some_and(|code| NO_LINK_CODES.contains(&code))
 }
+
+/// The system's codes for "no hard link here", per platform (17 is "file exists" outside Windows).
+#[cfg(windows)]
+const NO_LINK_CODES: &[i32] = &[
+    17, /* ERROR_NOT_SAME_DEVICE */
+    1,  /* ERROR_INVALID_FUNCTION, on SMB */
+];
+#[cfg(target_os = "linux")]
+const NO_LINK_CODES: &[i32] = &[
+    18, /* EXDEV */
+    1,  /* EPERM, from FAT */
+    95, /* EOPNOTSUPP */
+];
+#[cfg(target_os = "macos")]
+const NO_LINK_CODES: &[i32] = &[
+    18,  /* EXDEV */
+    1,   /* EPERM */
+    45,  /* ENOTSUP */
+    102, /* EOPNOTSUPP */
+];
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+const NO_LINK_CODES: &[i32] = &[18];
 
 #[cfg(test)]
 mod tests {
@@ -345,6 +389,11 @@ mod tests {
             "dep2"
         );
         assert!(folder.join("雪豹__IMG_0001_1.JPG.xmp").exists());
+        // The same name again (the same choice, or another one named alike): a new folder.
+        let Outcome::Made { folder: again, .. } = make(&folder, &[file("dep1")]) else {
+            panic!("not made again")
+        };
+        assert_eq!(again, dir.join("review_2"));
         // A table whose media are all elsewhere (another computer, another drive letter): no empty folder.
         let elsewhere = dir.join("review-elsewhere");
         assert!(matches!(make(&elsewhere, &[gone]), Outcome::NotFound(_)));

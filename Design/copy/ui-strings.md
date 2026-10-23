@@ -9,72 +9,72 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 运行 | Run | `app.rs:594` |
-| 选择程序后即可运行 | choose the program to run | `app.rs:602` |
-| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:606` |
-| 另一个命令正在运行 | another command is running | `app.rs:614` |
-| 就绪 | Ready | `app.rs:623` |
-| 需要 Serval | Serval needed | `app.rs:628` |
-| 未就绪 | Not ready | `app.rs:630` |
-| 正在暂停… | Pausing… | `app.rs:639` |
-| 运行中 | Running | `app.rs:641` |
-| 暂停 | Pause | `app.rs:647` |
-| 预览完成 | Preview finished | `app.rs:655` |
-| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:656` |
-| 按此执行 | Run it for real | `app.rs:661` |
-| 完成 | Finished | `app.rs:665` |
-| 再次运行 | Run again | `app.rs:667` |
-| 需要选择 | Decision needed | `app.rs:680` |
-| 还没有写入任何文件 | nothing has been written yet | `app.rs:681` |
-| 失败 | Failed | `app.rs:686` |
-| 重新运行 | Run again | `app.rs:690` |
-| 已暂停 | Paused | `app.rs:694` |
-| 继续 | Continue | `app.rs:696` |
-| 取消 | Cancel | `app.rs:713` |
-| 正在查找 Serval… | Looking for Serval… | `app.rs:738` |
-| 版本过旧 | too old | `app.rs:745` |
-| 未找到 Serval | Serval not found | `app.rs:749` |
-| 用这张标签表继续： | Continue with this tags table: | `app.rs:983` |
-| 独立捕获 | Events | `app.rs:987` |
-| 媒体提取 | Copy media | `app.rs:993` |
-| 查看媒体 | View media | `app.rs:999` |
-| 帮助 | Help | `app.rs:1028` |
-| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1043` |
-| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1055` |
-| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1067` |
-| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:672` |
-| 正在启动… | Starting… | `run.rs:296` |
-| 剩余约 | about | `run.rs:319` |
-| Serval 意外退出 | Serval exited unexpectedly | `run.rs:394` |
-| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:404` |
-| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:414` |
-| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:419` |
-| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:429` |
-| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:434` |
-| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:439` |
-| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:445` |
-| 正在扫描 | Scanning | `run.rs:469` |
-| 正在读取 | Reading | `run.rs:470` |
-| 正在检查 | Checking | `run.rs:471` |
-| 正在复制 | Copying | `run.rs:472` |
-| 正在移动 | Moving | `run.rs:473` |
-| 正在写入 | Writing | `run.rs:474` |
-| 正在删除 | Removing | `run.rs:475` |
-| 正在分析 | Analysing | `run.rs:476` |
-| 运行中 | Running | `run.rs:477` |
-| 生成 {} 个结果 | (format!, written per language) | `run.rs:348` |
-| 用时 {} | (format!, written per language) | `run.rs:353` |
-| {seconds} 秒 | (format!, written per language) | `run.rs:492` |
-| 写入 | (fragment) | `run.rs:455` |
-| 更新 | (fragment) | `run.rs:456` |
-| 新建 | (fragment) | `run.rs:457` |
-| 修改 | (fragment) | `run.rs:458` |
-| 完成 | (fragment) | `run.rs:459` |
-| 替换 | (fragment) | `run.rs:460` |
-| 已是最新 | (fragment) | `run.rs:461` |
-| 已存在 | (fragment) | `run.rs:462` |
-| 跳过 | (fragment) | `run.rs:463` |
-| 失败 | (fragment) | `run.rs:464` |
+| 运行 | Run | `app.rs:609` |
+| 选择程序后即可运行 | choose the program to run | `app.rs:617` |
+| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:621` |
+| 另一个命令正在运行 | another command is running | `app.rs:629` |
+| 就绪 | Ready | `app.rs:638` |
+| 需要 Serval | Serval needed | `app.rs:643` |
+| 未就绪 | Not ready | `app.rs:645` |
+| 正在暂停… | Pausing… | `app.rs:654` |
+| 运行中 | Running | `app.rs:656` |
+| 暂停 | Pause | `app.rs:662` |
+| 预览完成 | Preview finished | `app.rs:670` |
+| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:671` |
+| 按此执行 | Run it for real | `app.rs:676` |
+| 完成 | Finished | `app.rs:680` |
+| 再次运行 | Run again | `app.rs:682` |
+| 需要选择 | Decision needed | `app.rs:695` |
+| 还没有写入任何文件 | nothing has been written yet | `app.rs:696` |
+| 失败 | Failed | `app.rs:701` |
+| 重新运行 | Run again | `app.rs:705` |
+| 已暂停 | Paused | `app.rs:709` |
+| 继续 | Continue | `app.rs:711` |
+| 取消 | Cancel | `app.rs:728` |
+| 正在查找 Serval… | Looking for Serval… | `app.rs:753` |
+| 版本过旧 | too old | `app.rs:760` |
+| 未找到 Serval | Serval not found | `app.rs:764` |
+| 用这张标签表继续： | Continue with this tags table: | `app.rs:998` |
+| 独立捕获 | Events | `app.rs:1002` |
+| 媒体提取 | Copy media | `app.rs:1008` |
+| 查看媒体 | View media | `app.rs:1014` |
+| 帮助 | Help | `app.rs:1043` |
+| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1058` |
+| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1070` |
+| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1082` |
+| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:687` |
+| 正在启动… | Starting… | `run.rs:301` |
+| 剩余约 | about | `run.rs:324` |
+| Serval 意外退出 | Serval exited unexpectedly | `run.rs:399` |
+| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:409` |
+| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:419` |
+| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:424` |
+| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:434` |
+| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:439` |
+| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:444` |
+| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:450` |
+| 正在扫描 | Scanning | `run.rs:474` |
+| 正在读取 | Reading | `run.rs:475` |
+| 正在检查 | Checking | `run.rs:476` |
+| 正在复制 | Copying | `run.rs:477` |
+| 正在移动 | Moving | `run.rs:478` |
+| 正在写入 | Writing | `run.rs:479` |
+| 正在删除 | Removing | `run.rs:480` |
+| 正在分析 | Analysing | `run.rs:481` |
+| 运行中 | Running | `run.rs:482` |
+| 生成 {} 个结果 | (format!, written per language) | `run.rs:353` |
+| 用时 {} | (format!, written per language) | `run.rs:358` |
+| {seconds} 秒 | (format!, written per language) | `run.rs:497` |
+| 写入 | (fragment) | `run.rs:460` |
+| 更新 | (fragment) | `run.rs:461` |
+| 新建 | (fragment) | `run.rs:462` |
+| 修改 | (fragment) | `run.rs:463` |
+| 完成 | (fragment) | `run.rs:464` |
+| 替换 | (fragment) | `run.rs:465` |
+| 已是最新 | (fragment) | `run.rs:466` |
+| 已存在 | (fragment) | `run.rs:467` |
+| 跳过 | (fragment) | `run.rs:468` |
+| 失败 | (fragment) | `run.rs:469` |
 | 复制命令 | Copy command | `run_bar.rs:112` |
 | 预览完成 | Preview finished | `results.rs:21` |
 | 未改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。 | Nothing was changed. The planned changes are listed in the run log below; when they look right, press Run it for real. | `results.rs:22` |
@@ -121,16 +121,16 @@ example data.
 | {} 个已经复制过。 | (format!, written per language) | `conflicts.rs:87` |
 | … 另外 {} 个 | (format!, written per language) | `conflicts.rs:132` |
 | 保留两份，新的命名为 {example}（XMP 同名跟随）。 | (format!, written per language) | `conflicts.rs:157` |
-| 这些图片有多个物种和个体编号，但没有或有多个“已做个体识别的物种”。表里先按全部组合列出。 | These images have several species and individual IDs, and no single identified species. The table lists every combination for now. | `id_species.rs:58` |
-| 设置物种并重新运行 | Choose species and rerun | `id_species.rs:66` |
-| 这些图片里同时有多个物种和个体编号，XMP 没有记录编号属于哪个物种。需确定个体编号对应的物种。 | These images have several species and individual IDs, and the XMP does not say which species an ID belongs to. Choose the species the IDs belong to. | `id_species.rs:146` |
-| 选择会被记忆，下次处理这个文件夹时直接使用。 | The choice is remembered for this folder. | `id_species.rs:155` |
-| 先不处理 | Not now | `id_species.rs:161` |
-| {} 张图片的个体无法归到物种 | (format!, written per language) | `id_species.rs:55` |
-| {} 张 | (format!, written per language) | `id_species.rs:82` |
-| 重新运行（约 {}） | (format!, written per language) | `id_species.rs:132` |
-| {} 张图片的个体编号归属不明确 | (format!, written per language) | `id_species.rs:143` |
-|  · {shown} 等 {n} 个编号 | (fragment) | `id_species.rs:94` |
+| 这些图片有多个物种和个体编号，但没有或有多个“已做个体识别的物种”。表里先按全部组合列出。 | These images have several species and individual IDs, and no single identified species. The table lists every combination for now. | `id_species.rs:86` |
+| 设置物种并重新运行 | Choose species and rerun | `id_species.rs:94` |
+| 这些图片里同时有多个物种和个体编号，XMP 没有记录编号属于哪个物种。需确定个体编号对应的物种。 | These images have several species and individual IDs, and the XMP does not say which species an ID belongs to. Choose the species the IDs belong to. | `id_species.rs:174` |
+| 选择会被记忆，下次处理这个文件夹时直接使用。 | The choice is remembered for this folder. | `id_species.rs:183` |
+| 先不处理 | Not now | `id_species.rs:189` |
+| {} 张图片的个体无法归到物种 | (format!, written per language) | `id_species.rs:83` |
+| {} 张 | (format!, written per language) | `id_species.rs:110` |
+| 重新运行（约 {}） | (format!, written per language) | `id_species.rs:160` |
+| {} 张图片的个体编号归属不明确 | (format!, written per language) | `id_species.rs:171` |
+|  · {shown} 等 {n} 个编号 | (fragment) | `id_species.rs:122` |
 
 ## 标签获取 observe
 
@@ -212,100 +212,101 @@ example data.
 | 中文 | English | Where |
 | --- | --- | --- |
 | 选择或拖入 tags.csv | Choose or drop tags.csv | `browse/mod.rs:72` |
-| 全部 | All | `browse/mod.rs:334` |
-| 物种 | Species | `browse/mod.rs:367` |
-| 反选 | Invert | `browse/mod.rs:375` |
-| 清空 | Clear | `browse/mod.rs:392` |
-| 评分 | Rating | `browse/mod.rs:403` |
-| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:410` |
-| 找不到这个表格 | This table does not exist | `browse/mod.rs:500` |
-| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:505` |
-| 无法读取： | Cannot read: | `browse/mod.rs:513` |
-| 至 | to | `browse/mod.rs:545` |
-| 标签表 | Tags table | `browse/mod.rs:553` |
-| 选择… | Choose… | `browse/mod.rs:564` |
-| 应用表格到文件 | Write a table into the files | `browse/mod.rs:600` |
-| 选择编辑后的标签表（例如从 Caracal 导出的），检查改动后写回 XMP 文件。 | Choose an edited tags table (for example one exported from Caracal), check the changes, and write it into the XMP files. | `browse/mod.rs:601` |
-| 选择表格… | Choose a table… | `browse/mod.rs:607` |
-| 正在建立… | Making it… | `browse/mod.rs:638` |
-| 再次打开 | Open again | `browse/mod.rs:668` |
-| 用媒体提取复制 | Copy them instead | `browse/mod.rs:702` |
-| 挑选 | Choose | `browse/mod.rs:731` |
-| 按物种和评分挑选，在资源管理器或 Caracal 中查看。不挑选时，Caracal 打开整张表。 | Choose by species and rating, then look in the file manager or Caracal. With nothing chosen, Caracal opens the whole table. | `browse/mod.rs:733` |
-| 查看文件夹中的文件是原文件的「链接」：编辑内容会直接改动原文件；删除只删除链接，原文件不受影响。 | The files in a review folder are links to the originals: editing them changes the originals; deleting removes only the link. | `browse/mod.rs:748` |
-| 在资源管理器中查看所选 | Look at the choice in the file manager | `browse/mod.rs:753` |
-| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:754` |
-| 建立查看文件夹 | Make a review folder | `browse/mod.rs:760` |
-| 无法保存所选： | Cannot save the choice: | `browse/mod.rs:790` |
-| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:798` |
-| 在浏览器中打开所选：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the choice in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:799` |
-| 打开 Caracal | Open Caracal | `browse/mod.rs:805` |
-| … 另外 {hidden} 个 | (format!, written per language) | `browse/mod.rs:322` |
-| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:413` |
-| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:528` |
-| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:651` |
-| 找不到表中的媒体文件，例如 {}。表格是否来自另一台电脑，或移动硬盘的盘符变了？ | (format!, written per language) | `browse/mod.rs:711` |
-| 已将所选 {} 个文件的行另存为 {}，并在 Caracal 中打开。 | (format!, written per language) | `browse/mod.rs:775` |
+| 全部 | All | `browse/mod.rs:343` |
+| 物种 | Species | `browse/mod.rs:376` |
+| 反选 | Invert | `browse/mod.rs:384` |
+| 清空 | Clear | `browse/mod.rs:401` |
+| 评分 | Rating | `browse/mod.rs:412` |
+| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:419` |
+| 找不到这个表格 | This table does not exist | `browse/mod.rs:509` |
+| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:514` |
+| 无法读取： | Cannot read: | `browse/mod.rs:522` |
+| 至 | to | `browse/mod.rs:554` |
+| 标签表 | Tags table | `browse/mod.rs:562` |
+| 选择… | Choose… | `browse/mod.rs:573` |
+| 应用表格到文件 | Write a table into the files | `browse/mod.rs:609` |
+| 选择编辑后的标签表（例如从 Caracal 导出的），检查改动后写回 XMP 文件。 | Choose an edited tags table (for example one exported from Caracal), check the changes, and write it into the XMP files. | `browse/mod.rs:610` |
+| 选择表格… | Choose a table… | `browse/mod.rs:616` |
+| 正在建立… | Making it… | `browse/mod.rs:647` |
+| 再次打开 | Open again | `browse/mod.rs:677` |
+| 用媒体提取复制 | Copy them instead | `browse/mod.rs:711` |
+| 挑选 | Choose | `browse/mod.rs:740` |
+| 按物种和评分挑选，在资源管理器或 Caracal 中查看。不挑选时，Caracal 打开整张表。 | Choose by species and rating, then look in the file manager or Caracal. With nothing chosen, Caracal opens the whole table. | `browse/mod.rs:742` |
+| 查看文件夹中的文件是原文件的「链接」：编辑内容会直接改动原文件；删除只删除链接，原文件不受影响。 | The files in a review folder are links to the originals: editing them changes the originals; deleting removes only the link. | `browse/mod.rs:757` |
+| 在资源管理器中查看所选 | Look at the choice in the file manager | `browse/mod.rs:762` |
+| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:763` |
+| 建立查看文件夹 | Make a review folder | `browse/mod.rs:769` |
+| 无法保存所选： | Cannot save the choice: | `browse/mod.rs:799` |
+| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:807` |
+| 在浏览器中打开所选：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the choice in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:808` |
+| 打开 Caracal | Open Caracal | `browse/mod.rs:814` |
+| … 另外 {hidden} 个 | (format!, written per language) | `browse/mod.rs:331` |
+| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:422` |
+| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:537` |
+| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:660` |
+| 找不到表中的媒体文件，例如 {}。表格是否来自另一台电脑，或移动硬盘的盘符变了？ | (format!, written per language) | `browse/mod.rs:720` |
+| 已将所选 {} 个文件的行另存为 {}，并在 Caracal 中打开。 | (format!, written per language) | `browse/mod.rs:784` |
 
 ## XMP 更新 update
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 选择填好 xmp_update 列的表 | Choose a table with the xmp_update column filled | `screens/update.rs:175` |
-| 表格无法读取： | cannot read the table: | `screens/update.rs:272` |
-| 选择修改表 | choose the table | `screens/update.rs:344` |
-| 找不到这个表格 | the table does not exist | `screens/update.rs:345` |
-| 表格无法读取： | cannot read: | `screens/update.rs:346` |
-| 表中没有要修改的行 | no rows to change | `screens/update.rs:371` |
-| 选择要写入的表 | choose the table to write | `screens/update.rs:398` |
-| 至少选择一个字段 | choose at least one field | `screens/update.rs:403` |
-| 需要 Serval 才能检查 | Serval is needed to check | `screens/update.rs:406` |
-| 正在检查… | checking… | `screens/update.rs:408` |
-| 文件已与表格一致 | the files already match the table | `screens/update.rs:417` |
-| 原值 | Old | `screens/update.rs:502` |
-| 新值 | New | `screens/update.rs:503` |
-| 文件数 | Files | `screens/update.rs:504` |
-| （原时间） | (current time) | `screens/update.rs:510` |
-| （新增） | (added) | `screens/update.rs:512` |
-| 修改表 | Changes table | `screens/update.rs:608` |
-| 选择… | Choose… | `screens/update.rs:613` |
-| 标注好的表或从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。 | A table filled in by labellers, or exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged. | `screens/update.rs:634` |
-| 在 xmp_update 列填新值（时间填 xmp_update_datetime 列）；原值为空的行表示新增。 | Fill new values in xmp_update (times in xmp_update_datetime); rows with an empty old value add a tag. | `screens/update.rs:639` |
-| 写入方式 | How | `screens/update.rs:653` |
-| 按 xmp_update 列修改 | Change by the xmp_update column | `screens/update.rs:656` |
-| 整表写入 | Write the whole table | `screens/update.rs:657` |
-| 修改内容 | What to change | `screens/update.rs:680` |
-| 物种 | Species | `screens/update.rs:683` |
-| 个体 | Individual | `screens/update.rs:684` |
-| 评分 | Rating | `screens/update.rs:685` |
-| 时间 | Time | `screens/update.rs:686` |
-| 打开表格 | Open the table | `screens/update.rs:714` |
-| 没有 XMP 的媒体文件，从媒体文件创建 | Create missing XMP files from the media files | `screens/update.rs:744` |
-| 选择表格后自动检查，不会写入。 | Checked automatically once a table is chosen (--dry-run, nothing written). | `screens/update.rs:759` |
-| 正在检查每个文件… | Checking every file… | `screens/update.rs:767` |
-| 字段 | Field | `screens/update.rs:801` |
-| 将修改的文件 | Files to change | `screens/update.rs:802` |
-| 其中会移除表中没有的值 | of which lose values not in the table | `screens/update.rs:815` |
-| 共计（不重复） | In all (distinct) | `screens/update.rs:824` |
-| 这些文件需要先在表里改好： | Fix these in the table first: | `screens/update.rs:853` |
-| 写入的字段 | Fields to write | `screens/update.rs:871` |
-| 时间默认不写入：表格软件保存时常会改动时间格式。 | Time is not written by default: spreadsheet programs often change its format when saving. | `screens/update.rs:875` |
-| 将要做的修改 | What will change | `screens/update.rs:885` |
-| 检查失败 | the check failed | `screens/update.rs:926` |
-| 表中没有 {column} 列 | (format!, written per language) | `screens/update.rs:349` |
-| {} 行的路径不是 XMP 文件 | (format!, written per language) | `screens/update.rs:353` |
-| {} 行时间格式不对 | (format!, written per language) | `screens/update.rs:361` |
-| {} 个冲突 | (format!, written per language) | `screens/update.rs:367` |
-| 将修改 {} 个 XMP 文件 | (format!, written per language) | `screens/update.rs:374` |
-| {} 个文件有问题 | (format!, written per language) | `screens/update.rs:412` |
-| 将写入 {} 个文件 | (format!, written per language) | `screens/update.rs:420` |
-| 冲突：第 {} 行 | (format!, written per language) | `screens/update.rs:517` |
-| ；{} 个文件的修改互相冲突，需要先在表里改好 | (format!, written per language) | `screens/update.rs:539` |
-| ；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP sidecar」生成表格 | (format!, written per language) | `screens/update.rs:551` |
-| ；第 {} 行的时间不是 yyyy-MM-dd HH:mm:ss | (format!, written per language) | `screens/update.rs:563` |
-| 表中没有 {column} 列。 | (format!, written per language) | `screens/update.rs:700` |
-| 已检查 {} 个文件，{} 个已与表格一致。表格中的值覆盖文件中的值，空白单元格不改动；每个文件保留一份原始备份。 | (format!, written per language) | `screens/update.rs:830` |
-| 还有 {} 个文件没有 XMP sidecar，将从媒体文件创建。 | (format!, written per language) | `screens/update.rs:843` |
+| 选择要写入的标签表（例如从 Caracal 导出的） | Choose the tags table to write (for example one exported from Caracal) | `screens/update.rs:175` |
+| 选择填好 xmp_update 列的表 | Choose a table with the xmp_update column filled | `screens/update.rs:180` |
+| 表格无法读取： | cannot read the table: | `screens/update.rs:290` |
+| 选择修改表 | choose the table | `screens/update.rs:362` |
+| 找不到这个表格 | the table does not exist | `screens/update.rs:363` |
+| 表格无法读取： | cannot read: | `screens/update.rs:364` |
+| 表中没有要修改的行 | no rows to change | `screens/update.rs:389` |
+| 选择要写入的表 | choose the table to write | `screens/update.rs:416` |
+| 至少选择一个字段 | choose at least one field | `screens/update.rs:421` |
+| 需要 Serval 才能检查 | Serval is needed to check | `screens/update.rs:424` |
+| 正在检查… | checking… | `screens/update.rs:426` |
+| 文件已与表格一致 | the files already match the table | `screens/update.rs:435` |
+| 原值 | Old | `screens/update.rs:524` |
+| 新值 | New | `screens/update.rs:525` |
+| 文件数 | Files | `screens/update.rs:526` |
+| （原时间） | (current time) | `screens/update.rs:532` |
+| （新增） | (added) | `screens/update.rs:534` |
+| 修改表 | Changes table | `screens/update.rs:630` |
+| 选择… | Choose… | `screens/update.rs:635` |
+| 标注好的表或从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。 | A table filled in by labellers, or exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged. | `screens/update.rs:656` |
+| 在 xmp_update 列填新值（时间填 xmp_update_datetime 列）；原值为空的行表示新增。 | Fill new values in xmp_update (times in xmp_update_datetime); rows with an empty old value add a tag. | `screens/update.rs:661` |
+| 写入方式 | How | `screens/update.rs:675` |
+| 按 xmp_update 列修改 | Change by the xmp_update column | `screens/update.rs:678` |
+| 整表写入 | Write the whole table | `screens/update.rs:679` |
+| 修改内容 | What to change | `screens/update.rs:702` |
+| 物种 | Species | `screens/update.rs:705` |
+| 个体 | Individual | `screens/update.rs:706` |
+| 评分 | Rating | `screens/update.rs:707` |
+| 时间 | Time | `screens/update.rs:708` |
+| 打开表格 | Open the table | `screens/update.rs:736` |
+| 没有 XMP 的媒体文件，从媒体文件创建 | Create missing XMP files from the media files | `screens/update.rs:766` |
+| 选择表格后自动检查，不会写入。 | Checked automatically once a table is chosen (--dry-run, nothing written). | `screens/update.rs:781` |
+| 正在检查每个文件… | Checking every file… | `screens/update.rs:789` |
+| 字段 | Field | `screens/update.rs:823` |
+| 将修改的文件 | Files to change | `screens/update.rs:824` |
+| 其中会移除表中没有的值 | of which lose values not in the table | `screens/update.rs:837` |
+| 共计（不重复） | In all (distinct) | `screens/update.rs:846` |
+| 这些文件需要先在表里改好： | Fix these in the table first: | `screens/update.rs:875` |
+| 写入的字段 | Fields to write | `screens/update.rs:893` |
+| 时间默认不写入：表格软件保存时常会改动时间格式。 | Time is not written by default: spreadsheet programs often change its format when saving. | `screens/update.rs:897` |
+| 将要做的修改 | What will change | `screens/update.rs:907` |
+| 检查失败 | the check failed | `screens/update.rs:948` |
+| 表中没有 {column} 列 | (format!, written per language) | `screens/update.rs:367` |
+| {} 行的路径不是 XMP 文件 | (format!, written per language) | `screens/update.rs:371` |
+| {} 行时间格式不对 | (format!, written per language) | `screens/update.rs:379` |
+| {} 个冲突 | (format!, written per language) | `screens/update.rs:385` |
+| 将修改 {} 个 XMP 文件 | (format!, written per language) | `screens/update.rs:392` |
+| {} 个文件有问题 | (format!, written per language) | `screens/update.rs:430` |
+| 将写入 {} 个文件 | (format!, written per language) | `screens/update.rs:438` |
+| 冲突：第 {} 行 | (format!, written per language) | `screens/update.rs:539` |
+| ；{} 个文件的修改互相冲突，需要先在表里改好 | (format!, written per language) | `screens/update.rs:561` |
+| ；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP sidecar」生成表格 | (format!, written per language) | `screens/update.rs:573` |
+| ；第 {} 行的时间不是 yyyy-MM-dd HH:mm:ss | (format!, written per language) | `screens/update.rs:585` |
+| 表中没有 {column} 列。 | (format!, written per language) | `screens/update.rs:722` |
+| 已检查 {} 个文件，{} 个已与表格一致。表格中的值覆盖文件中的值，空白单元格不改动；每个文件保留一份原始备份。 | (format!, written per language) | `screens/update.rs:852` |
+| 还有 {} 个文件没有 XMP sidecar，将从媒体文件创建。 | (format!, written per language) | `screens/update.rs:865` |
 
 ## 媒体提取 extract
 
@@ -313,45 +314,45 @@ example data.
 | --- | --- | --- |
 | 选择或拖入 tags.csv | Choose or drop tags.csv | `screens/extract.rs:76` |
 | 搜索物种 | Search species | `screens/extract.rs:79` |
-| 选择标签表 | choose the tags table | `screens/extract.rs:401` |
-| 表格无法读取： | cannot read the table: | `screens/extract.rs:404` |
-| 找不到这个表格 | the table does not exist | `screens/extract.rs:407` |
-| 正在读取表格… | reading the table… | `screens/extract.rs:410` |
-| 选择要提取的物种或评分 | choose the species or a rating | `screens/extract.rs:413` |
-| 没有符合条件的记录 | nothing matches | `screens/extract.rs:416` |
-| 选择保留的文件夹 | choose the folders to keep | `screens/extract.rs:419` |
-| 找不到这个表格 | This table does not exist | `screens/extract.rs:500` |
-| 标签获取生成的 tags.csv，或标注员填好的表格 | The tags.csv from Get tags, or a table filled in by labellers | `screens/extract.rs:505` |
-| 正在读取… | Reading… | `screens/extract.rs:513` |
-| 无法读取： | Cannot read: | `screens/extract.rs:515` |
-| 至 | to | `screens/extract.rs:542` |
-| （无物种标签） | (no species tag) | `screens/extract.rs:633` |
-| 个文件 | files | `screens/extract.rs:679` |
-| 条记录 | records | `screens/extract.rs:680` |
-| 只要文件 | File only | `screens/extract.rs:742` |
-| 保留的文件夹 | Folders to keep | `screens/extract.rs:836` |
-| 标签表 | Tags table | `screens/extract.rs:860` |
-| 选择… | Choose… | `screens/extract.rs:874` |
-| 评分 | Rating | `screens/extract.rs:889` |
-| 全部 | All | `screens/extract.rs:891` |
-| 选择要提取的记录 | Choose the records to extract | `screens/extract.rs:909` |
-| 整理方式 | Organise | `screens/extract.rs:923` |
-| 按物种分子文件夹 | A folder per species | `screens/extract.rs:929` |
-| 文件名加上标签 | Add the tags to file names | `screens/extract.rs:938` |
-| 文件名格式：物种__个体__原文件名，多个值用 + 连接，例如 雪豹+岩羊__SL01__IMG_0001.JPG | Names: species__individuals__original name, values joined by +, e.g. Snow leopard+Blue sheep__SL01__IMG_0001.JPG | `screens/extract.rs:948` |
-| 等{}种 | (format!, written per language) | `screens/extract.rs:350` |
-| {} 行 | (format!, written per language) | `screens/extract.rs:525` |
-| {} 个物种 | (format!, written per language) | `screens/extract.rs:529` |
-| {} 个位点 | (format!, written per language) | `screens/extract.rs:534` |
-| … 另外 {hidden} 个 | (format!, written per language) | `screens/extract.rs:646` |
-| 来自 {} 个位点 | (format!, written per language) | `screens/extract.rs:704` |
-| {files} 个文件，约 {} | (fragment) | `screens/extract.rs:439` |
-| {files} 个文件 | (fragment) | `screens/extract.rs:440` |
-| 雪豹 | (fragment) | `screens/extract.rs:488` |
-| 兔狲 | (fragment) | `screens/extract.rs:488` |
-| 点选要保留的最上层文件夹。 | (fragment) | `screens/extract.rs:792` |
-| 只复制文件，不保留文件夹（同名文件会被识别为冲突）。 | (fragment) | `screens/extract.rs:796` |
-| 从 {} 开始保留 {} 层。输出示例： | (fragment) | `screens/extract.rs:804` |
+| 选择标签表 | choose the tags table | `screens/extract.rs:402` |
+| 表格无法读取： | cannot read the table: | `screens/extract.rs:405` |
+| 找不到这个表格 | the table does not exist | `screens/extract.rs:408` |
+| 正在读取表格… | reading the table… | `screens/extract.rs:411` |
+| 选择要提取的物种或评分 | choose the species or a rating | `screens/extract.rs:414` |
+| 没有符合条件的记录 | nothing matches | `screens/extract.rs:417` |
+| 选择保留的文件夹 | choose the folders to keep | `screens/extract.rs:420` |
+| 找不到这个表格 | This table does not exist | `screens/extract.rs:501` |
+| 标签获取生成的 tags.csv，或标注员填好的表格 | The tags.csv from Get tags, or a table filled in by labellers | `screens/extract.rs:506` |
+| 正在读取… | Reading… | `screens/extract.rs:514` |
+| 无法读取： | Cannot read: | `screens/extract.rs:516` |
+| 至 | to | `screens/extract.rs:543` |
+| （无物种标签） | (no species tag) | `screens/extract.rs:634` |
+| 个文件 | files | `screens/extract.rs:680` |
+| 条记录 | records | `screens/extract.rs:681` |
+| 只要文件 | File only | `screens/extract.rs:743` |
+| 保留的文件夹 | Folders to keep | `screens/extract.rs:837` |
+| 标签表 | Tags table | `screens/extract.rs:861` |
+| 选择… | Choose… | `screens/extract.rs:875` |
+| 评分 | Rating | `screens/extract.rs:890` |
+| 全部 | All | `screens/extract.rs:892` |
+| 选择要提取的记录 | Choose the records to extract | `screens/extract.rs:910` |
+| 整理方式 | Organise | `screens/extract.rs:924` |
+| 按物种分子文件夹 | A folder per species | `screens/extract.rs:930` |
+| 文件名加上标签 | Add the tags to file names | `screens/extract.rs:939` |
+| 文件名格式：物种__个体__原文件名，多个值用 + 连接，例如 雪豹+岩羊__SL01__IMG_0001.JPG | Names: species__individuals__original name, values joined by +, e.g. Snow leopard+Blue sheep__SL01__IMG_0001.JPG | `screens/extract.rs:949` |
+| 等{}种 | (format!, written per language) | `screens/extract.rs:351` |
+| {} 行 | (format!, written per language) | `screens/extract.rs:526` |
+| {} 个物种 | (format!, written per language) | `screens/extract.rs:530` |
+| {} 个位点 | (format!, written per language) | `screens/extract.rs:535` |
+| … 另外 {hidden} 个 | (format!, written per language) | `screens/extract.rs:647` |
+| 来自 {} 个位点 | (format!, written per language) | `screens/extract.rs:705` |
+| {files} 个文件，约 {} | (fragment) | `screens/extract.rs:440` |
+| {files} 个文件 | (fragment) | `screens/extract.rs:441` |
+| 雪豹 | (fragment) | `screens/extract.rs:489` |
+| 兔狲 | (fragment) | `screens/extract.rs:489` |
+| 点选要保留的最上层文件夹。 | (fragment) | `screens/extract.rs:793` |
+| 只复制文件，不保留文件夹（同名文件会被识别为冲突）。 | (fragment) | `screens/extract.rs:797` |
+| 从 {} 开始保留 {} 层。输出示例： | (fragment) | `screens/extract.rs:805` |
 
 ## Spec-driven screens: XMP 初始化, 元数据同步, XMP 导出, 重命名, 路径对齐, XMP 删除
 
@@ -523,9 +524,9 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 命令行参数 | Command-line options | `help.rs:132` |
-| 需要 Serval 才能显示。 | Shown once Serval is found. | `help.rs:137` |
-| 正在读取… | Reading… | `help.rs:139` |
-| 帮助 | Help | `help.rs:160` |
-| 隐藏命令行参数 | Hide command-line options | `help.rs:201` |
-| 显示命令行参数 | Show command-line options | `help.rs:203` |
+| 命令行参数 | Command-line options | `help.rs:138` |
+| 需要 Serval 才能显示。 | Shown once Serval is found. | `help.rs:143` |
+| 正在读取… | Reading… | `help.rs:145` |
+| 帮助 | Help | `help.rs:166` |
+| 隐藏命令行参数 | Hide command-line options | `help.rs:207` |
+| 显示命令行参数 | Show command-line options | `help.rs:209` |

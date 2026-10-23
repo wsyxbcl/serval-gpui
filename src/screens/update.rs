@@ -169,14 +169,24 @@ pub struct UpdateForm {
     _subscriptions: Vec<Subscription>,
 }
 
+/// The table field's hint: 按 xmp_update 列修改 needs that column; 整表写入 takes a tags table as it is.
+fn table_hint(write: bool) -> &'static str {
+    if write {
+        t(
+            "选择要写入的标签表（例如从 Caracal 导出的）",
+            "Choose the tags table to write (for example one exported from Caracal)",
+        )
+    } else {
+        t(
+            "选择填好 xmp_update 列的表",
+            "Choose a table with the xmp_update column filled",
+        )
+    }
+}
+
 impl UpdateForm {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let csv = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t(
-                "选择填好 xmp_update 列的表",
-                "Choose a table with the xmp_update column filled",
-            ))
-        });
+        let csv = cx.new(|cx| InputState::new(window, cx).placeholder(table_hint(false)));
         let subscription = cx.subscribe_in(&csv, window, |this, _, event: &InputEvent, _, cx| {
             if matches!(event, InputEvent::Change) {
                 this.read(cx);
@@ -214,9 +224,17 @@ impl UpdateForm {
         cx.notify();
     }
 
+    /// The way of writing; the table field's hint follows it.
+    fn set_write(&mut self, write: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.write = write;
+        self.csv.update(cx, |input, cx| {
+            input.set_placeholder(table_hint(write), window, cx)
+        });
+    }
+
     /// Open a table in the write mode (from 查看媒体's 应用表格到文件).
     pub fn apply_table(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.write = true;
+        self.set_write(true, window, cx);
         self.csv
             .update(cx, |input, cx| input.set_value(path, window, cx));
         self.read(cx);
@@ -447,14 +465,18 @@ impl UpdateForm {
         ]
     }
 
-    pub fn restore(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let settings = cx.default_global::<crate::settings::Settings>().clone();
         self.mode = settings
             .form_value("xmp_update", "mode")
             .and_then(|m| m.parse().ok())
             .filter(|&m| m < MODES.len())
             .unwrap_or(0);
-        self.write = settings.form_value("xmp_update", "write") == Some("1");
+        self.set_write(
+            settings.form_value("xmp_update", "write") == Some("1"),
+            window,
+            cx,
+        );
         self.create_missing = settings.form_value("xmp_update", "create_missing") != Some("0");
         if let Some(fields) = settings
             .form_value("xmp_update", "fields")
@@ -657,9 +679,9 @@ impl Render for UpdateForm {
                         t("整表写入", "Write the whole table"),
                     ],
                     self.write as usize,
-                    move |index, _, cx| {
+                    move |index, window, cx| {
                         let _ = this.update(cx, |this, cx| {
-                            this.write = index == 1;
+                            this.set_write(index == 1, window, cx);
                             this.recheck(cx);
                             cx.notify();
                         });

@@ -209,18 +209,72 @@ impl Form {
     }
 }
 
-/// A command line as a person would type it: arguments with spaces or quotes are quoted.
+/// A command line as a person would type it, quoted so that pasting it into a shell passes the same arguments:
+/// anything but plain characters is quoted, never in a way the shell expands.
 pub fn display_command(args: &[String]) -> String {
     std::iter::once("serval".to_string())
-        .chain(args.iter().map(|arg| {
-            if arg.contains('"') && !arg.contains('\'') {
-                format!("'{arg}'")
-            } else if arg.is_empty() || arg.contains([' ', '"', '\'']) {
-                format!("\"{}\"", arg.replace('"', "\\\""))
-            } else {
-                arg.clone()
-            }
-        }))
+        .chain(args.iter().map(|arg| quote(arg)))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// One argument. Elsewhere a POSIX shell: single quotes, in which nothing is special. On Windows double quotes, which
+/// cmd and PowerShell both read, unless the argument has what either expands or ends there (`$`, `` ` ``, `%`,
+/// quotes, PowerShell's curly quotes too): then PowerShell's single quotes, the default shell's.
+fn quote(arg: &str) -> String {
+    let plain =
+        |c: char| c.is_alphanumeric() || "-_./:=+".contains(c) || (cfg!(windows) && c == '\\');
+    if !arg.is_empty() && arg.chars().all(plain) {
+        return arg.to_string();
+    }
+    if !cfg!(windows) {
+        return format!("'{}'", arg.replace('\'', r"'\''"));
+    }
+    const SINGLE: [char; 5] = ['\'', '\u{2018}', '\u{2019}', '\u{201A}', '\u{201B}'];
+    // A backslash before the closing double quote would escape it.
+    if !arg.contains(['$', '`', '%', '"', '\u{201C}', '\u{201D}', '\u{201E}'])
+        && !arg.contains(SINGLE)
+        && !arg.ends_with('\\')
+    {
+        return format!("\"{arg}\"");
+    }
+    let mut quoted = String::from("'");
+    for c in arg.chars() {
+        quoted.push(c);
+        if SINGLE.contains(&c) {
+            quoted.push(c);
+        }
+    }
+    quoted.push('\'');
+    quoted
+}
+
+#[cfg(test)]
+mod tests {
+    use super::display_command;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_copied_command_gives_the_shell_the_same_arguments() {
+        let args: Vec<String> = [
+            "/data/$(printf WRONG)",
+            "it's `here`; & there",
+            "地青 DQ6061",
+            "",
+            "-o",
+        ]
+        .map(String::from)
+        .to_vec();
+        let command = display_command(&args);
+        let words = command.strip_prefix("serval ").unwrap();
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("printf '%s\\n' {words}"))
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(out.stdout).unwrap(),
+            args.join("\n") + "\n"
+        );
+    }
 }

@@ -32,8 +32,9 @@ The table is the working document; the XMP files are updated deliberately, with 
 - **Three ways out**, one card each, no run bar:
   1. **在资源管理器中查看所选** — §3.
   2. **在 Caracal 中查看和编辑** — opens Caracal at `#review&table=<the table's full path>`, on the choice: its
-     rows (every row of each chosen file, in table order, the header as read, UTF-8 with a BOM) are saved as
-     `serval_review/<date>_<species>.csv` (`_2`, … rather than overwrite) and that table is opened, so a large
+     rows (every row of each chosen file, in table order, the header as read, UTF-8 with a BOM) are saved next to
+     the table as `<table>_<date>_<species>.csv` (`_2`, … rather than overwrite; next to the table so relative
+     paths still lead to the media, and the media's folder need not be writable) and that table is opened, so a large
      table loads only what the user wants to look at. With nothing chosen, the whole table. A page cannot open
      a file from its path; the path is a hint: Caracal finds the table inside a folder the user granted before,
      or names the file to pick. The fragment never leaves the browser; nothing is copied to the clipboard, and
@@ -45,8 +46,9 @@ The table is the working document; the XMP files are updated deliberately, with 
 
 ## 3. Review folder (Explorer)
 
-- The chosen media and their sidecars are **hard-linked** into `<data>_serval_output/serval_review/<date>_<species>/`
-  and the folder is opened. Names are `<species>__<individuals>__<deployment>__<file name>`, the same as Caracal's
+- The chosen media and their sidecars are **hard-linked** into a new folder `<data>_serval_output/serval_review/<date>_<species>/`
+  (`_2`, … when the name is taken: the same name may be another rating, more species or an edited table) and the
+  folder is opened. A sidecar that cannot be linked stops it, rather than leave media without their labels. Names are `<species>__<individuals>__<deployment>__<file name>`, the same as Caracal's
   browser copies and `serval extract --rename` (individuals left out when empty, `untagged` without species); a
   name used twice gets `_1`, `_2`. (Aligned with Caracal 2026-10-23.)
 - Hard links take no space; Explorer, Photos and the player treat them as the real files, and copying out of the

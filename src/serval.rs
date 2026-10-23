@@ -30,19 +30,24 @@ impl ServalStatus {
 }
 
 /// The Serval to use (settings.md §1): the one chosen in Settings (or with `--serval`) when it works; otherwise the
-/// one shipped next to Waxbill, then one on PATH. A chosen program that has gone or is too old does not hide a
-/// working one shipped with Waxbill. Blocking; run it in the background.
+/// one shipped next to Waxbill, then one on PATH: the first that works. One that has gone, is too old or does not
+/// start never hides a working one after it; when none works, the first one found says why. Blocking; run it in the
+/// background.
 pub fn find(chosen: Option<PathBuf>) -> ServalStatus {
-    let chosen = chosen.map(check);
-    if let Some(ready @ ServalStatus::Ready { .. }) = chosen {
-        return ready;
+    let mut first = None;
+    for program in [chosen, next_to_waxbill(), find_on_path()]
+        .into_iter()
+        .flatten()
+    {
+        match check(program) {
+            ready @ ServalStatus::Ready { .. } => return ready,
+            ServalStatus::Missing => {}
+            status => {
+                first.get_or_insert(status);
+            }
+        }
     }
-    let found = next_to_waxbill().or_else(find_on_path).map(check);
-    match (found, chosen) {
-        (Some(ready @ ServalStatus::Ready { .. }), _) => ready,
-        (_, Some(chosen)) if chosen != ServalStatus::Missing => chosen,
-        (found, _) => found.unwrap_or(ServalStatus::Missing),
-    }
+    first.unwrap_or(ServalStatus::Missing)
 }
 
 fn program_name() -> &'static str {

@@ -306,7 +306,7 @@ impl ExtractForm {
             .unwrap_or_else(|| output::default_root(csv))
     }
 
-    /// Serval's filter for the choice: a single species as `-f species`, a rating alone as `-f rating`, anything
+    /// Serval's filter for the choice: a single species as `-f species`, a rating alone as `-f rating` (a range), anything
     /// else as an advanced expression.
     fn filter(&self) -> Option<(&'static str, String)> {
         let rating = RATINGS[self.rating].map(|(min, exact)| {
@@ -319,7 +319,8 @@ impl ExtractForm {
         match (self.selected.len(), rating) {
             (0, None) => None,
             (1, None) => Some(("species", self.selected.first().unwrap().clone())),
-            (0, Some(rating)) => Some(("rating", rating)),
+            // `-f rating` takes an exact value or a range, not `>=`; a range also reads 5.0 as 5.
+            (0, Some(_)) => RATINGS[self.rating].map(|(min, _)| ("rating", format!("{min}-5"))),
             (_, rating) => {
                 let species = self
                     .selected

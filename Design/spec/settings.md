@@ -14,8 +14,8 @@ Now (W08 revised 2026-10-13):
   side (with their READMEs and licences); Serval is not built into Waxbill. Unpacking the archive is the whole
   installation.
 - Waxbill uses, in this order: the program chosen in Settings (or `--serval`) when it works; else `serval.exe`
-  next to `waxbill.exe`; else `serval` on PATH. A chosen program that has gone or is too old does not hide a
-  working one next to Waxbill. Only an explicit choice is saved, so unpacking a newer archive brings its Serval
+  next to `waxbill.exe`; else `serval` on PATH: the first that works. One that has gone, is too old or does not
+  start never hides a working one after it; when none works, the first one found says why. Only an explicit choice is saved, so unpacking a newer archive brings its Serval
   into use.
 - With none of these, the card "选择 Serval 程序" appears in the content area, and Run is disabled with
   "需要 Serval".

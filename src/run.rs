@@ -62,6 +62,9 @@ pub struct Run {
     /// The form's command when the run started, without decisions: once the form says something else, the run
     /// bar is about the new command again.
     pub form_command: String,
+    /// The arguments it ran with (the form's, for real after 按此执行, with any answers): continuing, retrying or
+    /// running it again repeats them while the form is unchanged.
+    pub args: Vec<String>,
     /// The output folder this run (and the paused runs it continues) created, offered for deletion on cancel when
     /// the command only copies into it.
     pub created_output: Option<crate::run_dialogs::CreatedOutput>,
@@ -94,6 +97,7 @@ impl Run {
             log: vec![format!("$ {command}")],
             command,
             form_command: String::new(),
+            args: Vec::new(),
             id: 0,
             created_output: None,
             output_dir: None,
@@ -166,6 +170,7 @@ impl Run {
             log: vec![format!("$ {command}"), error.clone()],
             command,
             form_command: String::new(),
+            args: Vec::new(),
             id: 0,
             created_output: None,
             output_dir: None,
