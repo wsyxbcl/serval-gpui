@@ -9,77 +9,72 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 运行 | Run | `app.rs:565` |
-| 选择程序后即可运行 | choose the program to run | `app.rs:573` |
-| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:577` |
-| 另一个命令正在运行 | another command is running | `app.rs:585` |
-| 就绪 | Ready | `app.rs:594` |
-| 需要 Serval | Serval needed | `app.rs:599` |
-| 未就绪 | Not ready | `app.rs:601` |
-| 正在暂停… | Pausing… | `app.rs:610` |
-| 运行中 | Running | `app.rs:612` |
-| 暂停 | Pause | `app.rs:618` |
-| 预览完成 | Preview finished | `app.rs:626` |
-| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:627` |
-| 按此执行 | Run it for real | `app.rs:632` |
-| 完成 | Finished | `app.rs:636` |
-| 再次运行 | Run again | `app.rs:638` |
-| 需要选择 | Decision needed | `app.rs:651` |
-| 还没有写入任何文件 | nothing has been written yet | `app.rs:652` |
-| 失败 | Failed | `app.rs:657` |
-| 重新运行 | Run again | `app.rs:661` |
-| 已暂停 | Paused | `app.rs:665` |
-| 继续 | Continue | `app.rs:667` |
-| 取消 | Cancel | `app.rs:684` |
-| 正在查找 Serval… | Looking for Serval… | `app.rs:709` |
-| 版本过旧 | too old | `app.rs:716` |
-| 未找到 Serval | Serval not found | `app.rs:720` |
-| 用这张标签表继续： | Continue with this tags table: | `app.rs:954` |
-| 独立捕获 | Events | `app.rs:958` |
-| 媒体提取 | Copy media | `app.rs:964` |
-| 查看媒体 | View media | `app.rs:970` |
-| 帮助 | Help | `app.rs:999` |
-| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1014` |
-| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1026` |
-| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1038` |
-| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:643` |
-| 正在启动… | Starting… | `run.rs:269` |
-| 剩余约 | about | `run.rs:292` |
-| Serval 意外退出 | Serval exited unexpectedly | `run.rs:367` |
-| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:377` |
-| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:387` |
-| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:392` |
-| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:402` |
-| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:407` |
-| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:412` |
-| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:418` |
-| 正在扫描 | Scanning | `run.rs:442` |
-| 正在读取 | Reading | `run.rs:443` |
-| 正在检查 | Checking | `run.rs:444` |
-| 正在复制 | Copying | `run.rs:445` |
-| 正在移动 | Moving | `run.rs:446` |
-| 正在写入 | Writing | `run.rs:447` |
-| 正在删除 | Removing | `run.rs:448` |
-| 正在分析 | Analysing | `run.rs:449` |
-| 运行中 | Running | `run.rs:450` |
-| 生成 {} 个结果 | (format!, written per language) | `run.rs:321` |
-| 用时 {} | (format!, written per language) | `run.rs:326` |
-| {seconds} 秒 | (format!, written per language) | `run.rs:465` |
-| 雪豹 | (fragment) | `run.rs:138` |
-| 岩羊 | (fragment) | `run.rs:139` |
-| 赤狐 | (fragment) | `run.rs:140` |
-|  · {done} / {} 个文件 | (fragment) | `run.rs:276` |
-|  · {done} 个文件 | (fragment) | `run.rs:281` |
-| 写入 | (fragment) | `run.rs:428` |
-| 更新 | (fragment) | `run.rs:429` |
-| 新建 | (fragment) | `run.rs:430` |
-| 修改 | (fragment) | `run.rs:431` |
-| 完成 | (fragment) | `run.rs:432` |
-| 替换 | (fragment) | `run.rs:433` |
-| 已是最新 | (fragment) | `run.rs:434` |
-| 已存在 | (fragment) | `run.rs:435` |
-| 跳过 | (fragment) | `run.rs:436` |
-| 失败 | (fragment) | `run.rs:437` |
+| 运行 | Run | `app.rs:594` |
+| 选择程序后即可运行 | choose the program to run | `app.rs:602` |
+| Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:606` |
+| 另一个命令正在运行 | another command is running | `app.rs:614` |
+| 就绪 | Ready | `app.rs:623` |
+| 需要 Serval | Serval needed | `app.rs:628` |
+| 未就绪 | Not ready | `app.rs:630` |
+| 正在暂停… | Pausing… | `app.rs:639` |
+| 运行中 | Running | `app.rs:641` |
+| 暂停 | Pause | `app.rs:647` |
+| 预览完成 | Preview finished | `app.rs:655` |
+| 未改动任何文件；计划见运行日志 | nothing was changed; the plan is in the run log | `app.rs:656` |
+| 按此执行 | Run it for real | `app.rs:661` |
+| 完成 | Finished | `app.rs:665` |
+| 再次运行 | Run again | `app.rs:667` |
+| 需要选择 | Decision needed | `app.rs:680` |
+| 还没有写入任何文件 | nothing has been written yet | `app.rs:681` |
+| 失败 | Failed | `app.rs:686` |
+| 重新运行 | Run again | `app.rs:690` |
+| 已暂停 | Paused | `app.rs:694` |
+| 继续 | Continue | `app.rs:696` |
+| 取消 | Cancel | `app.rs:713` |
+| 正在查找 Serval… | Looking for Serval… | `app.rs:738` |
+| 版本过旧 | too old | `app.rs:745` |
+| 未找到 Serval | Serval not found | `app.rs:749` |
+| 用这张标签表继续： | Continue with this tags table: | `app.rs:983` |
+| 独立捕获 | Events | `app.rs:987` |
+| 媒体提取 | Copy media | `app.rs:993` |
+| 查看媒体 | View media | `app.rs:999` |
+| 帮助 | Help | `app.rs:1028` |
+| 打开标签表，按条件筛选后，在 Caracal 或本地文件管理器中查看媒体。 | Open a tags table, filter it, and view the media in Caracal or your file manager. | `app.rs:1043` |
+| 修改会立即生效并保存。 | Changes apply at once and are saved. | `app.rs:1055` |
+| 这个界面正在按新设计重建，暂时请在命令行使用。 | This screen is being rebuilt to the new design; use the command line for now. | `app.rs:1067` |
+| 完成，有 {warnings} 条警告 | (format!, written per language) | `app.rs:672` |
+| 正在启动… | Starting… | `run.rs:296` |
+| 剩余约 | about | `run.rs:319` |
+| Serval 意外退出 | Serval exited unexpectedly | `run.rs:394` |
+| 文件正被其他程序占用（例如在 Excel 中打开）。关闭后重新运行。 | A file is in use by another program (e.g. open in Excel). Close it and run again. | `run.rs:404` |
+| 磁盘空间不足。清理空间或更换输出位置后重新运行。 | The disk is full. Free some space or choose another output location, then run again. | `run.rs:414` |
+| 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:419` |
+| 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:429` |
+| 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:434` |
+| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:439` |
+| 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:445` |
+| 正在扫描 | Scanning | `run.rs:469` |
+| 正在读取 | Reading | `run.rs:470` |
+| 正在检查 | Checking | `run.rs:471` |
+| 正在复制 | Copying | `run.rs:472` |
+| 正在移动 | Moving | `run.rs:473` |
+| 正在写入 | Writing | `run.rs:474` |
+| 正在删除 | Removing | `run.rs:475` |
+| 正在分析 | Analysing | `run.rs:476` |
+| 运行中 | Running | `run.rs:477` |
+| 生成 {} 个结果 | (format!, written per language) | `run.rs:348` |
+| 用时 {} | (format!, written per language) | `run.rs:353` |
+| {seconds} 秒 | (format!, written per language) | `run.rs:492` |
+| 写入 | (fragment) | `run.rs:455` |
+| 更新 | (fragment) | `run.rs:456` |
+| 新建 | (fragment) | `run.rs:457` |
+| 修改 | (fragment) | `run.rs:458` |
+| 完成 | (fragment) | `run.rs:459` |
+| 替换 | (fragment) | `run.rs:460` |
+| 已是最新 | (fragment) | `run.rs:461` |
+| 已存在 | (fragment) | `run.rs:462` |
+| 跳过 | (fragment) | `run.rs:463` |
+| 失败 | (fragment) | `run.rs:464` |
 | 复制命令 | Copy command | `run_bar.rs:112` |
 | 预览完成 | Preview finished | `results.rs:21` |
 | 未改动任何文件。将要做的改动列在下方运行日志里；确认无误后按「按此执行」。 | Nothing was changed. The planned changes are listed in the run log below; when they look right, press Run it for real. | `results.rs:22` |
@@ -90,10 +85,10 @@ example data.
 | 已完成部分文件。继续会跳过该部分。 | Some files are done. Continue skips them. | `results.rs:60` |
 | 打开输出文件夹 | Open the output folder | `results.rs:157` |
 | 文件夹 | folder | `results.rs:180` |
-| 在 Caracal 中打开 | Open in Caracal | `results.rs:209` |
-| 打开 | Open | `results.rs:215` |
-| 运行日志 | Run log | `results.rs:241` |
-| 复制日志 | Copy log | `results.rs:248` |
+| 在 Caracal 中打开 | Open in Caracal | `results.rs:210` |
+| 打开 | Open | `results.rs:217` |
+| 运行日志 | Run log | `results.rs:243` |
+| 复制日志 | Copy log | `results.rs:250` |
 | 完成，有 {} 条警告 | (format!, written per language) | `results.rs:36` |
 | 另外 {} 条见运行日志 | (format!, written per language) | `results.rs:125` |
 | {} 行 | (format!, written per language) | `results.rs:177` |
@@ -216,35 +211,39 @@ example data.
 
 | 中文 | English | Where |
 | --- | --- | --- |
-| 选择或拖入 tags.csv | Choose or drop tags.csv | `browse/mod.rs:67` |
-| 全部 | All | `browse/mod.rs:269` |
-| 物种 | Species | `browse/mod.rs:290` |
-| 评分 | Rating | `browse/mod.rs:292` |
-| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:299` |
-| 找不到这个表格 | This table does not exist | `browse/mod.rs:367` |
-| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:372` |
-| 无法读取： | Cannot read: | `browse/mod.rs:380` |
-| 至 | to | `browse/mod.rs:412` |
-| 标签表 | Tags table | `browse/mod.rs:420` |
-| 选择… | Choose… | `browse/mod.rs:431` |
-| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:473` |
-| 在浏览器中打开整张表：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the whole table in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:474` |
-| 打开 Caracal | Open Caracal | `browse/mod.rs:480` |
-| 正在建立… | Making it… | `browse/mod.rs:490` |
-| 再次打开 | Open again | `browse/mod.rs:511` |
-| 生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。 | These are links to the original files: editing them here changes the originals; deleting removes only the link. | `browse/mod.rs:522` |
-| 链接异常，可使用 Caracal 或用媒体提取复制文件后查看。 | Links cannot be made here. View the files in Caracal, or copy them with Copy media. | `browse/mod.rs:533` |
-| 用媒体提取复制 | Copy them instead | `browse/mod.rs:542` |
-| 在资源管理器中查看所选 | Look at a choice in the file manager | `browse/mod.rs:558` |
-| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:560` |
-| 建立查看文件夹 | Make a review folder | `browse/mod.rs:573` |
-| 应用表格到文件 | Write the table into the files | `browse/mod.rs:582` |
-| 将整张标签表（例如从 Caracal 导出的）写回 XMP 文件。 | Writes the whole table (for example one exported from Caracal) back into the XMP files. | `browse/mod.rs:583` |
-| 检查并写入… | Check and write… | `browse/mod.rs:589` |
-| … 另外 {hidden} 个 | (format!, written per language) | `browse/mod.rs:257` |
-| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:302` |
-| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:395` |
-| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:499` |
+| 选择或拖入 tags.csv | Choose or drop tags.csv | `browse/mod.rs:72` |
+| 全部 | All | `browse/mod.rs:334` |
+| 物种 | Species | `browse/mod.rs:356` |
+| 评分 | Rating | `browse/mod.rs:358` |
+| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:365` |
+| 找不到这个表格 | This table does not exist | `browse/mod.rs:433` |
+| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:438` |
+| 无法读取： | Cannot read: | `browse/mod.rs:446` |
+| 至 | to | `browse/mod.rs:478` |
+| 标签表 | Tags table | `browse/mod.rs:486` |
+| 选择… | Choose… | `browse/mod.rs:497` |
+| 正在建立… | Making it… | `browse/mod.rs:538` |
+| 再次打开 | Open again | `browse/mod.rs:569` |
+| 生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。 | These are links to the original files: editing them here changes the originals; deleting removes only the link. | `browse/mod.rs:580` |
+| 用媒体提取复制 | Copy them instead | `browse/mod.rs:616` |
+| 挑选 | Choose | `browse/mod.rs:645` |
+| 按物种和评分挑选，在资源管理器或 Caracal 中查看。不挑选时，Caracal 打开整张表。 | Choose by species and rating, then look in the file manager or Caracal. With nothing chosen, Caracal opens the whole table. | `browse/mod.rs:647` |
+| 在资源管理器中查看所选 | Look at the choice in the file manager | `browse/mod.rs:657` |
+| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:658` |
+| 建立查看文件夹 | Make a review folder | `browse/mod.rs:664` |
+| 无法保存所选： | Cannot save the choice: | `browse/mod.rs:689` |
+| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:697` |
+| 在浏览器中打开所选：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the choice in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:698` |
+| 打开 Caracal | Open Caracal | `browse/mod.rs:704` |
+| 应用表格到文件 | Write the table into the files | `browse/mod.rs:714` |
+| 将整张标签表（例如从 Caracal 导出的）写回 XMP 文件。 | Writes the whole table (for example one exported from Caracal) back into the XMP files. | `browse/mod.rs:715` |
+| 检查并写入… | Check and write… | `browse/mod.rs:721` |
+| … 另外 {hidden} 个 | (format!, written per language) | `browse/mod.rs:322` |
+| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:368` |
+| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:461` |
+| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:552` |
+| 找不到表中的媒体文件，例如 {}。表格是否来自另一台电脑，或移动硬盘的盘符变了？ | (format!, written per language) | `browse/mod.rs:625` |
+| 已将所选 {} 个文件的行另存为 {}，并在 Caracal 中打开。 | (format!, written per language) | `browse/mod.rs:674` |
 
 ## XMP 更新 update
 
@@ -511,7 +510,8 @@ example data.
 | 关于 | About | `settings_screen.rs:251` |
 | Apache-2.0 许可 · | Licensed under Apache-2.0 · | `settings_screen.rs:258` |
 | 源代码 | Source code | `settings_screen.rs:264` |
-| 图标设计 @timber3 · © 2026 山水自然保护中心 | Icon by @timber3 · © 2026 Shan Shui Conservation Center | `settings_screen.rs:269` |
+| 打开日志文件夹 | Open the log folder | `settings_screen.rs:274` |
+| 图标设计 @timber3 · © 2026 山水自然保护中心 | Icon by @timber3 · © 2026 Shan Shui Conservation Center | `settings_screen.rs:287` |
 | 这个 Serval 版本太旧（{version}） | (format!, written per language) | `settings_screen.rs:69` |
 | Waxbill 需要 Serval {} 或以上，请向项目组获取新版本。 | (format!, written per language) | `settings_screen.rs:74` |
 | 需要 Serval {} 或以上。 | (format!, written per language) | `settings_screen.rs:123` |

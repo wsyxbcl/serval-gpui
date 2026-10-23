@@ -47,7 +47,7 @@ enum Review {
     Made(PathBuf, usize, usize),
     /// None of the chosen media exist; the first one.
     NotFound(PathBuf),
-    CannotLink,
+    CannotLink(review::NoLinks),
     Failed(String),
 }
 
@@ -60,6 +60,8 @@ pub struct Browse {
     rating: usize,
     show_all: bool,
     review: Review,
+    /// The chosen rows saved for Caracal, and how many files they are; or why they could not be saved.
+    caracal: Option<Result<(PathBuf, usize), String>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -83,6 +85,7 @@ impl Browse {
             rating: 0,
             show_all: false,
             review: Review::None,
+            caracal: None,
             _subscriptions: vec![subscription],
         }
     }
@@ -115,6 +118,7 @@ impl Browse {
         self.species
             .retain(|s| records.all.iter().any(|r| r.species.contains(s)));
         self.review = Review::None;
+        self.caracal = None;
         cx.notify();
     }
 
@@ -133,12 +137,10 @@ impl Browse {
         self.records.filter(&self.filters())
     }
 
-    /// Build the review folder next to the data and open it in the file manager.
-    fn make_review(&mut self, cx: &mut Context<Self>) {
-        let chosen = self.chosen();
-        let Some(first) = chosen.first().map(|&i| &self.records.all[i]) else {
-            return;
-        };
+    /// Where the choice goes (a review folder, or a table for Caracal), without an extension: `<date>_<species>` in
+    /// `serval_review` next to the data.
+    fn choice_target(&self, chosen: &[usize]) -> Option<PathBuf> {
+        let first = &self.records.all[*chosen.first()?];
         let data = first
             .media
             .parent()
@@ -165,7 +167,15 @@ impl Browse {
                 safe(&label)
             }
         );
-        let folder = output::command_dir(&output::default_root(&data), "review").join(folder_name);
+        Some(output::command_dir(&output::default_root(&data), "review").join(folder_name))
+    }
+
+    /// Build the review folder next to the data and open it in the file manager.
+    fn make_review(&mut self, cx: &mut Context<Self>) {
+        let chosen = self.chosen();
+        let Some(folder) = self.choice_target(&chosen) else {
+            return;
+        };
         let files: Vec<(PathBuf, PathBuf, String)> = chosen
             .iter()
             .map(|&i| {
@@ -194,8 +204,8 @@ impl Browse {
                     review::Outcome::NotFound(first) => {
                         format!("Review folder: no media found, e.g. {}", first.display())
                     }
-                    review::Outcome::CannotLink(err) => {
-                        format!("Review folder: cannot link: {err}")
+                    review::Outcome::CannotLink(why, err) => {
+                        format!("Review folder: cannot link ({why:?}): {err}")
                     }
                     review::Outcome::Failed(err) => format!("Review folder failed: {err}"),
                 });
@@ -209,13 +219,45 @@ impl Browse {
                         Review::Made(folder, files, missing)
                     }
                     review::Outcome::NotFound(first) => Review::NotFound(first),
-                    review::Outcome::CannotLink(_) => Review::CannotLink,
+                    review::Outcome::CannotLink(why, _) => Review::CannotLink(why),
                     review::Outcome::Failed(err) => Review::Failed(err),
                 };
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    /// Open Caracal on the choice (its rows saved as a table next to the review folders), or on the whole table when
+    /// nothing is chosen.
+    fn open_caracal(&mut self, table: &Path, cx: &mut Context<Self>) {
+        use crate::caracal::{Mode, open};
+        let chosen = self.chosen();
+        let (Some(stem), Some(Ok(csv))) = (self.choice_target(&chosen), &self.table) else {
+            self.caracal = None;
+            open(Mode::Review, table, cx);
+            return;
+        };
+        let mut rows: Vec<usize> = chosen
+            .iter()
+            .flat_map(|&i| self.records.all[i].rows.iter().copied())
+            .collect();
+        rows.sort_unstable();
+        let saved = review::subset(csv, &rows, &stem);
+        crate::log::line(match &saved {
+            Ok(subset) => format!(
+                "Caracal: {} rows of {} saved as {}",
+                rows.len(),
+                table.display(),
+                subset.display()
+            ),
+            Err(err) => format!("Caracal: cannot save the chosen rows: {err}"),
+        });
+        if let Ok(subset) = &saved {
+            open(Mode::Review, subset, cx);
+        }
+        self.caracal = Some(saved.map(|subset| (subset, chosen.len())));
+        cx.notify();
     }
 
     fn render_choice(&self, cx: &mut Context<Self>) -> Div {
@@ -255,6 +297,7 @@ impl Browse {
                                         this.species.remove(&value);
                                     }
                                     this.review = Review::None;
+                                    this.caracal = None;
                                     cx.notify();
                                 })),
                         ),
@@ -294,6 +337,7 @@ impl Browse {
                 let _ = this.update(cx, |this, cx| {
                     this.rating = index;
                     this.review = Review::None;
+                    this.caracal = None;
                     cx.notify();
                 });
             },
@@ -489,24 +533,6 @@ impl Render for Browse {
         };
         let chosen = self.chosen().len();
 
-        let caracal = {
-            let path = path.clone();
-            self.action(
-                t("在 Caracal 中查看和编辑", "View and edit in Caracal"),
-                t(
-                    "在浏览器中打开整张表：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
-                    "Opens the whole table in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files.",
-                ),
-                Button::new("open-caracal")
-                    .outline()
-                    .label(t("打开 Caracal", "Open Caracal"))
-                    .on_click(move |_, _, cx| crate::caracal::open(crate::caracal::Mode::Review, &path, cx))
-                    .into_any_element(),
-                None,
-                cx,
-            )
-        };
-
         let review_status: Option<Div> = match &self.review {
             Review::None => None,
             Review::Making => Some(help_line(t("正在建立…", "Making it…"), Tone::Quiet, cx)),
@@ -558,17 +584,33 @@ impl Render for Browse {
                     ),
                 )
             }
-            Review::CannotLink => Some(
+            Review::CannotLink(why) => Some(
                 h_flex()
                     .gap(tokens.px("space-2"))
-                    .child(help_line(
-                        t(
-                            "链接异常，可使用 Caracal 或用媒体提取复制文件后查看。",
-                            "Links cannot be made here. View the files in Caracal, or copy them with Copy media.",
-                        ),
+                    .child(div().flex_1().min_w_0().child(help_line(
+                        match (language(), why) {
+                            (Language::Chinese, review::NoLinks::FileSystem(fs)) => format!(
+                                "这块磁盘是 {fs} 格式，不支持硬链接（NTFS 磁盘才可以）。可以在 Caracal 中查看所选，或用媒体提取复制出来。"
+                            ),
+                            (Language::Chinese, review::NoLinks::Network) => {
+                                "网络位置不支持硬链接。可以在 Caracal 中查看所选，或用媒体提取复制出来。".to_string()
+                            }
+                            (Language::Chinese, review::NoLinks::Other(err)) => {
+                                format!("无法建立链接（{err}）。可以在 Caracal 中查看所选，或用媒体提取复制出来。")
+                            }
+                            (Language::English, review::NoLinks::FileSystem(fs)) => format!(
+                                "This disk is {fs}, which has no hard links (NTFS disks do). View the choice in Caracal, or copy it with Copy media."
+                            ),
+                            (Language::English, review::NoLinks::Network) => {
+                                "Network locations have no hard links. View the choice in Caracal, or copy it with Copy media.".to_string()
+                            }
+                            (Language::English, review::NoLinks::Other(err)) => format!(
+                                "Links cannot be made ({err}). View the choice in Caracal, or copy it with Copy media."
+                            ),
+                        },
                         Tone::Danger,
                         cx,
-                    ))
+                    )))
                     .child({
                         let (csv, species, rating) = (path.clone(), self.species.clone(), self.rating);
                         Button::new("to-extract").outline().compact().label(t("用媒体提取复制", "Copy them instead")).on_click(
@@ -594,34 +636,78 @@ impl Render for Browse {
             )),
             Review::Failed(err) => Some(help_line(err.clone(), Tone::Danger, cx)),
         };
-        // The choice feeds only the review folder, so it lives in that card; Caracal and 应用表格到文件 take the
-        // whole table.
-        let explorer = card(cx)
+        // The choice feeds both ways of looking; 应用表格到文件 takes the whole table.
+        let choice = card(cx)
             .gap(tokens.px("space-3"))
             .child(
                 v_flex()
                     .gap(tokens.px("space-1"))
-                    .child(div().font_semibold().child(t("在资源管理器中查看所选", "Look at a choice in the file manager")))
+                    .child(div().font_semibold().child(t("挑选", "Choose")))
                     .child(help_line(
                         t(
-                            "生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。",
-                            "Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage.",
+                            "按物种和评分挑选，在资源管理器或 Caracal 中查看。不挑选时，Caracal 打开整张表。",
+                            "Choose by species and rating, then look in the file manager or Caracal. With nothing chosen, Caracal opens the whole table.",
                         ),
                         Tone::Quiet,
                         cx,
                     )),
             )
-            .child(self.render_choice(cx))
-            .child(
-                h_flex().child(
-                    Button::new("make-review")
-                        .outline()
-                        .label(t("建立查看文件夹", "Make a review folder"))
-                        .disabled(chosen == 0 || matches!(self.review, Review::Making))
-                        .on_click(cx.listener(|this, _, _, cx| this.make_review(cx))),
+            .child(self.render_choice(cx));
+        let explorer = self.action(
+            t("在资源管理器中查看所选", "Look at the choice in the file manager"),
+            t(
+                "生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。",
+                "Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage.",
+            ),
+            Button::new("make-review")
+                .outline()
+                .label(t("建立查看文件夹", "Make a review folder"))
+                .disabled(chosen == 0 || matches!(self.review, Review::Making))
+                .on_click(cx.listener(|this, _, _, cx| this.make_review(cx)))
+                .into_any_element(),
+            review_status,
+            cx,
+        );
+        let caracal_status = self.caracal.as_ref().map(|saved| match saved {
+            Ok((subset, n)) => help_line(
+                match language() {
+                    Language::Chinese => format!(
+                        "已将所选 {} 个文件的行另存为 {}，并在 Caracal 中打开。",
+                        count(*n),
+                        subset.display()
+                    ),
+                    Language::English => format!(
+                        "Saved the rows of the {} chosen files as {} and opened it in Caracal.",
+                        count(*n),
+                        subset.display()
+                    ),
+                },
+                Tone::Quiet,
+                cx,
+            ),
+            Err(err) => help_line(
+                format!("{} {err}", t("无法保存所选：", "Cannot save the choice:")),
+                Tone::Danger,
+                cx,
+            ),
+        });
+        let caracal = {
+            let path = path.clone();
+            self.action(
+                t("在 Caracal 中查看和编辑", "View and edit in Caracal"),
+                t(
+                    "在浏览器中打开所选：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。",
+                    "Opens the choice in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files.",
                 ),
+                Button::new("open-caracal")
+                    .outline()
+                    .label(t("打开 Caracal", "Open Caracal"))
+                    .on_click(cx.listener(move |this, _, _, cx| this.open_caracal(&path, cx)))
+                    .into_any_element(),
+                caracal_status,
+                cx,
             )
-            .children(review_status);
+        };
         let apply = {
             let path = path.clone();
             self.action(
@@ -642,6 +728,7 @@ impl Render for Browse {
         v_flex()
             .gap(tokens.px("space-4"))
             .child(table_card)
+            .child(choice)
             .child(explorer)
             .child(caracal)
             .child(apply)

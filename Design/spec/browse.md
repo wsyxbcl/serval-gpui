@@ -25,11 +25,15 @@ The table is the working document; the XMP files are updated deliberately, with 
 
 - **Table**: a tags.csv from 标签获取, a labellers' table, or one exported from Caracal. One quiet line: rows,
   files, species, date range. The table is remembered.
-- **Choice**: species as checkboxes with counts (faceted under the rating), rating as a segmented control (全部 /
-  ≥ 3 / ≥ 4 / 5, as in 媒体提取). The line below says how many files (and videos) are chosen.
+- **Choice** (挑选, its own card): species as checkboxes with counts (faceted under the rating), rating as a
+  segmented control (全部 / ≥ 3 / ≥ 4 / 5, as in 媒体提取). The line below says how many files (and videos) are
+  chosen. It feeds both the review folder and Caracal; 应用表格到文件 takes the whole table.
 - **Three ways out**, one card each, no run bar:
   1. **在资源管理器中查看所选** — §3.
-  2. **在 Caracal 中查看和编辑** — opens Caracal at `#review&table=<the table's full path>`. A page cannot open
+  2. **在 Caracal 中查看和编辑** — opens Caracal at `#review&table=<the table's full path>`, on the choice: its
+     rows (every row of each chosen file, in table order, the header as read, UTF-8 with a BOM) are saved as
+     `serval_review/<date>_<species>.csv` (`_2`, … rather than overwrite) and that table is opened, so a large
+     table loads only what the user wants to look at. With nothing chosen, the whole table. A page cannot open
      a file from its path; the path is a hint: Caracal finds the table inside a folder the user granted before,
      or names the file to pick. The fragment never leaves the browser; nothing is copied to the clipboard, and
      Caracal is not bundled. The user reviews, edits and exports tags.csv. (W19 would load both without
@@ -49,8 +53,11 @@ The table is the working document; the XMP files are updated deliberately, with 
   deleting removes only the link. (Wording to be refined before release.)
 - Hard links need the same drive. Over SMB it depends on the server: a Synology share worked in the 2026-10-12
   test; many other network shares do not allow them (symbolic links need admin rights
-  on Windows; Photos does not step through `.lnk` shortcuts). Then nothing is made, and "用媒体提取复制" opens
-  媒体提取 with the same species and rating, which copies.
+  on Windows; Photos does not step through `.lnk` shortcuts). exFAT and FAT32 (most external disks and cards) have
+  no hard links at all. Then nothing is made; the message says why — the disk's file system (Windows:
+  `GetVolumeInformationW`; Linux: the mount table), or a network location (`GetDriveTypeW`, a `\\server` path),
+  or else the system's error — and offers Caracal or "用媒体提取复制", which opens 媒体提取 with the same species
+  and rating, which copies.
 
 ## 4. Writing a table back (元数据更新 · 整表写入)
 

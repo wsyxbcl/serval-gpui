@@ -18,6 +18,8 @@ pub struct Record {
     /// The folder below what every path shares ("DQ01/100MEDIA").
     pub folder: String,
     pub video: bool,
+    /// The table rows of this file (a file with two species has two), for writing a chosen subset.
+    pub rows: Vec<usize>,
 }
 
 pub struct Records {
@@ -64,7 +66,7 @@ impl Records {
         );
         let mut by_path: BTreeMap<&str, usize> = BTreeMap::new();
         let mut all: Vec<Record> = Vec::new();
-        for row in &csv.rows {
+        for (row_index, row) in csv.rows.iter().enumerate() {
             let file = csv.cell(row, path);
             if file.is_empty() {
                 continue;
@@ -101,10 +103,12 @@ impl Records {
                     deployment,
                     folder: String::new(),
                     video,
+                    rows: Vec::new(),
                 });
                 all.len() - 1
             });
             let record = &mut all[i];
+            record.rows.push(row_index);
             let add = |list: &mut Vec<String>, value: &str| {
                 if !value.is_empty() && !list.iter().any(|v| v == value) {
                     list.push(value.to_string());
