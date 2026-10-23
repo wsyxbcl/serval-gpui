@@ -333,10 +333,9 @@ impl TranslateForm {
         if coverage.ok() {
             return Some(help_line(
                 match language() {
-                    Language::Chinese => format!(
-                        "表中 {} 个物种都在物种名录。",
-                        count(coverage.species)
-                    ),
+                    Language::Chinese => {
+                        format!("表中 {} 个物种都在物种名录。", count(coverage.species))
+                    }
                     Language::English => format!(
                         "All {} species in the table are in the species list.",
                         count(coverage.species)
@@ -390,10 +389,9 @@ impl TranslateForm {
         }
         if !coverage.repeated.is_empty() {
             lines.push(match language() {
-                Language::Chinese => format!(
-                    "物种名录里重复出现：{}",
-                    coverage.repeated.join("、")
-                ),
+                Language::Chinese => {
+                    format!("物种名录里重复出现：{}", coverage.repeated.join("、"))
+                }
                 Language::English => format!(
                     "Listed more than once in the species list: {}",
                     coverage.repeated.join(", ")

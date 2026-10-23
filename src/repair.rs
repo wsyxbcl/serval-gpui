@@ -403,11 +403,11 @@ impl TableCheck {
         if check.missing_seconds > 0 {
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "{} 个时间缺少秒数，可能是 Excel/WPS 保存时丢失的。建议在原表中把时间列的格式设为 yyyy-mm-dd hh:mm:ss 后重新保存；Waxbill 不会自动补 00。",
+                    "{} 个时间缺少秒数（Excel/WPS 保存时常丢失）。请在原表中把时间列格式设为 yyyy-mm-dd hh:mm:ss 后重新保存。",
                     count(check.missing_seconds)
                 ),
                 Language::English => format!(
-                    "{} times have no seconds, probably lost when Excel/WPS saved the table. Set the time column's format to yyyy-mm-dd hh:mm:ss in the original table and save again; Waxbill does not fill in 00.",
+                    "{} times have no seconds (Excel/WPS often drops them when saving). Set the time column's format to yyyy-mm-dd hh:mm:ss in the original table and save again.",
                     count(check.missing_seconds)
                 ),
             });

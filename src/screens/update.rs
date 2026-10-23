@@ -571,7 +571,7 @@ impl UpdateForm {
         if !preview.media_rows.is_empty() {
             summary.push_str(&match language() {
                 Language::Chinese => format!(
-                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签读取中选择「XMP sidecar」生成表格",
+                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在「标签读取」中选择「XMP sidecar」生成表格",
                     count(preview.media_rows.len())
                 ),
                 Language::English => format!(

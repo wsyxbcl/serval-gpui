@@ -341,7 +341,7 @@ impl CaptureForm {
                 ),
                 _ => help_line(
                     t(
-                        "也可以选择 Camtrap DP 的 observations.csv",
+                        "也可选择 Camtrap DP 的 observations.csv",
                         "A Camtrap DP observations.csv works too",
                     ),
                     Tone::Quiet,
@@ -358,7 +358,7 @@ impl CaptureForm {
                 let rows = count(table.records.len());
                 let text = match (language(), table.camtrap_dp) {
                     (Language::Chinese, false) => {
-                        format!("{rows} 行 · 也可以选择 Camtrap DP 的 observations.csv")
+                        format!("{rows} 行 · 也可选择 Camtrap DP 的 observations.csv")
                     }
                     (Language::Chinese, true) => {
                         format!("{rows} 行 · Camtrap DP 观测表，位点来自 deploymentID")

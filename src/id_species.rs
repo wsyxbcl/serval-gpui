@@ -180,7 +180,7 @@ impl Waxbill {
                 div()
                     .text_size(tokens.px("text-sm"))
                     .text_color(cx.theme().muted_foreground)
-                    .child(t("选择会被记忆，下次处理这个文件夹时直接使用。", "The choice is remembered for this folder.")),
+                    .child(t("选择会按文件夹记住。", "The choice is remembered for this folder.")),
             )
             .child(
                 h_flex()

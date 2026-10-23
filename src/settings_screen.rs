@@ -240,7 +240,7 @@ impl Waxbill {
             )
             .child(help_line(
                 t(
-                    "在 Caracal 中打开时，表格和对应的媒体直接从本机读取，纯离线。浏览器首次会询问是否允许访问本地网络。",
+                    "在 Caracal 中打开时，表格和对应的媒体直接从本机读取，数据不离开本机。浏览器首次会询问是否允许访问本地网络。",
                     "When opening in Caracal, the table and its media are read straight from this computer and never leave it. The browser asks once to allow local network access.",
                 ),
                 Tone::Quiet,

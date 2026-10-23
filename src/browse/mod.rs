@@ -511,10 +511,7 @@ impl Render for Browse {
                 cx,
             ),
             None => help_line(
-                t(
-                    "标签读取生成的 tags.csv",
-                    "A tags.csv from Read tags",
-                ),
+                t("标签读取生成的 tags.csv", "A tags.csv from Read tags"),
                 Tone::Quiet,
                 cx,
             ),

@@ -74,7 +74,7 @@ impl Waxbill {
         if needs.ready > 0 {
             body.push_str(&match language() {
                 Language::Chinese => {
-                    format!("其余 {} 个可以直接复制。", count(needs.ready as usize))
+                    format!("其余 {} 个可直接复制。", count(needs.ready as usize))
                 }
                 Language::English => format!(
                     "The other {} can be copied directly. ",

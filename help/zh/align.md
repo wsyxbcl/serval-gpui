@@ -8,7 +8,7 @@
 ## 输入
 
 - **项目或文件夹**：要整理的项目文件夹（按位点对齐）或任意文件夹（摊平）。
-- **位点表**（可选）：deployments.csv，其中的 deploymentID 形如 `<deploymentName>_<collection>`（可先用重命名统一文件夹名）。
+- **位点表**（可选）：deployments.csv，其中的 deploymentID 形如 `<deploymentName>_<collection>`（可先用「重命名」统一文件夹名）。
 - **文件类型**：媒体、图片、视频或 XMP。
 - **移动而不是复制**、**保留第一层子文件夹（摊平时）**、**先预览，不复制**（默认开启）。
 

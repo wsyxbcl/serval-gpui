@@ -503,10 +503,7 @@ impl ExtractForm {
                     cx,
                 ),
                 _ => help_line(
-                    t(
-                        "标签读取生成的 tags.csv",
-                        "The tags.csv from Read tags",
-                    ),
+                    t("标签读取生成的 tags.csv", "The tags.csv from Read tags"),
                     Tone::Quiet,
                     cx,
                 ),

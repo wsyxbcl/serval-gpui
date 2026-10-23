@@ -754,8 +754,8 @@ pub static XMP_REMOVE: Spec = Spec {
         key: "confirm",
         label: ("确认删除这些 XMP 文件", "Delete these XMP files"),
         help: Some((
-            "标签和评分保存在 XMP 里，删除后无法恢复；可以先用 XMP 导出备份。",
-            "Tags and ratings live in the XMP files and cannot be recovered; back them up with Export XMP first.",
+            "元数据保存在 XMP 里，删除后无法恢复；可先用「XMP 导出」备份。",
+            "The metadata lives in the XMP files and cannot be recovered; back it up with Export XMP first.",
         )),
         default: false,
     }],
@@ -786,8 +786,8 @@ pub static XMP_REMOVE: Spec = Spec {
 pub static XMP_SYNC: Spec = Spec {
     key: "xmp_sync",
     summary: (
-        "把 XMP sidecar 中的标签写入媒体文件，让不读取 XMP 的软件也能看到。",
-        "Writes the tags in the XMP sidecars into the media files, so software that ignores XMP sees them too.",
+        "把 XMP sidecar 中的标签写入媒体文件，让不读取 XMP 的软件也能看到元数据。",
+        "Writes the tags in the XMP sidecars into the media files, so software that ignores XMP sees the metadata too.",
     ),
     paths: &[
         PathSpec {
