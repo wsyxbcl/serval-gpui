@@ -122,7 +122,7 @@ Rules:
 - [x] Browse and pick (W16, revised): a native grid, thumbnails and viewer were built and removed (no video in GPUI; Waxbill stays small). The screen now chooses by species and rating and hands off: a hard-linked review folder for Explorer (falling back to 媒体提取 when links cannot be made), Caracal in the browser (path copied), and 应用表格到文件.
 - [x] 元数据更新 · 整表写入: `xmp write` with a background `--dry-run` preview (per field, lost values, created sidecars, problem files block Run).
 - [x] W19 bridge for the hosted Caracal, v1 read-only (branch `w19-bridge`, `Design/spec/caracal-bridge.md`): a loopback server (token, Caracal origin only, files listed in the table only, Range for video), `source=` in the link, a switch in Settings. Edge shows the local-network prompt and then allows the request (tested 2026-10-13).
-- [ ] W19 end to end with Caracal on Windows, once Caracal reads `source=` and is deployed to caracal.hinature.cn (served from 127.0.0.1 it never shows the prompt): Edge's prompt on the first `info`, then whether thumbnails fetched by background workers are allowed too, the NAS share, a video seek, the "N of M found" count from `missing`.
+- [ ] (Users test it on 2.0.0.) W19 end to end with Caracal on Windows, once Caracal reads `source=` and is deployed to caracal.hinature.cn (served from 127.0.0.1 it never shows the prompt): Edge's prompt on the first `info`, then whether thumbnails fetched by background workers are allowed too, the NAS share, a video seek, the "N of M found" count from `missing`.
 - [x] W20 Explorer search over embedded labels (experiment): works on Windows after 元数据同步 (`标记:`, `分级:` find the photos). Opt-in only, since it changes the original files.
 - [x] Windows test 2026-10-12, fixes: paths can be dropped onto every path field; observe counts images, videos and XMP; the log scrolls; durations under a minute in seconds; no growing estimate after Stop; the run bar returns to Ready once the form changes; 整表写入 leaves time off by default; the capture timeline is removed.
 - [x] Table check and repair (data.md §2): GBK, UTF-16 and tab-separated tables and times rewritten by Excel/WPS are found under every table field; "生成修复后的副本" writes `<name>.utf8.csv` and switches the field to it.
@@ -132,31 +132,31 @@ Rules:
 - [x] While a command runs: a spinner on its sidebar entry, its form read-only, and a question when the window is closed (停止并退出 / 继续运行).
 - [x] Serval ends with Waxbill, also when Waxbill is killed or crashes: a Job Object on Windows (to be tested there), the parent-death signal on Linux (tested); macOS keeps finishing the run.
 - [x] Ship Serval with Waxbill (W08 revised): `serval.exe` next to `waxbill.exe` in the archive is found without setup; a chosen program still wins while it works.
-- [ ] Release builds for Windows, Linux and macOS (Waxbill and Serval as separate downloads; no full zip in CI, decided 2026-10-19); hosted where users can reach them.
+- [x] Release builds for Windows, Linux and macOS (Waxbill and Serval as separate downloads; no full zip in CI, decided 2026-10-19), as GitHub Releases.
 - [ ] Update check and download from the project's own server (manifest, checksums, signature); Waxbill itself notify-only at first. Later.
-- [x] 2026-10-14 review: the run log scrolls (the page takes the wheel only at the log's ends; a rendering test); Chinese in one font on Linux; sidebar in five groups (查看媒体, XMP 更新 renamed); a larger logo and the logo in 关于; paths not remembered across launches; capture event IDs on; rename/align start as a preview with 按此执行; next steps from 标签获取's tags table (独立捕获, 媒体提取, 查看媒体).
+- [x] 2026-10-14 review: the run log scrolls (the page takes the wheel only at the log's ends; a rendering test); Chinese in one font on Linux; sidebar in five groups (查看媒体, XMP 更新 renamed); a larger logo and the logo in 关于; paths not remembered across launches; capture event IDs on; rename/align start as a preview with 按此执行; next steps from 标签读取's tags table (独立捕获, 媒体提取, 查看媒体).
 - [x] Help (帮助, F1): a panel per screen with the written texts (help/zh, drafts for review) and Serval's `--help` on request. English texts to follow.
 - [x] 在 Caracal 中打开 for 独立捕获's `events_…` (by species, Serval 0.8.2+): `#species`, shown only when the table has `path`, `datetime` and `species`; per-individual and Camtrap DP results follow when Caracal supports them. Review-folder names aligned with Caracal (`<species>__<individuals>__<deployment>__<file>`, `_1`, `_2`). (2026-10-23)
 - [x] Layout at 1366×768 (also with help open): fits, with the sidebar and page scrolling. Plain-language messages for the commonest Serval errors (missing file or folder, permission, file in use, disk full, missing column, bad times, bad deploymentID), Serval's own words beside them. (Copy diagnostics: not needed, 2026-10-16.)
 - [x] Serval 0.8.1 (2026-10-19): transfer and sidecar fixes, and `observe` on a missing folder is an error. Binaries: run Serval's "Build Release Binaries" with v0.8.1.
 - [ ] Draw the board for the hand-off screen.
-- [ ] One `release` workflow builds Windows, Linux (Ubuntu 22.04) and both macOS targets on a v* tag or by hand, and drafts a GitHub Release on a tag; it replaces windows-release and macos-build. Not run yet: the Linux packages and the first macOS build are confirmed only by a real run.
+- [x] One `release` workflow builds Windows, Linux (Ubuntu 22.04) and both macOS targets on a v* tag or by hand, and drafts a GitHub Release on a tag; it replaces windows-release and macos-build. First run: v2.0.0-beta.1, all four targets.
+- [x] 2026-10-23: 查看媒体's choice (挑选, with 反选 and 清空) feeds both the review folder and Caracal (the chosen rows saved next to the table); why links cannot be made (exFAT/FAT32, network); 应用表格到文件 asks for its table; `waxbill.log`. Code review (Serval S01–S02, Waxbill G01–G11) fixed; wording passes 3 and 4 (标签读取, `<collection>`, 替换).
 
 ---
 
 ## User Work
 
-- Release 2.0.0 (2026-10): code review, manual test on Windows (title bar, drag and drop, killing Waxbill mid-run
-  ends Serval, the Caracal end-to-end list in the shared spec §9), wording review (`Design/copy/ui-strings.md`,
-  `help/zh/`); then merge `redesign` into `master`, tag `v2.0.0` (the release workflow drafts the GitHub Release),
-  and build Serval 0.8.2 (Serval's "Build Release Binaries").
+- Release 2.0.0 (2026-10-23): code review and wording review done; merged into `master`, tagged `v2.0.0` (check and
+  publish the drafted GitHub Release); Serval 0.8.2 built with "Build Release Binaries". Users test on 2.0.0
+  (title bar, drag and drop, killing Waxbill mid-run ends Serval, the Caracal end-to-end list in the shared spec §9).
 - Decide which subcommands beyond the initial set deserve first-class GUI forms.
 
 ---
 
 ## Future Work
 
-- After 2.0.0: gpui-kit 0.8 (Waxbill pins 0.7.1; a breaking upgrade of the toolkit), Polars 0.55 in Serval, and the
+- After 2.0.0: English help texts; 媒体提取 by deployment and date; gpui-kit 0.8 (Waxbill pins 0.7.1; a breaking upgrade of the toolkit), Polars 0.55 in Serval, and the
   routine lock-file updates in both, each with a full test pass.
 - English help texts (help/en), once the Chinese ones are final.
 
