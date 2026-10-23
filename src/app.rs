@@ -390,6 +390,10 @@ impl Waxbill {
 
     /// Show a screen; it is also where the next launch opens.
     fn go(&mut self, screen: ScreenId, cx: &mut Context<Self>) {
+        // Each screen opens at its top (its results, if any), not where the last screen was scrolled to.
+        if self.screen != screen {
+            self.page_scroll.set_offset(point(px(0.), px(0.)));
+        }
         self.screen = screen;
         Settings::update(cx, |settings| {
             settings.set_value("screen", format!("{screen:?}"))
@@ -528,6 +532,10 @@ impl Waxbill {
                         }
                         if !running && let Some(form) = this.form_of(screen) {
                             form.set_locked(false, cx);
+                        }
+                        // The results are above the form: show them, rather than leave the page where Run was.
+                        if !running && this.screen == screen {
+                            this.page_scroll.set_offset(point(px(0.), px(0.)));
                         }
                         cx.notify();
                         running
