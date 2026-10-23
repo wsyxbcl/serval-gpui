@@ -9,6 +9,7 @@ mod conflicts;
 mod help;
 mod i18n;
 mod id_species;
+mod log;
 mod output;
 mod repair;
 mod results;

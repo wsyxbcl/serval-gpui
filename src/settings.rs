@@ -149,6 +149,11 @@ impl Settings {
 }
 
 fn config_file() -> Option<PathBuf> {
+    Some(config_dir()?.join(CONFIG_FILE_NAME))
+}
+
+/// Waxbill's own folder for its settings and log.
+pub fn config_dir() -> Option<PathBuf> {
     let base = if cfg!(target_os = "windows") {
         PathBuf::from(std::env::var_os("APPDATA")?)
     } else if cfg!(target_os = "macos") {
@@ -158,7 +163,7 @@ fn config_file() -> Option<PathBuf> {
     } else {
         PathBuf::from(std::env::var_os("HOME")?).join(".config")
     };
-    Some(base.join(CONFIG_DIR_NAME).join(CONFIG_FILE_NAME))
+    Some(base.join(CONFIG_DIR_NAME))
 }
 
 #[cfg(test)]

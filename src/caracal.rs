@@ -85,7 +85,7 @@ pub fn open(mode: Mode, table: &Path, cx: &mut App) {
             if !cx.has_global::<Bridge>() {
                 match Bridge::start() {
                     Ok(bridge) => cx.set_global(bridge),
-                    Err(err) => eprintln!("Caracal bridge: {err}"),
+                    Err(err) => crate::log::line(format!("Caracal bridge did not start: {err}")),
                 }
             }
             cx.try_global::<Bridge>().map(|bridge| bridge.share(table))

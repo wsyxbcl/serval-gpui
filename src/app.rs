@@ -111,6 +111,12 @@ impl Waxbill {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        crate::log::line(format!(
+            "Waxbill {} started ({} {})",
+            env!("CARGO_PKG_VERSION"),
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ));
         let observe = cx.new(|cx| ObserveForm::new(window, cx));
         let capture = cx.new(|cx| CaptureForm::new(window, cx));
         let extract = cx.new(|cx| ExtractForm::new(window, cx));
@@ -316,6 +322,7 @@ impl Waxbill {
                 cx.set_global(crate::serval::ServalProgram(
                     status.program().map(Into::into),
                 ));
+                crate::log::line(format!("Serval: {status:?}"));
                 this.serval = status;
                 // The write preview needs Serval.
                 this.update.update(cx, |form, cx| form.recheck(cx));
@@ -506,6 +513,7 @@ impl Waxbill {
         self.next_run_id += 1;
         let id = self.next_run_id;
         run.id = id;
+        crate::log::line(format!("Run on {screen:?}: {}", run.command));
         self.runs.insert(screen, run);
         // While it runs, its form cannot be edited, by mouse or keyboard.
         form.set_locked(true, cx);
@@ -524,6 +532,19 @@ impl Waxbill {
                         // Redraw at least once a second for the elapsed and remaining time.
                         run.poll();
                         let running = run.is_running();
+                        if !running {
+                            let failure = if run.outcome == Outcome::Failed {
+                                format!(": {}", run.failure())
+                            } else {
+                                String::new()
+                            };
+                            crate::log::line(format!(
+                                "Run on {screen:?} ended {:?} after {:.1} s, {} warnings{failure}",
+                                run.outcome,
+                                run.elapsed.as_secs_f64(),
+                                run.warnings.len()
+                            ));
+                        }
                         if !running && screen == ScreenId::Observe && run.unresolved.is_some() {
                             this.ask_id_species(cx);
                         }

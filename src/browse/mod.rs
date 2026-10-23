@@ -182,6 +182,23 @@ impl Browse {
                 .spawn(async move { review::make(&folder, &files) })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                crate::log::line(match &outcome {
+                    review::Outcome::Made {
+                        folder,
+                        files,
+                        missing,
+                    } => format!(
+                        "Review folder {}: {files} linked, {missing} not found",
+                        folder.display()
+                    ),
+                    review::Outcome::NotFound(first) => {
+                        format!("Review folder: no media found, e.g. {}", first.display())
+                    }
+                    review::Outcome::CannotLink(err) => {
+                        format!("Review folder: cannot link: {err}")
+                    }
+                    review::Outcome::Failed(err) => format!("Review folder failed: {err}"),
+                });
                 this.review = match outcome {
                     review::Outcome::Made {
                         folder,
@@ -192,7 +209,7 @@ impl Browse {
                         Review::Made(folder, files, missing)
                     }
                     review::Outcome::NotFound(first) => Review::NotFound(first),
-                    review::Outcome::CannotLink => Review::CannotLink,
+                    review::Outcome::CannotLink(_) => Review::CannotLink,
                     review::Outcome::Failed(err) => Review::Failed(err),
                 };
                 cx.notify();

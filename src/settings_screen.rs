@@ -263,6 +263,24 @@ impl Waxbill {
                             .text_color(tokens.color("accent"))
                             .child(t("源代码", "Source code"))
                             .on_click(|_, _, cx| cx.open_url(env!("CARGO_PKG_REPOSITORY"))),
+                    )
+                    .child("·")
+                    // The folder with waxbill.log, for a bug report.
+                    .child(
+                        div()
+                            .id("log-link")
+                            .cursor_pointer()
+                            .text_color(tokens.color("accent"))
+                            .child(t("打开日志文件夹", "Open the log folder"))
+                            .on_click(|_, _, cx| {
+                                if let Some(dir) =
+                                    crate::log::path().and_then(|p| p.parent().map(Into::into))
+                                {
+                                    let dir: std::path::PathBuf = dir;
+                                    let _ = std::fs::create_dir_all(&dir);
+                                    cx.open_with_system(&dir);
+                                }
+                            }),
                     ),
             )
             .child(help_line(

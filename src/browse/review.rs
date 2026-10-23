@@ -15,8 +15,9 @@ pub enum Outcome {
     /// None of the listed media exist (a table from another computer, a drive with another letter): nothing is
     /// made. The first missing file, to show.
     NotFound(PathBuf),
-    /// The media are on another drive or a network share: links cannot be made there.
-    CannotLink,
+    /// The media are on another drive or a network share: links cannot be made there (the system's error, for
+    /// the log).
+    CannotLink(String),
     Failed(String),
 }
 
@@ -110,7 +111,7 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
             Ok(()) => made += 1,
             Err(err) if made == 0 && is_cross_device(&err) => {
                 let _ = std::fs::remove_dir(folder);
-                return Outcome::CannotLink;
+                return Outcome::CannotLink(format!("{}: {err}", media.display()));
             }
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 missing.push(media);
