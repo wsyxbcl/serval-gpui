@@ -353,7 +353,52 @@ impl Browse {
                 h_flex()
                     .items_start()
                     .gap(tokens.px("space-5"))
-                    .child(field(t("物种", "Species"), cx).flex_1().child(list))
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .gap(tokens.px("space-2"))
+                            .child(
+                                h_flex()
+                                    .justify_between()
+                                    .child(
+                                        div()
+                                            .text_size(tokens.px("text-md"))
+                                            .font_medium()
+                                            .child(t("物种", "Species")),
+                                    )
+                                    .child(
+                                        h_flex()
+                                            .gap(tokens.px("space-3"))
+                                            .px(tokens.px("space-2"))
+                                            .child(choice_link(
+                                                "invert-species",
+                                                t("反选", "Invert"),
+                                                {
+                                                    let all: BTreeSet<String> = species
+                                                        .iter()
+                                                        .map(|(name, _)| name.clone())
+                                                        .collect();
+                                                    move |this| {
+                                                        this.species = all
+                                                            .difference(&this.species)
+                                                            .cloned()
+                                                            .collect();
+                                                    }
+                                                },
+                                                cx,
+                                            ))
+                                            .child(choice_link(
+                                                "clear-species",
+                                                t("清空", "Clear"),
+                                                |this| {
+                                                    this.species.clear();
+                                                },
+                                                cx,
+                                            )),
+                                    ),
+                            )
+                            .child(list),
+                    )
                     .child(
                         field(t("评分", "Rating"), cx)
                             .w(px(240.))
@@ -409,6 +454,28 @@ impl Browse {
             )
             .children(extra)
     }
+}
+
+/// A small text button above the species list (反选, 清空).
+fn choice_link(
+    id: &'static str,
+    label: &'static str,
+    change: impl Fn(&mut Browse) + 'static,
+    cx: &mut Context<Browse>,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .cursor_pointer()
+        .text_size(cx.tokens().px("text-sm"))
+        .text_color(cx.theme().muted_foreground)
+        .hover(|style| style.text_color(cx.theme().foreground))
+        .child(label)
+        .on_click(cx.listener(move |this, _, _, cx| {
+            change(this);
+            this.review = Review::None;
+            this.caracal = None;
+            cx.notify();
+        }))
 }
 
 /// A tag as part of a file name.
@@ -528,8 +595,41 @@ impl Render for Browse {
             &self.csv,
             cx,
         ));
+        // An edited table is usually another file (Caracal's export), so 应用表格到文件 asks for it.
+        let apply = self.action(
+            t("应用表格到文件", "Write a table into the files"),
+            t(
+                "选择编辑后的标签表（例如从 Caracal 导出的），检查改动后写回 XMP 文件。",
+                "Choose an edited tags table (for example one exported from Caracal), check the changes, and write it into the XMP files.",
+            ),
+            Button::new("apply-table")
+                .outline()
+                .label(t("选择表格…", "Choose a table…"))
+                .on_click(cx.listener(|_, _, window, cx| {
+                    let paths = cx.prompt_for_paths(PathPromptOptions {
+                        files: true,
+                        directories: false,
+                        multiple: false,
+                        prompt: None,
+                    });
+                    cx.spawn_in(window, async move |this, cx| {
+                        if let Ok(Ok(Some(paths))) = paths.await
+                            && let Some(path) = paths.into_iter().next()
+                        {
+                            let _ = this.update(cx, |_, cx| cx.emit(BrowseEvent::ApplyTable(path)));
+                        }
+                    })
+                    .detach();
+                }))
+                .into_any_element(),
+            None,
+            cx,
+        );
         let Some(path) = csv.filter(|_| matches!(self.table, Some(Ok(_)))) else {
-            return v_flex().gap(tokens.px("space-4")).child(table_card);
+            return v_flex()
+                .gap(tokens.px("space-4"))
+                .child(table_card)
+                .child(apply);
         };
         let chosen = self.chosen().len();
 
@@ -539,7 +639,6 @@ impl Render for Browse {
             Review::Made(folder, n, missing) => {
                 let folder = folder.clone();
                 Some(
-                    v_flex().gap(tokens.px("space-2")).child(
                     h_flex()
                         .gap(tokens.px("space-2"))
                         .child(help_line(
@@ -569,19 +668,6 @@ impl Render for Browse {
                                 .label(t("再次打开", "Open again"))
                                 .on_click(move |_, _, cx| cx.open_with_system(&folder)),
                         ),
-                    )
-                    // Hard links look like copies but are the same files (browse.md §3).
-                    .child(
-                        div()
-                            .p(tokens.px("space-3"))
-                            .rounded(tokens.px("radius-sm"))
-                            .bg(tokens.color("warning-soft"))
-                            .text_size(tokens.px("text-sm"))
-                            .child(t(
-                                "生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。",
-                                "These are links to the original files: editing them here changes the originals; deleting removes only the link.",
-                            )),
-                    ),
                 )
             }
             Review::CannotLink(why) => Some(
@@ -593,7 +679,7 @@ impl Render for Browse {
                                 "这块磁盘是 {fs} 格式，不支持硬链接（NTFS 磁盘才可以）。可以在 Caracal 中查看所选，或用媒体提取复制出来。"
                             ),
                             (Language::Chinese, review::NoLinks::Network) => {
-                                "网络位置不支持硬链接。可以在 Caracal 中查看所选，或用媒体提取复制出来。".to_string()
+                                "这个网络位置不支持硬链接（取决于 NAS 的设置）。可以在 Caracal 中查看所选，或用媒体提取复制出来。".to_string()
                             }
                             (Language::Chinese, review::NoLinks::Other(err)) => {
                                 format!("无法建立链接（{err}）。可以在 Caracal 中查看所选，或用媒体提取复制出来。")
@@ -602,7 +688,7 @@ impl Render for Browse {
                                 "This disk is {fs}, which has no hard links (NTFS disks do). View the choice in Caracal, or copy it with Copy media."
                             ),
                             (Language::English, review::NoLinks::Network) => {
-                                "Network locations have no hard links. View the choice in Caracal, or copy it with Copy media.".to_string()
+                                "This network location does not allow hard links (it depends on the server). View the choice in Caracal, or copy it with Copy media.".to_string()
                             }
                             (Language::English, review::NoLinks::Other(err)) => format!(
                                 "Links cannot be made ({err}). View the choice in Caracal, or copy it with Copy media."
@@ -653,6 +739,16 @@ impl Render for Browse {
                     )),
             )
             .child(self.render_choice(cx));
+        // Hard links look like copies but are the same files (browse.md §3): said before the folder is made.
+        let links_warning = div()
+            .p(tokens.px("space-3"))
+            .rounded(tokens.px("radius-sm"))
+            .bg(tokens.color("warning-soft"))
+            .text_size(tokens.px("text-sm"))
+            .child(t(
+                "查看文件夹中的文件是原文件的「链接」：编辑内容会直接改动原文件；删除只删除链接，原文件不受影响。",
+                "The files in a review folder are links to the originals: editing them changes the originals; deleting removes only the link.",
+            ));
         let explorer = self.action(
             t("在资源管理器中查看所选", "Look at the choice in the file manager"),
             t(
@@ -665,7 +761,12 @@ impl Render for Browse {
                 .disabled(chosen == 0 || matches!(self.review, Review::Making))
                 .on_click(cx.listener(|this, _, _, cx| this.make_review(cx)))
                 .into_any_element(),
-            review_status,
+            Some(
+                v_flex()
+                    .gap(tokens.px("space-2"))
+                    .child(links_warning)
+                    .children(review_status),
+            ),
             cx,
         );
         let caracal_status = self.caracal.as_ref().map(|saved| match saved {
@@ -705,23 +806,6 @@ impl Render for Browse {
                     .on_click(cx.listener(move |this, _, _, cx| this.open_caracal(&path, cx)))
                     .into_any_element(),
                 caracal_status,
-                cx,
-            )
-        };
-        let apply = {
-            let path = path.clone();
-            self.action(
-                t("应用表格到文件", "Write the table into the files"),
-                t(
-                    "将整张标签表（例如从 Caracal 导出的）写回 XMP 文件。",
-                    "Writes the whole table (for example one exported from Caracal) back into the XMP files.",
-                ),
-                Button::new("apply-table")
-                    .outline()
-                    .label(t("检查并写入…", "Check and write…"))
-                    .on_click(cx.listener(move |_, _, _, cx| cx.emit(BrowseEvent::ApplyTable(path.clone()))))
-                    .into_any_element(),
-                None,
                 cx,
             )
         };

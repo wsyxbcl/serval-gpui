@@ -26,7 +26,8 @@ The table is the working document; the XMP files are updated deliberately, with 
 - **Table**: a tags.csv from 标签获取, a labellers' table, or one exported from Caracal. One quiet line: rows,
   files, species, date range. The table is remembered.
 - **Choice** (挑选, its own card): species as checkboxes with counts (faceted under the rating), rating as a
-  segmented control (全部 / ≥ 3 / ≥ 4 / 5, as in 媒体提取). The line below says how many files (and videos) are
+  segmented control (全部 / ≥ 3 / ≥ 4 / 5, as in 媒体提取). 反选 and 清空 above the list, so leaving out a tag
+  (Blank, say) is two clicks. The line below says how many files (and videos) are
   chosen. It feeds both the review folder and Caracal; 应用表格到文件 takes the whole table.
 - **Three ways out**, one card each, no run bar:
   1. **在资源管理器中查看所选** — §3.
@@ -39,7 +40,8 @@ The table is the working document; the XMP files are updated deliberately, with 
      Caracal is not bundled. The user reviews, edits and exports tags.csv. (W19 would load both without
      picking.) The same link opens observe's tags table in `#species` and xmp init's table in `#time`, from the
      result rows.
-  3. **应用表格到文件** — opens 元数据更新 in 整表写入 with this table (§4).
+  3. **应用表格到文件** — asks for the edited table (usually another file: Caracal's export), then opens 元数据更新
+     in 整表写入 with it (§4). Shown before any table is open, for coming back from Caracal.
 
 ## 3. Review folder (Explorer)
 
@@ -49,8 +51,8 @@ The table is the working document; the XMP files are updated deliberately, with 
   name used twice gets `_1`, `_2`. (Aligned with Caracal 2026-10-23.)
 - Hard links take no space; Explorer, Photos and the player treat them as the real files, and copying out of the
   folder copies the real files. Edits Serval makes later replace the sidecar, so a review folder is a snapshot.
-- Once the folder is made, a warning says the files are the originals: rotating or editing there changes them;
-  deleting removes only the link. (Wording to be refined before release.)
+- A warning in the card, before the folder is made, says the files are the originals: editing there changes them;
+  deleting removes only the link.
 - Hard links need the same drive. Over SMB it depends on the server: a Synology share worked in the 2026-10-12
   test; many other network shares do not allow them (symbolic links need admin rights
   on Windows; Photos does not step through `.lnk` shortcuts). exFAT and FAT32 (most external disks and cards) have

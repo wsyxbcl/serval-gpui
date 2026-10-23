@@ -213,37 +213,39 @@ example data.
 | --- | --- | --- |
 | 选择或拖入 tags.csv | Choose or drop tags.csv | `browse/mod.rs:72` |
 | 全部 | All | `browse/mod.rs:334` |
-| 物种 | Species | `browse/mod.rs:356` |
-| 评分 | Rating | `browse/mod.rs:358` |
-| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:365` |
-| 找不到这个表格 | This table does not exist | `browse/mod.rs:433` |
-| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:438` |
-| 无法读取： | Cannot read: | `browse/mod.rs:446` |
-| 至 | to | `browse/mod.rs:478` |
-| 标签表 | Tags table | `browse/mod.rs:486` |
-| 选择… | Choose… | `browse/mod.rs:497` |
-| 正在建立… | Making it… | `browse/mod.rs:538` |
-| 再次打开 | Open again | `browse/mod.rs:569` |
-| 生成的文件为原文件的「链接」：在这里编辑文件内容会直接改动原文件；删除只会删除链接，原文件不受影响。 | These are links to the original files: editing them here changes the originals; deleting removes only the link. | `browse/mod.rs:580` |
-| 用媒体提取复制 | Copy them instead | `browse/mod.rs:616` |
-| 挑选 | Choose | `browse/mod.rs:645` |
-| 按物种和评分挑选，在资源管理器或 Caracal 中查看。不挑选时，Caracal 打开整张表。 | Choose by species and rating, then look in the file manager or Caracal. With nothing chosen, Caracal opens the whole table. | `browse/mod.rs:647` |
-| 在资源管理器中查看所选 | Look at the choice in the file manager | `browse/mod.rs:657` |
-| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:658` |
-| 建立查看文件夹 | Make a review folder | `browse/mod.rs:664` |
-| 无法保存所选： | Cannot save the choice: | `browse/mod.rs:689` |
-| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:697` |
-| 在浏览器中打开所选：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the choice in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:698` |
-| 打开 Caracal | Open Caracal | `browse/mod.rs:704` |
-| 应用表格到文件 | Write the table into the files | `browse/mod.rs:714` |
-| 将整张标签表（例如从 Caracal 导出的）写回 XMP 文件。 | Writes the whole table (for example one exported from Caracal) back into the XMP files. | `browse/mod.rs:715` |
-| 检查并写入… | Check and write… | `browse/mod.rs:721` |
+| 物种 | Species | `browse/mod.rs:367` |
+| 反选 | Invert | `browse/mod.rs:375` |
+| 清空 | Clear | `browse/mod.rs:392` |
+| 评分 | Rating | `browse/mod.rs:403` |
+| 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:410` |
+| 找不到这个表格 | This table does not exist | `browse/mod.rs:500` |
+| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:505` |
+| 无法读取： | Cannot read: | `browse/mod.rs:513` |
+| 至 | to | `browse/mod.rs:545` |
+| 标签表 | Tags table | `browse/mod.rs:553` |
+| 选择… | Choose… | `browse/mod.rs:564` |
+| 应用表格到文件 | Write a table into the files | `browse/mod.rs:600` |
+| 选择编辑后的标签表（例如从 Caracal 导出的），检查改动后写回 XMP 文件。 | Choose an edited tags table (for example one exported from Caracal), check the changes, and write it into the XMP files. | `browse/mod.rs:601` |
+| 选择表格… | Choose a table… | `browse/mod.rs:607` |
+| 正在建立… | Making it… | `browse/mod.rs:638` |
+| 再次打开 | Open again | `browse/mod.rs:668` |
+| 用媒体提取复制 | Copy them instead | `browse/mod.rs:702` |
+| 挑选 | Choose | `browse/mod.rs:731` |
+| 按物种和评分挑选，在资源管理器或 Caracal 中查看。不挑选时，Caracal 打开整张表。 | Choose by species and rating, then look in the file manager or Caracal. With nothing chosen, Caracal opens the whole table. | `browse/mod.rs:733` |
+| 查看文件夹中的文件是原文件的「链接」：编辑内容会直接改动原文件；删除只删除链接，原文件不受影响。 | The files in a review folder are links to the originals: editing them changes the originals; deleting removes only the link. | `browse/mod.rs:748` |
+| 在资源管理器中查看所选 | Look at the choice in the file manager | `browse/mod.rs:753` |
+| 生成对应媒体的硬链接：缩略图、系统播放器、复制功能都可直接使用，不会额外占用存储空间。 | Makes hard links to the chosen media: thumbnails, players and copying work as usual, with no extra storage. | `browse/mod.rs:754` |
+| 建立查看文件夹 | Make a review folder | `browse/mod.rs:760` |
+| 无法保存所选： | Cannot save the choice: | `browse/mod.rs:790` |
+| 在 Caracal 中查看和编辑 | View and edit in Caracal | `browse/mod.rs:798` |
+| 在浏览器中打开所选：查看、评分、修改物种后导出 tags.csv，再回到这里「应用表格到文件」。 | Opens the choice in Caracal in the browser: view, rate and fix species, export tags.csv, then come back here to write the table into the files. | `browse/mod.rs:799` |
+| 打开 Caracal | Open Caracal | `browse/mod.rs:805` |
 | … 另外 {hidden} 个 | (format!, written per language) | `browse/mod.rs:322` |
-| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:368` |
-| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:461` |
-| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:552` |
-| 找不到表中的媒体文件，例如 {}。表格是否来自另一台电脑，或移动硬盘的盘符变了？ | (format!, written per language) | `browse/mod.rs:625` |
-| 已将所选 {} 个文件的行另存为 {}，并在 Caracal 中打开。 | (format!, written per language) | `browse/mod.rs:674` |
+| 已选 {} 个文件（其中 {} 个视频） | (format!, written per language) | `browse/mod.rs:413` |
+| {} 行 · {} 个文件 · {} 个物种 | (format!, written per language) | `browse/mod.rs:528` |
+| 已建立 {} 个文件的查看文件夹，已在资源管理器中打开。 | (format!, written per language) | `browse/mod.rs:651` |
+| 找不到表中的媒体文件，例如 {}。表格是否来自另一台电脑，或移动硬盘的盘符变了？ | (format!, written per language) | `browse/mod.rs:711` |
+| 已将所选 {} 个文件的行另存为 {}，并在 Caracal 中打开。 | (format!, written per language) | `browse/mod.rs:775` |
 
 ## XMP 更新 update
 
