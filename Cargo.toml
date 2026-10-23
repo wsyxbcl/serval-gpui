@@ -1,6 +1,6 @@
 [package]
 name = "maze-serval-gpui"
-version = "2.0.0"
+version = "2.0.0-beta.1"
 edition = "2024"
 default-run = "waxbill"
 description = "Waxbill: a desktop app for Serval, the camera-trap data tool."

@@ -3858,7 +3858,7 @@ dependencies = [
 
 [[package]]
 name = "maze-serval-gpui"
-version = "2.0.0"
+version = "2.0.0-beta.1"
 dependencies = [
  "csv",
  "embed-resource",
