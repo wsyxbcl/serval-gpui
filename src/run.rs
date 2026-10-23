@@ -442,7 +442,7 @@ pub fn plain_error(raw: &str) -> Option<&'static str> {
         )
     } else if has(&["deploymentid"]) {
         t(
-            "位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。",
+            "位点表中的 deploymentID 有误，应为「位点_<collection>」。可先用重命名统一文件夹名。",
             "A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first.",
         )
     } else if has(&["columnnotfound", "unable to find column"]) || raw.starts_with("not found: \"")

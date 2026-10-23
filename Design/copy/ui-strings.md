@@ -12,7 +12,7 @@ example data.
 | 运行 | Run | `app.rs:609` |
 | 选择程序后即可运行 | choose the program to run | `app.rs:617` |
 | Serval 版本过旧，请在设置中更换 | Serval is too old; change it in Settings | `app.rs:621` |
-| 另一个命令正在运行 | another command is running | `app.rs:629` |
+| 其他命令正在运行 | another command is running | `app.rs:629` |
 | 就绪 | Ready | `app.rs:638` |
 | 需要 Serval | Serval needed | `app.rs:643` |
 | 未就绪 | Not ready | `app.rs:645` |
@@ -51,7 +51,7 @@ example data.
 | 没有权限读写这个位置。检查文件夹权限，或更换输出位置。 | No permission to read or write this location. Check the folder's permissions, or choose another output location. | `run.rs:424` |
 | 找不到文件或文件夹。检查路径是否正确，移动硬盘或网络位置是否已连接。 | A file or folder was not found. Check the path, and that the drive or network location is connected. | `run.rs:434` |
 | 表格中的时间有空值或无法读取。检查 datetime 列。 | The table's times are empty or cannot be read. Check the datetime column. | `run.rs:439` |
-| 位点表中的 deploymentID 有误，应为「位点_样区」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:444` |
+| 位点表中的 deploymentID 有误，应为「位点_<collection>」。可先用重命名统一文件夹名。 | A deploymentID in the deployments table is wrong; it should be <deployment>_<collection>. Rename can make the folder names match first. | `run.rs:444` |
 | 表格缺少需要的列。检查列名（见下方原文）。 | The table is missing a column it needs. Check the column names (see the message below). | `run.rs:450` |
 | 正在扫描 | Scanning | `run.rs:474` |
 | 正在读取 | Reading | `run.rs:475` |
@@ -132,7 +132,7 @@ example data.
 | {} 张图片的个体编号归属不明确 | (format!, written per language) | `id_species.rs:171` |
 |  · {shown} 等 {n} 个编号 | (fragment) | `id_species.rs:122` |
 
-## 标签获取 observe
+## 标签读取 observe
 
 | 中文 | English | Where |
 | --- | --- | --- |
@@ -219,7 +219,7 @@ example data.
 | 评分 | Rating | `browse/mod.rs:412` |
 | 选择物种或评分。 | Choose species or a rating. | `browse/mod.rs:419` |
 | 找不到这个表格 | This table does not exist | `browse/mod.rs:509` |
-| 标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表 | A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal | `browse/mod.rs:514` |
+| 标签读取生成的 tags.csv | A tags.csv from Read tags | `browse/mod.rs:514` |
 | 无法读取： | Cannot read: | `browse/mod.rs:522` |
 | 至 | to | `browse/mod.rs:554` |
 | 标签表 | Tags table | `browse/mod.rs:562` |
@@ -270,7 +270,7 @@ example data.
 | （新增） | (added) | `screens/update.rs:534` |
 | 修改表 | Changes table | `screens/update.rs:630` |
 | 选择… | Choose… | `screens/update.rs:635` |
-| 标注好的表或从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。 | A table filled in by labellers, or exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged. | `screens/update.rs:656` |
+| 例如从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。 | For example one exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged. | `screens/update.rs:656` |
 | 在 xmp_update 列填新值（时间填 xmp_update_datetime 列）；原值为空的行表示新增。 | Fill new values in xmp_update (times in xmp_update_datetime); rows with an empty old value add a tag. | `screens/update.rs:661` |
 | 写入方式 | How | `screens/update.rs:675` |
 | 按 xmp_update 列修改 | Change by the xmp_update column | `screens/update.rs:678` |
@@ -302,7 +302,7 @@ example data.
 | 将写入 {} 个文件 | (format!, written per language) | `screens/update.rs:438` |
 | 冲突：第 {} 行 | (format!, written per language) | `screens/update.rs:539` |
 | ；{} 个文件的修改互相冲突，需要先在表里改好 | (format!, written per language) | `screens/update.rs:561` |
-| ；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP sidecar」生成表格 | (format!, written per language) | `screens/update.rs:573` |
+| ；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签读取中选择「XMP sidecar」生成表格 | (format!, written per language) | `screens/update.rs:573` |
 | ；第 {} 行的时间不是 yyyy-MM-dd HH:mm:ss | (format!, written per language) | `screens/update.rs:585` |
 | 表中没有 {column} 列。 | (format!, written per language) | `screens/update.rs:722` |
 | 已检查 {} 个文件，{} 个已与表格一致。表格中的值覆盖文件中的值，空白单元格不改动；每个文件保留一份原始备份。 | (format!, written per language) | `screens/update.rs:852` |
@@ -322,7 +322,7 @@ example data.
 | 没有符合条件的记录 | nothing matches | `screens/extract.rs:417` |
 | 选择保留的文件夹 | choose the folders to keep | `screens/extract.rs:420` |
 | 找不到这个表格 | This table does not exist | `screens/extract.rs:501` |
-| 标签获取生成的 tags.csv，或标注员填好的表格 | The tags.csv from Get tags, or a table filled in by labellers | `screens/extract.rs:506` |
+| 标签读取生成的 tags.csv | The tags.csv from Read tags | `screens/extract.rs:506` |
 | 正在读取… | Reading… | `screens/extract.rs:514` |
 | 无法读取： | Cannot read: | `screens/extract.rs:516` |
 | 至 | to | `screens/extract.rs:543` |
@@ -366,11 +366,11 @@ example data.
 | （可选） |  (optional) | `screens/simple.rs:372` |
 | 选择… | Choose… | `screens/simple.rs:389` |
 | 选项 | Options | `screens/simple.rs:467` |
-| 为每个媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。 | Creates an XMP sidecar for each media file (existing ones are kept) and a table for checking the data. | `screens/simple.rs:543` |
+| 为媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。 | Creates XMP sidecars for media files (existing ones are kept) and a table for checking the data. | `screens/simple.rs:543` |
 | 媒体文件夹 | Media folder | `screens/simple.rs:549` |
-| 把项目中的位点文件夹统一改名为「位点_样区」（小写），与位点表中的 deploymentID 一致。 | Renames the deployment folders in a project to <deployment>_<collection> in lower case, matching deploymentID in the deployments table. | `screens/simple.rs:585` |
+| 把项目中的位点文件夹统一改名为「位点_<collection>」（小写），与位点表中的 deploymentID 一致。 | Renames the deployment folders in a project to <deployment>_<collection> in lower case, matching deploymentID in the deployments table. | `screens/simple.rs:585` |
 | 项目文件夹 | Project folder | `screens/simple.rs:591` |
-| 项目文件夹：其下是各样区文件夹，样区下是位点文件夹。 | The project folder: a folder per collection, with the deployment folders inside. | `screens/simple.rs:594` |
+| 项目文件夹：其下是各<collection>文件夹，<collection>下是位点文件夹。 | The project folder: a folder per collection, with the deployment folders inside. | `screens/simple.rs:594` |
 | 先预览，不改名 | Preview only, rename nothing | `screens/simple.rs:602` |
 | 在运行日志里列出将要做的改名。 | Lists the renames in the run log. | `screens/simple.rs:603` |
 | 预览改名 | preview the renames | `screens/simple.rs:619` |
@@ -417,7 +417,7 @@ example data.
 | 表格不存在 | a table does not exist | `screens/translate.rs:225` |
 | 选择两个不同的列 | choose two different columns | `screens/translate.rs:227` |
 | 选择列 | choose the columns | `screens/translate.rs:246` |
-| 可以在物种名录里补上后重新检查。 | Add them to the species list, then check again. | `screens/translate.rs:418` |
+| 可在物种名录里补充后重新检查。 | Add them to the species list, then check again. | `screens/translate.rs:418` |
 | 重新检查 | Check again | `screens/translate.rs:429` |
 | 选择… | Choose… | `screens/translate.rs:457` |
 | 要替换的表 | Table to translate | `screens/translate.rs:496` |
@@ -425,13 +425,13 @@ example data.
 | 无法读取： | Cannot read: | `screens/translate.rs:531` |
 | 从这一列 | From the column | `screens/translate.rs:540` |
 | 换成这一列 | To the column | `screens/translate.rs:547` |
-| {} 个物种无法翻译 | (format!, written per language) | `screens/translate.rs:231` |
-| {} 个物种都能翻译 | (format!, written per language) | `screens/translate.rs:241` |
-| 表中 {} 个物种都能在物种名录里找到翻译。 | (format!, written per language) | `screens/translate.rs:336` |
+| {} 个物种无法替换 | (format!, written per language) | `screens/translate.rs:231` |
+| {} 个物种都能替换 | (format!, written per language) | `screens/translate.rs:241` |
+| 表中 {} 个物种都在物种名录。 | (format!, written per language) | `screens/translate.rs:336` |
 | {name}（{} 行） | (format!, written per language) | `screens/translate.rs:354` |
 | {} 个物种中有 {} 个不在物种名录里：{} | (format!, written per language) | `screens/translate.rs:363` |
-| {} 个物种在“到”这一列是空的：{} | (format!, written per language) | `screens/translate.rs:379` |
-| 物种名录里重复出现：{}（每个名字只能有一个翻译） | (format!, written per language) | `screens/translate.rs:393` |
+| {} 个物种的目标值为空：{} | (format!, written per language) | `screens/translate.rs:379` |
+| 物种名录里重复出现：{} | (format!, written per language) | `screens/translate.rs:393` |
 | {} 行 | (format!, written per language) | `screens/translate.rs:502` |
 | {} 个标签 | (format!, written per language) | `screens/translate.rs:519` |
 
@@ -456,7 +456,7 @@ example data.
 | 路径对齐 | Align paths | `screens/mod.rs:70` |
 | XMP 初始化 | Initialise XMP | `screens/mod.rs:71` |
 | 查看媒体 | View media | `screens/mod.rs:72` |
-| 标签获取 | Get tags | `screens/mod.rs:73` |
+| 标签读取 | Read tags | `screens/mod.rs:73` |
 | 独立捕获 | Events | `screens/mod.rs:74` |
 | 物种名替换 | Translate species | `screens/mod.rs:75` |
 | XMP 更新 | Update XMP | `screens/mod.rs:76` |
@@ -465,7 +465,7 @@ example data.
 | XMP 导出 | Export XMP | `screens/mod.rs:79` |
 | XMP 删除 | Remove XMP | `screens/mod.rs:80` |
 | 设置 | Settings | `screens/mod.rs:81` |
-| 按物种名录把物种名换成另一种写法（例如中文名、学名）。 | Rewrites species names another way (e.g. Chinese or scientific names) from a species list. | `screens/mod.rs:129` |
+| 按物种名录变更物种名称（例如中文名、学名）。 | Changes species names by a species list (e.g. to Chinese or scientific names). | `screens/mod.rs:129` |
 | 按表格修改 XMP 中的标签：按 xmp_update 列修改，或整表写入。 | Changes the tags in the XMP files from a table: by the xmp_update column, or the whole table. | `screens/mod.rs:133` |
 | 读取照片和视频中的标签，生成标签表（tags.csv）和物种统计。 | Reads species, individual and other tags from photos and videos into tags.csv and species counts. | `screens/mod.rs:137` |
 | 按标签筛选，把照片、视频和 XMP 一起复制到新文件夹。 | Copies the photos and videos you choose by tag, with their XMP, into a new folder. | `screens/mod.rs:141` |

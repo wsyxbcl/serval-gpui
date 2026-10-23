@@ -20,7 +20,7 @@ CHINESE_BRANCH = re.compile(r'Language::Chinese\s*=>\s*(?:\{\s*)?format!\(\s*' +
 SECTIONS = [
     ("Shell, run bar and results", ["app.rs", "run.rs", "run_bar.rs", "results.rs", "run_dialogs.rs",
                                     "conflicts.rs", "id_species.rs", "runner.rs"]),
-    ("标签获取 observe", ["screens/observe.rs"]),
+    ("标签读取 observe", ["screens/observe.rs"]),
     ("独立捕获 capture", ["screens/capture.rs"]),
     ("查看媒体 browse", ["browse/mod.rs", "browse/records.rs", "browse/review.rs"]),
     ("XMP 更新 update", ["screens/update.rs"]),

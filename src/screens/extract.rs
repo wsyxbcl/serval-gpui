@@ -504,8 +504,8 @@ impl ExtractForm {
                 ),
                 _ => help_line(
                     t(
-                        "标签获取生成的 tags.csv，或标注员填好的表格",
-                        "The tags.csv from Get tags, or a table filled in by labellers",
+                        "标签读取生成的 tags.csv",
+                        "The tags.csv from Read tags",
                     ),
                     Tone::Quiet,
                     cx,

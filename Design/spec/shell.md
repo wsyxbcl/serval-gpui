@@ -19,7 +19,7 @@ Commands grouped by kind of work. Labels are the task, not the CLI name:
 
 | Group | Item | Serval command |
 | --- | --- | --- |
-| 数据分析 Data analysis | 标签获取 Get tags | `observe` |
+| 数据分析 Data analysis | 标签读取 Read tags | `observe` |
 | | 独立捕获 Independent captures | `capture` |
 | | 查看媒体 View media (was 浏览与精选) | `xmp get`, `xmp set`, `xmp write` ([browse](browse.md)) |
 | 元数据 Metadata | XMP 初始化 Initialise XMP | `xmp init` |
@@ -39,7 +39,7 @@ Commands grouped by kind of work. Labels are the task, not the CLI name:
   (`--scrollbar-thumb`, the full bill on hover); areas that fit show none. (2026-10-15)
 - Width `--sidebar-w`. The selected item has the `--sidebar-active` fill and a 3px `--accent` marker.
 - A running command shows a small spinner next to its item, so the user can look at other screens meanwhile.
-  Only one command runs at a time; Run on another screen is disabled with "另一个命令正在运行".
+  Only one command runs at a time; Run on another screen is disabled with "其他命令正在运行".
 - `tags2img` is not listed (a digiKam helper used rarely); it can be added under Tools if needed.
 
 ## 3. Screen anatomy

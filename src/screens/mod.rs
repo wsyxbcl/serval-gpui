@@ -70,7 +70,7 @@ impl ScreenId {
             Align => t("路径对齐", "Align paths"),
             XmpInit => t("XMP 初始化", "Initialise XMP"),
             Browse => t("查看媒体", "View media"),
-            Observe => t("标签获取", "Get tags"),
+            Observe => t("标签读取", "Read tags"),
             Capture => t("独立捕获", "Events"),
             Translate => t("物种名替换", "Translate species"),
             XmpUpdate => t("XMP 更新", "Update XMP"),
@@ -127,8 +127,8 @@ impl Form {
         match self {
             Form::Simple(form) => form.read(cx).summary(),
             Form::Translate(_) => t(
-                "按物种名录把物种名换成另一种写法（例如中文名、学名）。",
-                "Rewrites species names another way (e.g. Chinese or scientific names) from a species list.",
+                "按物种名录变更物种名称（例如中文名、学名）。",
+                "Changes species names by a species list (e.g. to Chinese or scientific names).",
             ),
             Form::Update(_) => t(
                 "按表格修改 XMP 中的标签：按 xmp_update 列修改，或整表写入。",

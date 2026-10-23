@@ -1,4 +1,4 @@
-//! 标签获取 Get tags: `serval observe` (board: shell.html, observe-ready).
+//! 标签读取 Read tags: `serval observe` (board: shell.html, observe-ready).
 
 use super::Plan;
 use super::form::{

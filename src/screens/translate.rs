@@ -229,18 +229,18 @@ impl TranslateForm {
             _ => match coverage {
                 Some(c) if !c.ok() => Err(match language() {
                     Language::Chinese => format!(
-                        "{} 个物种无法翻译",
+                        "{} 个物种无法替换",
                         c.missing.len() + c.untranslated.len() + c.repeated.len()
                     ),
                     Language::English => format!(
-                        "{} species cannot be translated",
+                        "{} species cannot be replaced",
                         c.missing.len() + c.untranslated.len() + c.repeated.len()
                     ),
                 }),
                 Some(c) => Ok(match language() {
-                    Language::Chinese => format!("{} 个物种都能翻译", count(c.species)),
+                    Language::Chinese => format!("{} 个物种都能替换", count(c.species)),
                     Language::English => {
-                        format!("all {} species can be translated", count(c.species))
+                        format!("all {} species can be replaced", count(c.species))
                     }
                 }),
                 None => Err(t("选择列", "choose the columns").to_string()),
@@ -334,11 +334,11 @@ impl TranslateForm {
             return Some(help_line(
                 match language() {
                     Language::Chinese => format!(
-                        "表中 {} 个物种都能在物种名录里找到翻译。",
+                        "表中 {} 个物种都在物种名录。",
                         count(coverage.species)
                     ),
                     Language::English => format!(
-                        "All {} species in the table have a translation.",
+                        "All {} species in the table are in the species list.",
                         count(coverage.species)
                     ),
                 },
@@ -377,12 +377,12 @@ impl TranslateForm {
         if !coverage.untranslated.is_empty() {
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "{} 个物种在“到”这一列是空的：{}",
+                    "{} 个物种的目标值为空：{}",
                     coverage.untranslated.len(),
                     list(&coverage.untranslated)
                 ),
                 Language::English => format!(
-                    "{} species have an empty translation: {}",
+                    "{} species have an empty target: {}",
                     coverage.untranslated.len(),
                     list(&coverage.untranslated)
                 ),
@@ -391,11 +391,11 @@ impl TranslateForm {
         if !coverage.repeated.is_empty() {
             lines.push(match language() {
                 Language::Chinese => format!(
-                    "物种名录里重复出现：{}（每个名字只能有一个翻译）",
+                    "物种名录里重复出现：{}",
                     coverage.repeated.join("、")
                 ),
                 Language::English => format!(
-                    "Listed more than once in the species list: {} (each needs one translation)",
+                    "Listed more than once in the species list: {}",
                     coverage.repeated.join(", ")
                 ),
             });
@@ -416,7 +416,7 @@ impl TranslateForm {
                         .gap(tokens.px("space-2"))
                         .child(help_line(
                             t(
-                                "可以在物种名录里补上后重新检查。",
+                                "可在物种名录里补充后重新检查。",
                                 "Add them to the species list, then check again.",
                             ),
                             Tone::Quiet,

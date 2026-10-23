@@ -541,8 +541,8 @@ fn files_line(found: Option<FolderCount>, sidecars: bool) -> String {
 pub static XMP_INIT: Spec = Spec {
     key: "xmp_init",
     summary: (
-        "为每个媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。",
-        "Creates an XMP sidecar for each media file (existing ones are kept) and a table for checking the data.",
+        "为媒体文件建立 XMP sidecar（已有的不改动），生成信息表单（用于数据检查）。",
+        "Creates XMP sidecars for media files (existing ones are kept) and a table for checking the data.",
     ),
     paths: &[PathSpec {
         key: "dir",
@@ -583,7 +583,7 @@ pub static XMP_INIT: Spec = Spec {
 pub static RENAME: Spec = Spec {
     key: "rename",
     summary: (
-        "把项目中的位点文件夹统一改名为「位点_样区」（小写），与位点表中的 deploymentID 一致。",
+        "把项目中的位点文件夹统一改名为「位点_<collection>」（小写），与位点表中的 deploymentID 一致。",
         "Renames the deployment folders in a project to <deployment>_<collection> in lower case, matching deploymentID in the deployments table.",
     ),
     paths: &[PathSpec {
@@ -592,7 +592,7 @@ pub static RENAME: Spec = Spec {
         kind: PathKind::Folder,
         optional: false,
         help: Some((
-            "项目文件夹：其下是各样区文件夹，样区下是位点文件夹。",
+            "项目文件夹：其下是各<collection>文件夹，<collection>下是位点文件夹。",
             "The project folder: a folder per collection, with the deployment folders inside.",
         )),
     }],

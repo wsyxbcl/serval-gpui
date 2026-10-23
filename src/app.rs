@@ -66,7 +66,7 @@ pub struct Launch {
     pub serval: Option<PathBuf>,
     /// Light or dark was given on the command line, so the setting does not apply.
     pub appearance_given: bool,
-    /// A folder to open in 标签获取, or a table to open in 独立捕获.
+    /// A folder to open in 标签读取, or a table to open in 独立捕获.
     pub open: Option<PathBuf>,
     /// Start the run as soon as Serval is found.
     pub run: bool,
@@ -626,7 +626,7 @@ impl Waxbill {
             ),
             (_, _, true) => (
                 false,
-                t("另一个命令正在运行", "another command is running").to_string(),
+                t("其他命令正在运行", "another command is running").to_string(),
             ),
             (Err(missing), _, _) => (false, missing.clone()),
             (Ok(_), _, _) => (true, button.to_string()),
@@ -949,7 +949,7 @@ impl Waxbill {
         )
     }
 
-    /// What to do with 标签获取's tags table next: open it in another screen, already filled in (data.md §5). This
+    /// What to do with 标签读取's tags table next: open it in another screen, already filled in (data.md §5). This
     /// is how a table made a minute ago is one click away, now that paths are not remembered across launches.
     fn render_next_steps(&self, cx: &mut Context<Self>) -> Option<Div> {
         if self.screen != ScreenId::Observe {

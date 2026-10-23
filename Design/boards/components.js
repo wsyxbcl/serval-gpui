@@ -11,7 +11,7 @@ const NAV = [
   { id: "init", icon: "＋", label: "XMP 初始化" },
   { group: "数据分析" },
   { id: "browse", icon: "▦", label: "浏览与精选" },
-  { id: "observe", icon: "◉", label: "标签获取" },
+  { id: "observe", icon: "◉", label: "标签读取" },
   { id: "capture", icon: "◷", label: "独立捕获" },
   { id: "translate", icon: "文", label: "物种名替换" },
   { id: "update", icon: "↻", label: "元数据更新" },

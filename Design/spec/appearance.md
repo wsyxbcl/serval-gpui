@@ -21,7 +21,7 @@ Tokens: [`boards/tokens.css`](../boards/tokens.css). Proposal [W09](decisions.md
 
 ## 3. Copy
 
-- Chinese is the default language; English is complete. Labels name the task in the user's words (标签获取, not
+- Chinese is the default language; English is complete. Labels name the task in the user's words (标签读取, not
   observe); the Serval command name appears in the command line and the help.
 - Sentences say what happened and what to do next. Numbers use thousands separators. No status codes or raw
   errors as the only text.

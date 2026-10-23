@@ -23,7 +23,7 @@ The table is the working document; the XMP files are updated deliberately, with 
 
 ## 2. The screen
 
-- **Table**: a tags.csv from 标签获取, a labellers' table, or one exported from Caracal. One quiet line: rows,
+- **Table**: a tags.csv from 标签读取. One quiet line: rows,
   files, species, date range. The table is remembered.
 - **Choice** (挑选, its own card): species as checkboxes with counts (faceted under the rating), rating as a
   segmented control (全部 / ≥ 3 / ≥ 4 / 5, as in 媒体提取). 反选 and 清空 above the list, so leaving out a tag

@@ -571,11 +571,11 @@ impl UpdateForm {
         if !preview.media_rows.is_empty() {
             summary.push_str(&match language() {
                 Language::Chinese => format!(
-                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签获取中选择「XMP sidecar」生成表格",
+                    "；{} 行的路径是媒体文件而不是 XMP，XMP 更新只修改 XMP：请在标签读取中选择「XMP sidecar」生成表格",
                     count(preview.media_rows.len())
                 ),
                 Language::English => format!(
-                    "; {} rows point at media files, not XMP; this changes XMP files only: make the table with Get tags reading XMP sidecars",
+                    "; {} rows point at media files, not XMP; this changes XMP files only: make the table with Read tags reading XMP sidecars",
                     count(preview.media_rows.len())
                 ),
             });
@@ -654,8 +654,8 @@ impl Render for UpdateForm {
                 .child(help_line(
                     if self.write {
                         t(
-                            "标注好的表或从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。",
-                            "A table filled in by labellers, or exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged.",
+                            "例如从 Caracal 导出的表：表中的标签写入 XMP，空白单元格不改动文件。",
+                            "For example one exported from Caracal: its labels are written into the XMP as they are; empty cells leave the file unchanged.",
                         )
                     } else {
                         t(

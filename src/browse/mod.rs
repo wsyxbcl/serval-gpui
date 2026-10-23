@@ -96,7 +96,7 @@ impl Browse {
         (!value.is_empty()).then(|| PathBuf::from(value))
     }
 
-    /// Open a table here (a next step from 标签获取's result).
+    /// Open a table here (a next step from 标签读取's result).
     pub fn set_table(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
         self.csv
             .update(cx, |input, cx| input.set_value(path, window, cx));
@@ -512,8 +512,8 @@ impl Render for Browse {
             ),
             None => help_line(
                 t(
-                    "标签获取生成的 tags.csv、标注员填好的表，或从 Caracal 导出的表",
-                    "A tags.csv from Get tags, a table filled in by labellers, or one exported from Caracal",
+                    "标签读取生成的 tags.csv",
+                    "A tags.csv from Read tags",
                 ),
                 Tone::Quiet,
                 cx,
