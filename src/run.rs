@@ -36,6 +36,23 @@ pub struct OutputFile {
     pub kind: String,
     pub path: PathBuf,
     pub rows: Option<u64>,
+    /// A table's column names, read from its header when Serval reports it (which tool can open it).
+    pub columns: Vec<String>,
+}
+
+/// The column names in a CSV's first line (BOM and case removed); empty when it cannot be read.
+fn header_columns(path: &std::path::Path) -> Vec<String> {
+    use std::io::BufRead;
+    let Ok(file) = std::fs::File::open(path) else {
+        return Vec::new();
+    };
+    let mut line = String::new();
+    let _ = std::io::BufReader::new(file).read_line(&mut line);
+    line.trim_start_matches('\u{feff}')
+        .trim_end()
+        .split(',')
+        .map(|c| c.trim().trim_matches('"').to_lowercase())
+        .collect()
 }
 
 pub struct Run {
@@ -241,7 +258,17 @@ impl Run {
                 Event::Warning { message, path } => self.warnings.push((message, path)),
                 Event::Error { message, path } => self.errors.push((message, path)),
                 Event::Output { kind, path, rows } => {
-                    self.outputs.push(OutputFile { kind, path, rows })
+                    let columns = if kind == "csv" {
+                        header_columns(&path)
+                    } else {
+                        Vec::new()
+                    };
+                    self.outputs.push(OutputFile {
+                        kind,
+                        path,
+                        rows,
+                        columns,
+                    })
                 }
                 Event::Summary(summary) => self.summary = summary,
                 Event::Needs {

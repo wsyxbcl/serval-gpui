@@ -15,7 +15,66 @@ pub enum Outcome {
     Failed(String),
 }
 
-/// Link each `(media, sidecar, prefix)` into `folder` as `<prefix>__<name>`; a name used twice gets `_2`, `_3`.
+/// The name before the original file name, the same as Caracal's copies and `serval extract --rename`:
+/// `<species>__<individuals>__<deployment>`. Species and individuals follow Serval's rules (each value without dots
+/// and with characters file systems reject as `_`, sorted, unique, joined by `+`, at most about 100 bytes); no
+/// individuals leaves that part out, no species is `untagged`.
+pub fn prefix(species: &[String], individuals: &[String], deployment: &str) -> String {
+    let part = |value: &str| -> String {
+        value
+            .chars()
+            .filter(|c| *c != '.')
+            .map(|c| {
+                if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
+                    || c.is_control()
+                {
+                    '_'
+                } else {
+                    c
+                }
+            })
+            .collect::<String>()
+            .trim()
+            .to_string()
+    };
+    let joined = |values: &[String]| -> String {
+        let values: std::collections::BTreeSet<String> = values
+            .iter()
+            .map(|v| part(v))
+            .filter(|v| !v.is_empty())
+            .collect();
+        let mut joined = String::new();
+        for (i, value) in values.iter().enumerate() {
+            if !joined.is_empty() && joined.len() + 1 + value.len() > 100 {
+                joined.push_str(&format!("+{} more", values.len() - i));
+                break;
+            }
+            if !joined.is_empty() {
+                joined.push('+');
+            }
+            joined.push_str(value);
+        }
+        joined
+    };
+    let species = joined(species);
+    let mut prefix = if species.is_empty() {
+        "untagged".to_string()
+    } else {
+        species
+    };
+    let individuals = joined(individuals);
+    if !individuals.is_empty() {
+        prefix = format!("{prefix}__{individuals}");
+    }
+    let deployment = part(deployment);
+    if !deployment.is_empty() {
+        prefix = format!("{prefix}__{deployment}");
+    }
+    prefix
+}
+
+/// Link each `(media, sidecar, prefix)` into `folder` as `<prefix>__<name>`; a name used twice gets `_1`, `_2`, as
+/// Serval and Caracal name their copies.
 pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
     if let Err(err) = std::fs::create_dir_all(folder) {
         return Outcome::Failed(format!("{}: {err}", folder.display()));
@@ -35,7 +94,7 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
             Some((stem, ext)) => (stem.to_string(), format!(".{ext}")),
             None => (target.clone(), String::new()),
         };
-        let mut n = 1;
+        let mut n = 0;
         while !used.insert(target.to_lowercase()) {
             n += 1;
             target = format!("{stem}_{n}{ext}");
@@ -83,7 +142,24 @@ fn is_cross_device(err: &std::io::Error) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Outcome, make};
+    use super::{Outcome, make, prefix};
+
+    #[test]
+    fn names_match_caracal_and_serval_extract() {
+        let list = |values: &[&str]| values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
+        // Caracal's examples (2026-10-23).
+        assert_eq!(
+            prefix(
+                &list(&["Tibetan fox", "Plateau pika"]),
+                &list(&["F03"]),
+                "DQ6061"
+            ),
+            "Plateau pika+Tibetan fox__F03__DQ6061"
+        );
+        assert_eq!(prefix(&list(&["雪豹"]), &[], "DQ6061"), "雪豹__DQ6061");
+        assert_eq!(prefix(&[], &[], "DQ6062"), "untagged__DQ6062");
+        assert_eq!(prefix(&list(&["Bird spp."]), &[], "A/B"), "Bird spp__A_B");
+    }
 
     #[test]
     fn review_folder_links_media_and_sidecars_without_name_clashes() {
@@ -107,10 +183,10 @@ mod tests {
         };
         assert_eq!(files, 2);
         assert_eq!(
-            std::fs::read_to_string(folder.join("雪豹__IMG_0001_2.JPG")).unwrap(),
+            std::fs::read_to_string(folder.join("雪豹__IMG_0001_1.JPG")).unwrap(),
             "dep2"
         );
-        assert!(folder.join("雪豹__IMG_0001_2.JPG.xmp").exists());
+        assert!(folder.join("雪豹__IMG_0001_1.JPG.xmp").exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

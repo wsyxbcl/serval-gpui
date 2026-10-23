@@ -40,8 +40,9 @@ The table is the working document; the XMP files are updated deliberately, with 
 ## 3. Review folder (Explorer)
 
 - The chosen media and their sidecars are **hard-linked** into `<data>_serval_output/serval_review/<date>_<species>/`
-  and the folder is opened. Names are `<species>__<deployment>__<file name>` so the folder sorts by species and
-  deployment; a name used twice gets `_2`.
+  and the folder is opened. Names are `<species>__<individuals>__<deployment>__<file name>`, the same as Caracal's
+  browser copies and `serval extract --rename` (individuals left out when empty, `untagged` without species); a
+  name used twice gets `_1`, `_2`. (Aligned with Caracal 2026-10-23.)
 - Hard links take no space; Explorer, Photos and the player treat them as the real files, and copying out of the
   folder copies the real files. Edits Serval makes later replace the sidecar, so a review folder is a snapshot.
 - Once the folder is made, a warning says the files are the originals: rotating or editing there changes them;

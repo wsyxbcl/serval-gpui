@@ -202,13 +202,15 @@ pub fn output_list(run: &Run, cx: &App) -> Option<Div> {
                             .text_color(cx.theme().muted_foreground)
                             .child(detail),
                     )
-                    .children(crate::caracal::Mode::for_output(&path).map(|mode| {
-                        let path = path.clone();
-                        Button::new(("caracal-output", i))
-                            .ghost()
-                            .label(t("在 Caracal 中打开", "Open in Caracal"))
-                            .on_click(move |_, _, cx| crate::caracal::open(mode, &path, cx))
-                    }))
+                    .children(
+                        crate::caracal::Mode::for_output(&path, &file.columns).map(|mode| {
+                            let path = path.clone();
+                            Button::new(("caracal-output", i))
+                                .ghost()
+                                .label(t("在 Caracal 中打开", "Open in Caracal"))
+                                .on_click(move |_, _, cx| crate::caracal::open(mode, &path, cx))
+                        }),
+                    )
                     .child(
                         Button::new(("open-output", i))
                             .ghost()

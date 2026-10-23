@@ -136,7 +136,7 @@ Rules:
 - [ ] Update check and download from the project's own server (manifest, checksums, signature); Waxbill itself notify-only at first. Later.
 - [x] 2026-10-14 review: the run log scrolls (the page takes the wheel only at the log's ends; a rendering test); Chinese in one font on Linux; sidebar in five groups (查看媒体, XMP 更新 renamed); a larger logo and the logo in 关于; paths not remembered across launches; capture event IDs on; rename/align start as a preview with 按此执行; next steps from 标签获取's tags table (独立捕获, 媒体提取, 查看媒体).
 - [x] Help (帮助, F1): a panel per screen with the written texts (help/zh, drafts for review) and Serval's `--help` on request. English texts to follow.
-- [ ] 在 Caracal 中打开 for 独立捕获's results (with deployment and eventID), once Caracal confirms the table and mode.
+- [x] 在 Caracal 中打开 for 独立捕获's `events_…` (by species, Serval 0.8.2+): `#species`, shown only when the table has `path`, `datetime` and `species`; per-individual and Camtrap DP results follow when Caracal supports them. Review-folder names aligned with Caracal (`<species>__<individuals>__<deployment>__<file>`, `_1`, `_2`). (2026-10-23)
 - [x] Layout at 1366×768 (also with help open): fits, with the sidebar and page scrolling. Plain-language messages for the commonest Serval errors (missing file or folder, permission, file in use, disk full, missing column, bad times, bad deploymentID), Serval's own words beside them. (Copy diagnostics: not needed, 2026-10-16.)
 - [x] Serval 0.8.1 (2026-10-19): transfer and sidecar fixes, and `observe` on a missing folder is an error. Binaries: run Serval's "Build Release Binaries" with v0.8.1.
 - [ ] Draw the board for the hand-off screen.

@@ -167,10 +167,7 @@ impl Browse {
             .iter()
             .map(|&i| {
                 let r = &self.records.all[i];
-                let mut prefix = safe(&r.species.join("+"));
-                if !r.deployment.is_empty() {
-                    prefix = format!("{prefix}__{}", safe(&r.deployment));
-                }
+                let prefix = review::prefix(&r.species, &r.individuals, &r.deployment);
                 (r.media.clone(), r.sidecar.clone(), prefix)
             })
             .collect();
