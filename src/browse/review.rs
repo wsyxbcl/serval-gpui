@@ -6,10 +6,15 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 pub enum Outcome {
+    /// Made, with how many listed files were not found.
     Made {
         folder: PathBuf,
         files: usize,
+        missing: usize,
     },
+    /// None of the listed media exist (a table from another computer, a drive with another letter): nothing is
+    /// made. The first missing file, to show.
+    NotFound(PathBuf),
     /// The media are on another drive or a network share: links cannot be made there.
     CannotLink,
     Failed(String),
@@ -81,6 +86,7 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
     }
     let mut used: HashSet<String> = HashSet::new();
     let mut made = 0;
+    let mut missing: Vec<&Path> = Vec::new();
     for (media, sidecar, prefix) in files {
         let Some(name) = media.file_name().map(|n| n.to_string_lossy().into_owned()) else {
             continue;
@@ -106,7 +112,10 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
                 let _ = std::fs::remove_dir(folder);
                 return Outcome::CannotLink;
             }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue, // listed but gone
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                missing.push(media);
+                continue;
+            }
             Err(err) => return Outcome::Failed(format!("{}: {err}", media.display())),
         }
         // Either spelling of the sidecar, linked with the spelling it has.
@@ -120,9 +129,16 @@ pub fn make(folder: &Path, files: &[(PathBuf, PathBuf, String)]) -> Outcome {
             let _ = std::fs::hard_link(found, folder.join(format!("{target}.{ext}")));
         }
     }
+    if made == 0
+        && let Some(first) = missing.first()
+    {
+        let _ = std::fs::remove_dir(folder);
+        return Outcome::NotFound(first.to_path_buf());
+    }
     Outcome::Made {
         folder: folder.to_path_buf(),
         files: made,
+        missing: missing.len(),
     }
 }
 
@@ -178,15 +194,26 @@ mod tests {
             )
         };
         let folder = dir.join("review");
-        let Outcome::Made { files, .. } = make(&folder, &[file("dep1"), file("dep2")]) else {
+        let gone = (
+            dir.join("gone/IMG_9.JPG"),
+            dir.join("gone/IMG_9.JPG.xmp"),
+            "雪豹".to_string(),
+        );
+        let Outcome::Made { files, missing, .. } =
+            make(&folder, &[file("dep1"), file("dep2"), gone.clone()])
+        else {
             panic!("not made")
         };
-        assert_eq!(files, 2);
+        assert_eq!((files, missing), (2, 1));
         assert_eq!(
             std::fs::read_to_string(folder.join("雪豹__IMG_0001_1.JPG")).unwrap(),
             "dep2"
         );
         assert!(folder.join("雪豹__IMG_0001_1.JPG.xmp").exists());
+        // A table whose media are all elsewhere (another computer, another drive letter): no empty folder.
+        let elsewhere = dir.join("review-elsewhere");
+        assert!(matches!(make(&elsewhere, &[gone]), Outcome::NotFound(_)));
+        assert!(!elsewhere.exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

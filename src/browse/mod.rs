@@ -43,7 +43,10 @@ impl EventEmitter<BrowseEvent> for Browse {}
 enum Review {
     None,
     Making,
-    Made(PathBuf, usize),
+    /// The folder, the files linked, and the listed files not found.
+    Made(PathBuf, usize, usize),
+    /// None of the chosen media exist; the first one.
+    NotFound(PathBuf),
     CannotLink,
     Failed(String),
 }
@@ -180,10 +183,15 @@ impl Browse {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.review = match outcome {
-                    review::Outcome::Made { folder, files } => {
+                    review::Outcome::Made {
+                        folder,
+                        files,
+                        missing,
+                    } => {
                         cx.open_with_system(&folder);
-                        Review::Made(folder, files)
+                        Review::Made(folder, files, missing)
                     }
+                    review::Outcome::NotFound(first) => Review::NotFound(first),
                     review::Outcome::CannotLink => Review::CannotLink,
                     review::Outcome::Failed(err) => Review::Failed(err),
                 };
@@ -485,7 +493,7 @@ impl Render for Browse {
         let review_status: Option<Div> = match &self.review {
             Review::None => None,
             Review::Making => Some(help_line(t("正在建立…", "Making it…"), Tone::Quiet, cx)),
-            Review::Made(folder, n) => {
+            Review::Made(folder, n, missing) => {
                 let folder = folder.clone();
                 Some(
                     v_flex().gap(tokens.px("space-2")).child(
@@ -493,9 +501,19 @@ impl Render for Browse {
                         .gap(tokens.px("space-2"))
                         .child(help_line(
                             match language() {
+                                Language::Chinese if *missing > 0 => format!(
+                                    "已建立 {} 个文件的查看文件夹，已在资源管理器中打开；另有 {} 个文件找不到。",
+                                    count(*n),
+                                    count(*missing)
+                                ),
                                 Language::Chinese => {
                                     format!("已建立 {} 个文件的查看文件夹，已在资源管理器中打开。", count(*n))
                                 }
+                                Language::English if *missing > 0 => format!(
+                                    "Made a review folder of {} files and opened it; {} files were not found.",
+                                    count(*n),
+                                    count(*missing)
+                                ),
                                 Language::English => format!("Made a review folder of {} files and opened it.", count(*n)),
                             },
                             Tone::Quiet,
@@ -543,6 +561,20 @@ impl Render for Browse {
                         )
                     }),
             ),
+            Review::NotFound(first) => Some(help_line(
+                match language() {
+                    Language::Chinese => format!(
+                        "找不到表中的媒体文件，例如 {}。表格是否来自另一台电脑，或移动硬盘的盘符变了？",
+                        first.display()
+                    ),
+                    Language::English => format!(
+                        "The media in the table are not found, e.g. {}. Is the table from another computer, or has the drive letter changed?",
+                        first.display()
+                    ),
+                },
+                Tone::Danger,
+                cx,
+            )),
             Review::Failed(err) => Some(help_line(err.clone(), Tone::Danger, cx)),
         };
         // The choice feeds only the review folder, so it lives in that card; Caracal and 应用表格到文件 take the
