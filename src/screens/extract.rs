@@ -388,7 +388,6 @@ impl ExtractForm {
                 "species".into(),
             ]);
         }
-        args.extend(["--progress".into(), "json".into()]);
         if let Some(csv) = &csv {
             let dir =
                 output::command_dir(&self.output_root(csv), "extract").join(self.run_folder());

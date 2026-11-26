@@ -228,7 +228,6 @@ impl CaptureForm {
         if !self.exclude {
             args.push("--no-exclude".into());
         }
-        args.extend(["--progress".into(), "json".into()]);
         if let Some(csv) = &csv {
             args.push("-o".into());
             args.push(

@@ -1181,13 +1181,7 @@ fn run_args(
             args.drain(i..(i + answer.len()).min(args.len()));
         }
     }
-    let at = args
-        .iter()
-        .position(|a| a == "--progress")
-        .unwrap_or(args.len());
-    for (i, arg) in extra.iter().enumerate() {
-        args.insert(at + i, arg.to_string());
-    }
+    args.extend(extra.iter().map(|arg| arg.to_string()));
     args
 }
 
@@ -1197,12 +1191,10 @@ mod tests {
 
     #[test]
     fn a_run_for_real_stays_for_real_when_continued_or_answered() {
-        let form: Vec<String> = ["align", "--dryrun", "--progress", "json", "/in"]
-            .map(String::from)
-            .to_vec();
+        let form: Vec<String> = ["align", "--dryrun", "/json"].map(String::from).to_vec();
         let command = crate::screens::display_command(&form);
         let real = run_args(None, &command, &form, &[], &["--dryrun"]);
-        assert_eq!(real.join(" "), "align --progress json /in");
+        assert_eq!(real.join(" "), "align /json");
         // Continued after a pause, then a conflict answered twice.
         let continued = run_args(Some((command.clone(), real)), &command, &form, &[], &[]);
         let answered = run_args(
@@ -1219,9 +1211,6 @@ mod tests {
             &["--on-existing", "replace"],
             &[],
         );
-        assert_eq!(
-            again.join(" "),
-            "align --on-existing replace --progress json /in"
-        );
+        assert_eq!(again.join(" "), "align /json --on-existing replace");
     }
 }

@@ -184,3 +184,5 @@ viewer → `set` with `expect`; "添加物种" on a selection → `add`; writing
   (`apply_tag_ops`, `apply_rating_ops`, `write_xmp_with_backup`), plus `--backup first` and `--log-to`.
 - Tests: the level-numbering vectors (§3) shared with Waxbill; one end-to-end test per command that runs without
   a terminal and checks no prompt is reached.
+
+The copied terminal command includes task options and conflict decisions. Waxbill supplies the global `--progress json` option when it starts Serval.

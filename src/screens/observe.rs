@@ -204,7 +204,7 @@ impl ObserveForm {
 
     pub fn plan(&self, cx: &App) -> Plan {
         let input = self.input_path(cx);
-        let mut args = vec!["observe".to_string(), "--progress".into(), "json".into()];
+        let mut args = vec!["observe".to_string()];
         if let Some(input) = &input {
             args.push("-o".into());
             args.push(

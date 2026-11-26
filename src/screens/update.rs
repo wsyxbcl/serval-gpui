@@ -257,11 +257,7 @@ impl UpdateForm {
         if dry_run {
             args.push("--dry-run".into());
         }
-        args.extend([
-            "--progress".into(),
-            "json".into(),
-            csv.to_string_lossy().into(),
-        ]);
+        args.push(csv.to_string_lossy().into());
         args
     }
 
@@ -355,7 +351,6 @@ impl UpdateForm {
             (_, _, "datetime") => args.push("--datetime".into()),
             (_, _, kind) => args.extend(["-t".into(), kind.into()]),
         }
-        args.extend(["--progress".into(), "json".into()]);
         args.extend(csv.as_ref().map(|p| p.to_string_lossy().into_owned()));
         let preview = self.preview();
         let ready = match (&csv, &self.table) {
@@ -913,6 +908,7 @@ impl UpdateForm {
 fn dry_run(program: &Path, args: &[String], cwd: &Path) -> WriteCheck {
     use crate::runner::Event;
     let output = match crate::runner::background_command(program)
+        .args(["--progress", "json"])
         .args(args)
         .current_dir(cwd)
         .stdin(std::process::Stdio::null())
