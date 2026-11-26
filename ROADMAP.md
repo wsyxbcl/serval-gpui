@@ -13,6 +13,8 @@ Rules:
 
 ## Agent Work
 
+- [x] Terminal-friendly copied commands and whole-event extraction by species or ID.
+
 - [x] Read-only volunteer progress by folder or deployment, with scoped Caracal species analysis.
 
 ### Completed

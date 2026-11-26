@@ -18,7 +18,7 @@ The run bar always answers one of: what will happen, what is happening, what hap
 | Failed | red | "失败 · <how far it got>" | 重新运行 |
 | Paused | grey | "已暂停 · done / total" | 继续 Ctrl+Enter, and 取消 beside it |
 
-- The exact command (with every flag Waxbill will pass) is shown under the status line before, during and after
+- The terminal command (with task options and any conflict decision) is shown under the status line before, during and after
   the run, and "复制命令" copies it, quoted so that a shell gets the same arguments (single quotes on Linux and
   macOS; on Windows double quotes unless an argument holds what cmd or PowerShell would expand, then PowerShell's
   single quotes). During a failure the secondary action is "复制日志".

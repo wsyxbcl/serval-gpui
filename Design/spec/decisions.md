@@ -31,7 +31,7 @@ place and the status changes here.
 
 - Waxbill is a light front end for Serval: forms in, files out. It does not reimplement Serval.
 - Every screen says what will happen, what is happening, or what happened, and what to do next.
-- The exact Serval command stays visible and copyable; Waxbill never does anything the command line cannot.
+- The terminal command stays visible and copyable. Waxbill adds JSON progress when starting the process; Waxbill never does anything the command line cannot.
 - Plain words over technical detail; the raw log is always one click away.
 
 ## W03 Flags instead of prompts: confirmed

@@ -1,0 +1,5 @@
+path,deployment,datetime,species,event_id
+/data/spring/A03/001.jpg,A03,2025-04-01 12:10:00,雪豹,1
+/data/spring/A03/002.jpg,A03,2025-04-01 12:10:01,雪豹,1
+/data/spring/B02/003.jpg,B02,2025-04-02 09:02:00,雪豹,2
+/data/fall/A03/004.jpg,A03,2025-10-01 09:02:00,,

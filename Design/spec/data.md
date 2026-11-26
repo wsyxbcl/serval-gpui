@@ -74,3 +74,5 @@ Ranked by value for the work Serval supports, cheapest first:
    the background). A table editor for the `xmp_update` columns remains an option for bulk corrections.
 5. **Project memory**: Waxbill remembers per data folder the last inputs, the identified species, the deployment
    level and the taglist, so a returning user starts where they left off.
+
+Extract accepts capture event tables. Choose whole events by species or ID. Rows with an empty event ID are skipped. The preview counts one copy per media path within each selected event. The output contains an event_<id> folder per event.

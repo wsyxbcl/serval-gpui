@@ -50,7 +50,7 @@ Every command screen, top to bottom:
    command's help (from `serval <cmd> --help`, localised where available).
 2. Result area (only after a run): see [run §3](run.md#3-results).
 3. Form in cards: inputs first, then options, then output location, then "高级选项" collapsed.
-4. Run bar (sticky, `--runbar-h`): status line, the exact command (one line, monospace, truncated in the
+4. Run bar (sticky, `--runbar-h`): status line, the terminal command (one line, monospace, truncated in the
    middle), "复制命令", and the one primary button. See [run §1](run.md#1-run-bar).
 
 Rules:

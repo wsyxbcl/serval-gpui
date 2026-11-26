@@ -54,6 +54,8 @@ pub const DESIGN_STATES: &[&str] = &[
     "settings-ready",
     "settings-unsupported",
     "capture-ready",
+    "volunteer-progress",
+    "extract-events",
     "extract-from-data",
     "extract-keep-dirs",
     "extract-conflicts",
@@ -203,6 +205,23 @@ impl Waxbill {
             version: version.into(),
         };
         match design_state {
+            Some(state @ ("volunteer-progress" | "extract-events")) => {
+                let path = launch.open.unwrap_or_else(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("Design/examples/events_species.csv")
+                });
+                let file = path.to_string_lossy().into_owned();
+                app.serval = example_serval("0.8.2", "serval");
+                if state == "volunteer-progress" {
+                    app.screen = ScreenId::Browse;
+                    app.browse
+                        .update(cx, |form, cx| form.set_table(file, window, cx));
+                } else {
+                    app.screen = ScreenId::Extract;
+                    app.extract
+                        .update(cx, |form, cx| form.set_event_example(file, window, cx));
+                }
+            }
             Some("first-run") => app.serval = ServalStatus::Missing,
             Some(state @ ("extract-from-data" | "extract-keep-dirs" | "extract-conflicts")) => {
                 app.serval = example_serval("0.8.0", "serval");
@@ -314,15 +333,33 @@ impl Waxbill {
 
     fn detect_serval(&mut self, program: Option<PathBuf>, run: bool, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
-            let status = cx
+            let (status, event_extract) = cx
                 .background_executor()
-                .spawn(async move { serval::find(program) })
+                .spawn(async move {
+                    let status = serval::find(program);
+                    let events = status.program().is_some_and(|program| {
+                        crate::runner::background_command(program)
+                            .args(["extract", "--help"])
+                            .output()
+                            .is_ok_and(|out| {
+                                out.status.success()
+                                    && String::from_utf8_lossy(&out.stdout)
+                                        .split_whitespace()
+                                        .any(|word| word == "--unit")
+                            })
+                    });
+                    (status, events)
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 cx.set_global(crate::serval::ServalProgram(
                     status.program().map(Into::into),
                 ));
                 crate::log::line(format!("Serval: {status:?}"));
+                this.extract.update(cx, |form, cx| {
+                    form.supports_events = event_extract;
+                    cx.notify();
+                });
                 this.serval = status;
                 // The write preview needs Serval.
                 this.update.update(cx, |form, cx| form.recheck(cx));
@@ -1163,7 +1200,7 @@ impl Render for Waxbill {
 
 /// The arguments of a run: the last run's (`last`: its form command and arguments) while the form still says
 /// `form_command`, else the form's; without `without`; with `extra`, an answer such as `--on-existing skip`, in place
-/// of an earlier answer to the same question and before the positional arguments at the end (`-o <dir> <input>`).
+/// of an earlier answer to the same question.
 fn run_args(
     last: Option<(String, Vec<String>)>,
     form_command: &str,
