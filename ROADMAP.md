@@ -13,6 +13,8 @@ Rules:
 
 ## Agent Work
 
+- [x] Read-only volunteer progress by folder or deployment, with scoped Caracal species analysis.
+
 ### Completed
 - [x] Created initial project specification and working plan.
 - [x] Defined v1 direction: thin GUI wrapper over the existing `serval` CLI.

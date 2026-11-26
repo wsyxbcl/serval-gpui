@@ -1011,7 +1011,7 @@ impl Waxbill {
                 ))
                 .child(step(
                     "next-browse",
-                    t("查看媒体", "View media"),
+                    t("查看标注进度和媒体", "Labeling progress and media"),
                     ScreenId::Browse,
                     cx,
                 )),
