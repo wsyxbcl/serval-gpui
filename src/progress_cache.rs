@@ -289,10 +289,10 @@ fn observe(
         };
         if let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) {
             let message = event["message"].as_str().unwrap_or(&line);
-            if event["serval"] == "file_error" {
-                if let Some(path) = event["path"].as_str() {
-                    failed.insert(PathBuf::from(path));
-                }
+            if event["serval"] == "file_error"
+                && let Some(path) = event["path"].as_str()
+            {
+                failed.insert(PathBuf::from(path));
             }
             if event["serval"] == "error" {
                 failure.get_or_insert_with(|| message.to_string());

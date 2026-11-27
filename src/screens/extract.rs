@@ -1248,7 +1248,7 @@ mod event_tests {
             gpui_kit::init(cx);
             crate::theme::init(ThemeMode::Light, cx);
         });
-        let (form, cx) = cx.add_window_view(|window, cx| ExtractForm::new(window, cx));
+        let (form, cx) = cx.add_window_view(ExtractForm::new);
         form.update_in(cx, |form, window, cx| {
             let file =
                 Path::new(env!("CARGO_MANIFEST_DIR")).join("Design/examples/events_species.csv");
