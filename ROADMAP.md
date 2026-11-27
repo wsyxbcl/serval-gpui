@@ -15,7 +15,7 @@ Rules:
 
 - [x] Terminal-friendly copied commands and whole-event extraction by species or ID.
 
-- [x] Read-only volunteer progress by folder or deployment, with scoped Caracal species analysis.
+- [ ] Replace the browse-page progress prototype with Tools → 标注进度, a folder tree and a Waxbill-managed local snapshot. See Design/spec/volunteer-progress.md.
 
 ### Completed
 - [x] Created initial project specification and working plan.

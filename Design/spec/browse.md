@@ -72,11 +72,3 @@ The table is the working document; the XMP files are updated deliberately, with 
 - Options: the fields to write (species, individual and rating by default; time is off because spreadsheet
   programs rewrite times when saving), and "没有 XMP 的媒体文件，从媒体文件创建" (`--create-missing`,
   on by default). Run is `serval xmp write` with the same options.
-
-## Volunteer progress
-
-Read the initialized task folder with Read tags (XMP), then choose Labeling progress and media.
-The denominator is the number of distinct media paths. A file with any species counts once.
-Folder grouping uses the full prefix through the chosen level. Deployment grouping combines equal
-folder names at that level. Open a group in Caracal species analysis with every original row of
-its members, including untagged files. Rerun Read tags after labeling in digiKam to refresh.
