@@ -4,7 +4,7 @@
 //! edited table comes back through 应用表格到文件 (`xmp write`).
 
 pub mod records;
-mod review;
+pub(crate) mod review;
 
 use crate::i18n::{Language, count, language, t};
 use crate::output;
@@ -58,9 +58,6 @@ pub struct Browse {
     records: Records,
     species: BTreeSet<String>,
     rating: usize,
-    level: Option<usize>,
-    by_site: bool,
-    progress: std::collections::BTreeMap<String, records::ProgressGroup>,
     show_all: bool,
     review: Review,
     /// The chosen rows saved for Caracal, and how many files they are; or why they could not be saved.
@@ -86,9 +83,6 @@ impl Browse {
             records: Records { all: Vec::new() },
             species: BTreeSet::new(),
             rating: 0,
-            level: None,
-            by_site: false,
-            progress: Default::default(),
             show_all: false,
             review: Review::None,
             caracal: None,
@@ -116,19 +110,10 @@ impl Browse {
             Some(Ok(csv)) => {
                 let column = csv.column("path");
                 let level = detect_level(csv.rows.iter().map(|r| csv.cell(r, column)));
-                self.level = level.or_else(|| {
-                    csv.rows
-                        .first()?
-                        .get(column?)?
-                        .split(['/', '\\'])
-                        .count()
-                        .checked_sub(2)
-                });
                 Records::from_csv(csv, level)
             }
             _ => Records { all: Vec::new() },
         };
-        self.progress = self.records.progress(self.level, self.by_site);
         let records = &self.records;
         self.species
             .retain(|s| records.all.iter().any(|r| r.species.contains(s)));
@@ -282,104 +267,6 @@ impl Browse {
         }
         self.caracal = Some(saved.map(|subset| (subset, chosen.len())));
         cx.notify();
-    }
-
-    fn render_progress(&self, path: &Path, cx: &mut Context<Self>) -> Div {
-        use crate::caracal::{Mode, open};
-        let tagged: usize = self.progress.values().map(|g| g.tagged).sum();
-        let fraction = |n: usize, total: usize| {
-            let pct = if total == 0 {
-                0.0
-            } else {
-                100.0 * n as f64 / total as f64
-            };
-            format!("{} / {} ({pct:.1}%)", count(n), count(total))
-        };
-        let whole = path.to_owned();
-        let mut body = card(cx).child(
-            h_flex()
-                .justify_between()
-                .child(format!(
-                    "{} · {}",
-                    t("物种标注进度", "Species labeling progress"),
-                    fraction(tagged, self.records.all.len())
-                ))
-                .child(
-                    Button::new("progress-all")
-                        .outline()
-                        .label(t("在 Caracal 中打开全部", "Open all in Caracal"))
-                        .on_click(move |_, _, cx| open(Mode::Species, &whole, cx)),
-                ),
-        );
-        if let Some(sample) = self.records.all.first() {
-            body =
-                body.child(h_flex().gap(px(8.)).children([false, true].into_iter().map(
-                    |by_site| {
-                        Button::new(("progress-by", by_site as usize))
-                            .outline()
-                            .disabled(self.by_site == by_site)
-                            .label(if by_site {
-                                t("按位点", "By deployment")
-                            } else {
-                                t("按路径", "By folder")
-                            })
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.by_site = by_site;
-                                this.progress = this.records.progress(this.level, by_site);
-                                cx.notify();
-                            }))
-                    },
-                )))
-                .child(crate::screens::form::level_picker(
-                    &sample.media.to_string_lossy(),
-                    self.level,
-                    cx,
-                    |this: &mut Self, level, cx| {
-                        this.level = Some(level);
-                        this.progress = this.records.progress(this.level, this.by_site);
-                        cx.notify();
-                    },
-                ));
-        }
-        for (i, (name, group)) in self.progress.iter().enumerate() {
-            let name = name.clone();
-            let table = path.to_owned();
-            body = body.child(
-                h_flex()
-                    .justify_between()
-                    .child(format!(
-                        "{} · {}",
-                        if name.is_empty() {
-                            t("未分组", "Ungrouped")
-                        } else {
-                            &name
-                        },
-                        fraction(group.tagged, group.files)
-                    ))
-                    .child(
-                        Button::new(("progress-group", i))
-                            .ghost()
-                            .label(t("在 Caracal 中打开", "Open in Caracal"))
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                if let (Some(Ok(csv)), Some(group)) =
-                                    (&this.table, this.progress.get(&name))
-                                {
-                                    let stem = table.with_file_name(format!(
-                                        "{}_progress",
-                                        table.file_stem().unwrap_or_default().to_string_lossy()
-                                    ));
-                                    let saved = review::subset(csv, &group.rows, &stem);
-                                    if let Ok(path) = &saved {
-                                        open(Mode::Species, path, cx);
-                                    }
-                                    this.caracal = Some(saved.map(|path| (path, group.files)));
-                                    cx.notify();
-                                }
-                            })),
-                    ),
-            );
-        }
-        body
     }
 
     fn render_choice(&self, cx: &mut Context<Self>) -> Div {
@@ -931,7 +818,6 @@ impl Render for Browse {
         v_flex()
             .gap(tokens.px("space-4"))
             .child(table_card)
-            .child(self.render_progress(&path, cx))
             .child(choice)
             .child(explorer)
             .child(caracal)

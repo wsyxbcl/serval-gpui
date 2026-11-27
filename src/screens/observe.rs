@@ -14,6 +14,7 @@ use gpui_kit::component::radio::{Radio, RadioGroup};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -23,6 +24,8 @@ enum Found {
     Nothing,
     Counting,
     Counted(FolderCount),
+    List { rows: usize, files: usize },
+    Invalid(String),
     Missing,
 }
 
@@ -40,14 +43,17 @@ pub struct ObserveForm {
     count_generation: usize,
     /// Its command is running: the inputs are disabled (the app also blocks the mouse).
     pub locked: bool,
+    pub supports_files_from: bool,
     _subscriptions: Vec<Subscription>,
 }
 
 impl ObserveForm {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .placeholder(t("选择或拖入一个文件夹", "Choose or drop a folder"))
+            InputState::new(window, cx).placeholder(t(
+                "选择或拖入文件夹或 CSV 清单",
+                "Choose or drop a folder or CSV list",
+            ))
         });
         let subscription = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, _, cx| {
             if matches!(event, InputEvent::Change) {
@@ -67,6 +73,7 @@ impl ObserveForm {
             id_species: Vec::new(),
             count_generation: 0,
             locked: false,
+            supports_files_from: false,
             _subscriptions: vec![subscription],
         }
     }
@@ -131,7 +138,8 @@ impl ObserveForm {
     fn input_path(&self, cx: &App) -> Option<PathBuf> {
         let value = self.input.read(cx).value();
         let value = value.trim();
-        (!value.is_empty()).then(|| PathBuf::from(value))
+        (!value.is_empty())
+            .then(|| std::path::absolute(value).unwrap_or_else(|_| PathBuf::from(value)))
     }
 
     /// Count the folder a moment after typing stops.
@@ -155,37 +163,55 @@ impl ObserveForm {
             cx.notify();
             return;
         };
+        self.found = Found::Counting;
+        cx.notify();
         cx.spawn(async move |this, cx| {
             cx.background_executor()
                 .timer(Duration::from_millis(300))
                 .await;
-            let still_current = this
-                .update(cx, |this, cx| {
-                    let current = this.count_generation == generation;
-                    if current {
-                        this.found = if path.is_dir() {
-                            Found::Counting
-                        } else {
-                            Found::Missing
-                        };
-                        cx.notify();
-                    }
-                    current && path.is_dir()
-                })
-                .unwrap_or(false);
-            if !still_current {
+            if !this
+                .update(cx, |this, _| this.count_generation == generation)
+                .unwrap_or(false)
+            {
                 return;
             }
-            let counted = cx
+            let found = cx
                 .background_executor()
-                .spawn(async move { count_folder(&path) })
+                .spawn(async move {
+                    if path.is_dir() {
+                        Found::Counted(count_folder(&path))
+                    } else if csv_extension(&path) {
+                        preview_list(&path).unwrap_or_else(Found::Invalid)
+                    } else {
+                        Found::Missing
+                    }
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 if this.count_generation == generation {
-                    this.found = Found::Counted(counted);
+                    this.found = found;
                     cx.notify();
                 }
             });
+        })
+        .detach();
+    }
+
+    fn choose_list(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let paths = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: None,
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = paths.await
+                && let Some(path) = paths.into_iter().next()
+            {
+                let _ = this.update_in(cx, |this, window, cx| {
+                    this.set_input(path.to_string_lossy().into_owned(), window, cx)
+                });
+            }
         })
         .detach();
     }
@@ -204,6 +230,8 @@ impl ObserveForm {
 
     pub fn plan(&self, cx: &App) -> Plan {
         let input = self.input_path(cx);
+        let is_list =
+            input.as_deref().is_some_and(csv_extension) && !matches!(self.found, Found::Counted(_));
         let mut args = vec!["observe".to_string()];
         if let Some(input) = &input {
             args.push("-o".into());
@@ -228,10 +256,26 @@ impl ObserveForm {
             _ => {}
         }
         if let Some(input) = &input {
+            if is_list {
+                args.push("--files-from".into());
+            }
             args.push(input.to_string_lossy().into());
         }
         let ready = match (&input, &self.found) {
-            (None, _) => Err(t("选择媒体文件夹", "choose the media folder").to_string()),
+            (None, _) => Err(t(
+                "选择媒体文件夹或 CSV 清单",
+                "choose a media folder or CSV list",
+            )
+            .to_string()),
+            _ if is_list && !self.supports_files_from => Err(t(
+                "请在设置中选择支持 --files-from 的 Serval",
+                "choose a Serval with --files-from support in Settings",
+            )
+            .to_string()),
+            (_, Found::Invalid(error)) => Err(error.clone()),
+            (_, Found::Counting | Found::Nothing) if is_list => {
+                Err(t("正在读取清单…", "Reading the list…").to_string())
+            }
             (Some(_), Found::Missing) => {
                 Err(t("媒体文件夹不存在", "the media folder does not exist").to_string())
             }
@@ -275,6 +319,15 @@ impl ObserveForm {
                     cx,
                 ));
             }
+            Found::Invalid(message) => return Some(help_line(message.clone(), Tone::Danger, cx)),
+            Found::List { rows, files } => match crate::i18n::language() {
+                crate::i18n::Language::Chinese => {
+                    format!("{} 行，{} 个不同文件路径", count(*rows), count(*files))
+                }
+                crate::i18n::Language::English => {
+                    format!("{} rows, {} unique file paths", count(*rows), count(*files))
+                }
+            },
             Found::Counted(found) => match crate::i18n::language() {
                 crate::i18n::Language::Chinese => format!(
                     "找到 {} 张图片、{} 个视频、{} 个 XMP",
@@ -301,7 +354,7 @@ impl Render for ObserveForm {
 
         let input_card = card(cx)
             .child(accept_drop(
-                field(t("媒体文件夹", "Media folder"), cx)
+                field(t("媒体文件夹或 CSV 清单", "Media folder or CSV list"), cx)
                     .child(
                         h_flex()
                             .gap(tokens.px("space-2"))
@@ -315,11 +368,20 @@ impl Render for ObserveForm {
                             )
                             .child(
                                 Button::new("choose-input")
-                                    .label(t("选择…", "Choose…"))
+                                    .label(t("文件夹…", "Folder…"))
                                     .outline()
                                     .large()
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.choose_folder(window, cx)
+                                    })),
+                            )
+                            .child(
+                                Button::new("choose-list")
+                                    .label("CSV…")
+                                    .outline()
+                                    .large()
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.choose_list(window, cx)
                                     })),
                             ),
                     )
@@ -424,4 +486,74 @@ fn folder_key(folder: &Path) -> String {
         "folder.{}.id_species",
         folder.to_string_lossy().trim_end_matches(['/', '\\'])
     )
+}
+
+fn csv_extension(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("csv"))
+}
+
+fn preview_list(path: &Path) -> Result<Found, String> {
+    let reader = csv::Reader::from_path(path).map_err(|err| err.to_string())?;
+    count_list(reader, path.parent().unwrap_or(Path::new(".")))
+}
+
+fn count_list<R: std::io::Read>(mut reader: csv::Reader<R>, base: &Path) -> Result<Found, String> {
+    let column = reader
+        .headers()
+        .map_err(|err| err.to_string())?
+        .iter()
+        .position(|name| name == "path")
+        .ok_or_else(|| t("清单缺少 path 列", "the list needs a path column").to_string())?;
+    let mut files = HashSet::new();
+    let mut rows = 0;
+    for record in reader.records() {
+        let record = record.map_err(|err| err.to_string())?;
+        rows += 1;
+        let file = record.get(column).unwrap_or_default();
+        if file.is_empty() {
+            return Err(format!(
+                "{} {}",
+                t("path 为空，行号", "empty path at row"),
+                rows + 1
+            ));
+        }
+        files.insert(base.join(file));
+    }
+    if files.is_empty() {
+        return Err(t("清单中没有文件", "the list contains no files").to_string());
+    }
+    Ok(Found::List {
+        rows,
+        files: files.len(),
+    })
+}
+
+#[cfg(test)]
+mod list_tests {
+    use super::{Found, count_list};
+    use std::path::Path;
+
+    #[test]
+    fn counts_rows_and_distinct_paths_relative_to_the_manifest() {
+        let base = std::env::temp_dir();
+        let path = base.join("a,1.jpg");
+        let input = format!(
+            "\u{feff}species,path\r\ncat,\"a,1.jpg\"\r\nfox,\"{}\"\r\ncat,b.jpg\r\n",
+            path.display()
+        );
+        assert_eq!(
+            count_list(csv::Reader::from_reader(input.as_bytes()), &base),
+            Ok(Found::List { rows: 3, files: 2 })
+        );
+    }
+
+    #[test]
+    fn rejects_lists_without_file_paths() {
+        for input in ["species\ncat\n", "path\n", "species,path\ncat,\n"] {
+            assert!(
+                count_list(csv::Reader::from_reader(input.as_bytes()), Path::new(".")).is_err()
+            );
+        }
+    }
 }

@@ -52,41 +52,7 @@ pub struct Counts {
     pub folders: Vec<(String, usize)>,
 }
 
-#[derive(Default)]
-pub struct ProgressGroup {
-    pub tagged: usize,
-    pub files: usize,
-    pub rows: Vec<usize>,
-}
-
 impl Records {
-    pub fn progress(&self, level: Option<usize>, by_site: bool) -> BTreeMap<String, ProgressGroup> {
-        let mut groups = BTreeMap::<String, ProgressGroup>::new();
-        for record in &self.all {
-            let path = record.media.to_string_lossy();
-            let mut parts: Vec<_> = path.split(['/', '\\']).collect();
-            parts.pop();
-            let name = level
-                .and_then(|level| {
-                    let part = parts.get(level)?;
-                    Some(if by_site {
-                        part.to_string()
-                    } else {
-                        parts[..=level].join("/")
-                    })
-                })
-                .unwrap_or_default();
-            let group = groups.entry(name).or_default();
-            group.files += 1;
-            group.tagged += usize::from(!record.species.is_empty());
-            group.rows.extend_from_slice(&record.rows);
-        }
-        for group in groups.values_mut() {
-            group.rows.sort_unstable();
-        }
-        groups
-    }
-
     /// Merge the rows of each file: species and individuals collected, rating and time from the first row that has
     /// them (Serval keeps them equal across a file's rows). `level` is the deployment's path level.
     pub fn from_csv(csv: &Csv, level: Option<usize>) -> Records {
@@ -319,30 +285,5 @@ mod tests {
         );
         // … while the rating list counts only snow leopards.
         assert_eq!(counts.ratings, [1, 0, 0, 0, 0, 1]);
-    }
-}
-
-#[cfg(test)]
-mod progress_tests {
-    use super::*;
-    #[test]
-    fn progress_counts_media_once_and_keeps_every_row_for_caracal() {
-        let csv = Csv {
-            header: vec!["path".into(), "species".into()],
-            rows: [
-                ("/spring/A/a.jpg", "Fox"),
-                ("/spring/A/a.jpg", "Cat"),
-                ("/fall/A/b.jpg", ""),
-                ("/fall/B/c.jpg", "Fox"),
-            ]
-            .map(|(p, s)| vec![p.into(), s.into()])
-            .to_vec(),
-        };
-        let records = Records::from_csv(&csv, None);
-        let sites = records.progress(Some(2), true);
-        assert_eq!((sites["A"].tagged, sites["A"].files), (1, 2));
-        assert_eq!(sites["A"].rows, vec![0, 1, 2]);
-        assert_eq!(records.progress(Some(2), false).len(), 3);
-        assert_eq!(records.progress(None, false)[""].files, 3);
     }
 }

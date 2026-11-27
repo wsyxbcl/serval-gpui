@@ -54,7 +54,7 @@ When targets already exist with different content, Serval stops before writing a
 
 ## 4. Identified species
 
-Observe's input is a folder; which images have several species and individual IDs is only known after the scan,
+Observe accepts a folder or CSV file list; which images have several species and individual IDs is only known after the scan,
 which is the run itself. So there is no field for it in the form.
 
 - When Serval reports unresolved images (the `unresolved` event with the species involved, their image counts
@@ -63,6 +63,6 @@ which is the run itself. So there is no field for it in the form.
 - "重新运行" reruns observe with `--id-species` for the checked species; the button shows the last run's duration
   because the scan is repeated. "先不处理" keeps the result (every individual paired with every species in those
   images) and the result banner stays ([run §3](run.md#3-results)).
-- The choice is remembered per input folder and passed on the next run of that folder, so the question is asked
-  at most once per folder.
+- The choice is remembered per input folder or CSV path and passed on the next run of that input, so the question is asked
+  at most once per input.
 - This case is rare (individually identified species seldom appear together), so most users never see it.

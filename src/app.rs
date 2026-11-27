@@ -82,6 +82,7 @@ pub struct Waxbill {
     /// Screens that are only paths, checkboxes and choices.
     simple: HashMap<ScreenId, Entity<SimpleForm>>,
     translate: Entity<TranslateForm>,
+    pub(crate) progress: Entity<crate::progress::Progress>,
     browse: Entity<crate::browse::Browse>,
     update: Entity<UpdateForm>,
     /// The choice in the conflicts dialog: skip, replace or rename (questions.md §3).
@@ -171,6 +172,7 @@ impl Waxbill {
             simple,
             translate,
             browse,
+            progress: cx.new(|_| Default::default()),
             update,
             conflict_choice: 0,
             id_species: None,
@@ -213,9 +215,8 @@ impl Waxbill {
                 let file = path.to_string_lossy().into_owned();
                 app.serval = example_serval("0.8.2", "serval");
                 if state == "volunteer-progress" {
-                    app.screen = ScreenId::Browse;
-                    app.browse
-                        .update(cx, |form, cx| form.set_table(file, window, cx));
+                    app.screen = ScreenId::Progress;
+                    app.progress.update(cx, |form, cx| form.example(&path, cx));
                 } else {
                     app.screen = ScreenId::Extract;
                     app.extract
@@ -333,22 +334,26 @@ impl Waxbill {
 
     fn detect_serval(&mut self, program: Option<PathBuf>, run: bool, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
-            let (status, event_extract) = cx
+            let (status, event_extract, list_input) = cx
                 .background_executor()
                 .spawn(async move {
                     let status = serval::find(program);
-                    let events = status.program().is_some_and(|program| {
-                        crate::runner::background_command(program)
-                            .args(["extract", "--help"])
-                            .output()
-                            .is_ok_and(|out| {
-                                out.status.success()
-                                    && String::from_utf8_lossy(&out.stdout)
-                                        .split_whitespace()
-                                        .any(|word| word == "--unit")
-                            })
-                    });
-                    (status, events)
+                    let supports = |command: &str, flag: &str| {
+                        status.program().is_some_and(|program| {
+                            crate::runner::background_command(program)
+                                .args([command, "--help"])
+                                .output()
+                                .is_ok_and(|out| {
+                                    out.status.success()
+                                        && String::from_utf8_lossy(&out.stdout)
+                                            .split_whitespace()
+                                            .any(|word| word == flag)
+                                })
+                        })
+                    };
+                    let events = supports("extract", "--unit");
+                    let lists = supports("observe", "--files-from");
+                    (status, events, lists)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -359,6 +364,13 @@ impl Waxbill {
                 this.extract.update(cx, |form, cx| {
                     form.supports_events = event_extract;
                     cx.notify();
+                });
+                this.observe.update(cx, |form, cx| {
+                    form.supports_files_from = list_input;
+                    cx.notify();
+                });
+                this.progress.update(cx, |form, cx| {
+                    form.set_program(status.program(), list_input, cx)
                 });
                 this.serval = status;
                 // The write preview needs Serval.
@@ -1048,7 +1060,7 @@ impl Waxbill {
                 ))
                 .child(step(
                     "next-browse",
-                    t("查看标注进度和媒体", "Labeling progress and media"),
+                    t("查看媒体", "View media"),
                     ScreenId::Browse,
                     cx,
                 )),
@@ -1087,7 +1099,19 @@ impl Waxbill {
     fn render_screen(&self, cx: &mut Context<Self>) -> AnyElement {
         let tokens = cx.tokens().clone();
         let form = self.form();
-        let content = if self.screen == ScreenId::Browse {
+        let content = if self.screen == ScreenId::Progress {
+            v_flex()
+                .gap(tokens.px("space-5"))
+                .child(self.render_heading(
+                    t(
+                        "查看任务文件夹中已标注和待标注的媒体。",
+                        "Check labeled and pending media in a task folder.",
+                    ),
+                    true,
+                    cx,
+                ))
+                .child(self.progress.clone())
+        } else if self.screen == ScreenId::Browse {
             // Browse hands the looking to other tools: no run bar of its own (browse.md).
             v_flex()
                 .gap(tokens.px("space-5"))

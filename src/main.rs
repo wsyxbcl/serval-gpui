@@ -11,6 +11,8 @@ mod i18n;
 mod id_species;
 mod log;
 mod output;
+mod progress;
+mod progress_cache;
 mod repair;
 mod results;
 mod run;

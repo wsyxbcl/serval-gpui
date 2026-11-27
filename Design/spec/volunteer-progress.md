@@ -1,10 +1,10 @@
 # Volunteer labeling progress
 
-Volunteers label initialized XMP sidecars in digiKam. In Waxbill, Tools → 标注进度 accepts a dropped or chosen task folder. The first visit scans the folder. Subsequent visits show the latest successful scan and its timestamp. 刷新进度 starts a full rescan.
+Volunteers label initialized XMP sidecars in digiKam. In Waxbill, Tools → 标注进度 accepts a dropped or chosen task folder. Choosing or dropping the folder starts an incremental scan. 刷新进度 checks the current disk contents again. The timestamp records the most recent successful check.
 
 Show the task total and immediate child folders. Expand a folder to see the next level. Count each distinct media path once, including untagged files. Any species label counts as labeled. Every folder total includes its descendants and files directly inside it. Group by the task-relative folder path so matching folder names in different branches stay separate.
 
-Serval reads sidecars using `observe -x`. Waxbill directs its output into a staging folder in the local application cache, then aggregates the resulting media table. Use one snapshot per canonical task path. Record the source path and successful scan time. Publish the completed snapshot atomically and retain the previous complete result on cancellation or failure.
+Waxbill enumerates XMP paths and compares file sizes and modification times against the last successful scan. It sends only new and changed paths to Serval in a tags-compatible CSV using `observe -x --files-from`. If all entries match, skip Serval. Remove missing entries only after a successful enumeration. Clearing the cache forces a full read on the next refresh. Waxbill directs its output into a staging folder in the local application cache, then aggregates the resulting media table. Use one snapshot per canonical task path. Record the source path and successful scan time. Publish the completed snapshot atomically and retain the previous complete result on cancellation or failure.
 
 Cache roots are `~/Library/Caches/Waxbill/progress/` on macOS, `%LOCALAPPDATA%/Waxbill/Cache/progress/` on Windows and `$XDG_CACHE_HOME/waxbill/progress/` on Linux (default `~/.cache/waxbill/progress/`). Settings provides a clear-progress-cache action. Only Waxbill-owned cached data is removed.
 
