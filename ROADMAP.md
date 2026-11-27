@@ -15,7 +15,7 @@ Rules:
 
 - [x] Terminal-friendly copied commands and whole-event extraction by species or ID.
 
-- [x] Tools → 标注进度 scans a task folder incrementally, shows a folder tree and opens its current selection in Caracal. Read tags also accepts path lists from CSV. See Design/spec/volunteer-progress.md.
+- [x] Tools → 标注进度 scans a task folder incrementally, excludes unreadable sidecars and paired digiKam frame captures, shows a folder tree and opens its current selection in Caracal. Read tags also accepts path lists from CSV. See Design/spec/volunteer-progress.md.
 
 ### Completed
 - [x] Created initial project specification and working plan.

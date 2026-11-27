@@ -10,6 +10,7 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     h_flex, v_flex,
 };
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -60,6 +61,7 @@ struct Results {
     tree: Folder,
     changed: usize,
     removed: usize,
+    failed: usize,
     scanned_at: SystemTime,
 }
 impl Results {
@@ -68,6 +70,7 @@ impl Results {
         table: PathBuf,
         changed: usize,
         removed: usize,
+        failed: usize,
         scanned_at: SystemTime,
     ) -> Result<Self, String> {
         let csv = Csv::read(&table)?;
@@ -97,6 +100,7 @@ impl Results {
             tree,
             changed,
             removed,
+            failed,
             scanned_at,
         })
     }
@@ -146,7 +150,7 @@ impl Progress {
     pub fn example(&mut self, path: &Path, cx: &mut Context<Self>) {
         let root = PathBuf::from("/data");
         self.root = Some(root.clone());
-        self.results = Results::read(root, path.to_owned(), 3, 0, SystemTime::now()).ok();
+        self.results = Results::read(root, path.to_owned(), 3, 0, 1, SystemTime::now()).ok();
         cx.notify();
     }
     fn refresh(&mut self, root: PathBuf, cx: &mut Context<Self>) {
@@ -188,6 +192,7 @@ impl Progress {
                 snapshot.table,
                 snapshot.changed,
                 snapshot.removed,
+                snapshot.failed,
                 snapshot.scanned_at,
             )
             .map(|data| (Some(data), snapshot.scanned_at))
@@ -382,6 +387,16 @@ impl Render for Progress {
                         results.removed,
                         t("个文件已移除", "files removed")
                     ))
+                    .when(results.failed > 0, |card| {
+                        card.child(format!(
+                            "{} {}",
+                            results.failed,
+                            t(
+                                "个 XMP 读取失败，已从统计中排除",
+                                "unreadable XMP files excluded"
+                            )
+                        ))
+                    })
                     .children(rows),
             );
         }
@@ -426,7 +441,8 @@ mod tests {
                 .unwrap();
         }
         writer.flush().unwrap();
-        let data = Results::read(dir.clone(), table, 2, 0, std::time::SystemTime::now()).unwrap();
+        let data =
+            Results::read(dir.clone(), table, 2, 0, 0, std::time::SystemTime::now()).unwrap();
         assert_eq!(
             (data.tree.files, data.tree.labeled, data.csv.rows.len()),
             (2, 1, 3)

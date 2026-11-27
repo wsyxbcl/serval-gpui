@@ -14,6 +14,7 @@ pub struct Snapshot {
     pub table: PathBuf,
     pub changed: usize,
     pub removed: usize,
+    pub failed: usize,
     pub scanned_at: SystemTime,
 }
 
@@ -39,6 +40,8 @@ impl Stamp {
 
 #[derive(Serialize, Deserialize)]
 struct Index {
+    #[serde(default)]
+    failed: Option<BTreeSet<PathBuf>>,
     scanned_at: SystemTime,
     files: BTreeMap<PathBuf, Stamp>,
 }
@@ -177,6 +180,8 @@ fn enumerate(root: &Path) -> io::Result<BTreeMap<PathBuf, Stamp>> {
     let mut files = BTreeMap::new();
     let mut folders = vec![root.to_owned()];
     while let Some(folder) = folders.pop() {
+        let mut videos = BTreeSet::new();
+        let mut sidecars = Vec::new();
         for entry in folder
             .read_dir()
             .map_err(|e| io::Error::other(format!("{}: {e}", folder.display())))?
@@ -192,17 +197,56 @@ fn enumerate(root: &Path) -> io::Result<BTreeMap<PathBuf, Stamp>> {
             let path = entry.path();
             if ty.is_dir() {
                 folders.push(path);
-            } else if ty.is_file()
-                && path
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("xmp"))
-            {
-                utf8(&path)?;
-                files.insert(path.clone(), Stamp::read(&path)?);
+            } else if ty.is_file() {
+                let name = entry.file_name();
+                let Some(name) = name.to_str() else {
+                    if path
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("xmp"))
+                    {
+                        utf8(&path)?;
+                    }
+                    continue;
+                };
+                let Some((stem, ext)) = name.rsplit_once('.') else {
+                    continue;
+                };
+                let media = if ext.eq_ignore_ascii_case("xmp") {
+                    sidecars.push(path);
+                    stem
+                } else {
+                    name
+                };
+                if let Some((_, ext)) = media.rsplit_once('.')
+                    && matches!(ext.to_ascii_lowercase().as_str(), "mp4" | "avi" | "mov")
+                {
+                    // digiKam uses QFileInfo::baseName(), up to the first dot.
+                    videos.insert(media.split('.').next().unwrap().to_owned());
+                }
+            }
+        }
+        for path in sidecars {
+            let screenshot = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|name| name.rsplit_once('.'))
+                .filter(|(_, ext)| ext.eq_ignore_ascii_case("jpg"))
+                .and_then(|(stem, _)| stem.rsplit_once('-'))
+                .is_some_and(|(base, ms)| {
+                    videos.contains(base) && ms.parse::<u32>().is_ok_and(|n| n.to_string() == ms)
+                });
+            if !screenshot {
+                let stamp = Stamp::read(&path)?;
+                files.insert(path, stamp);
             }
         }
     }
     Ok(files)
+}
+
+struct Observation {
+    table: PathBuf,
+    failed: BTreeSet<PathBuf>,
 }
 
 fn observe(
@@ -210,7 +254,7 @@ fn observe(
     root: &Path,
     changed: &BTreeSet<&PathBuf>,
     stage: &Path,
-) -> io::Result<PathBuf> {
+) -> io::Result<Observation> {
     let manifest = stage.join("paths.csv");
     let mut writer = csv::Writer::from_path(&manifest)?;
     writer.write_record(["path"])?;
@@ -231,6 +275,7 @@ fn observe(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()?;
+    let mut failed = BTreeSet::new();
     let mut detail = String::new();
     let mut failure = None;
     let stderr = child.stderr.take().expect("piped stderr");
@@ -244,7 +289,11 @@ fn observe(
         };
         if let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) {
             let message = event["message"].as_str().unwrap_or(&line);
-            // List-mode observe exits unsuccessfully on an unreadable sidecar.
+            if event["serval"] == "file_error" {
+                if let Some(path) = event["path"].as_str() {
+                    failed.insert(PathBuf::from(path));
+                }
+            }
             if event["serval"] == "error" {
                 failure.get_or_insert_with(|| message.to_string());
             }
@@ -278,22 +327,29 @@ fn observe(
             table = Some(entry.path());
         }
     }
-    table.ok_or_else(|| io::Error::other("Serval produced no tags table"))
+    Ok(Observation {
+        table: table.ok_or_else(|| io::Error::other("Serval produced no tags table"))?,
+        failed,
+    })
 }
 
 fn merge(
     table: &Path,
     previous: Option<&Path>,
-    delta: Option<&Path>,
+    delta: Option<&Observation>,
     files: &BTreeMap<PathBuf, Stamp>,
     changed: &BTreeSet<&PathBuf>,
 ) -> io::Result<()> {
+    let failed = delta.map(|d| &d.failed);
+    if failed.is_some_and(|paths| paths.iter().any(|p| !changed.contains(p))) {
+        return Err(io::Error::other("Unexpected failed path in Serval output"));
+    }
     let mut header = None;
     let mut rows: BTreeMap<PathBuf, Vec<StringRecord>> = BTreeMap::new();
     for (path, is_delta) in previous
         .map(|p| (p, false))
         .into_iter()
-        .chain(delta.map(|p| (p, true)))
+        .chain(delta.map(|d| (d.table.as_path(), true)))
     {
         let mut reader = csv::Reader::from_path(path)?;
         let columns = reader.headers()?.clone();
@@ -324,7 +380,9 @@ fn merge(
             }
         }
     }
-    if rows.len() != files.len() {
+    if rows.len() + failed.map_or(0, BTreeSet::len) != files.len()
+        || failed.is_some_and(|paths| paths.iter().any(|p| rows.contains_key(p)))
+    {
         return Err(io::Error::other("Tags table is missing requested sidecars"));
     }
     let mut writer = csv::Writer::from_path(table)?;
@@ -354,7 +412,7 @@ impl Drop for Staging {
 
 fn refresh_task(
     task: &Task,
-    read_changes: impl FnOnce(&Path, &BTreeSet<&PathBuf>, &Path) -> io::Result<PathBuf>,
+    read_changes: impl FnOnce(&Path, &BTreeSet<&PathBuf>, &Path) -> io::Result<Observation>,
 ) -> io::Result<Snapshot> {
     let _lock = task.lock()?;
     let previous = task.previous()?;
@@ -362,7 +420,13 @@ fn refresh_task(
     let before = previous.as_ref().map(|(_, _, index)| &index.files);
     let changed: BTreeSet<_> = files
         .iter()
-        .filter(|(p, s)| before.and_then(|b| b.get(*p)) != Some(*s))
+        .filter(|(p, s)| {
+            previous
+                .as_ref()
+                .and_then(|(_, _, i)| i.failed.as_ref())
+                .is_none_or(|failed| failed.contains(*p))
+                || before.and_then(|b| b.get(*p)) != Some(*s)
+        })
         .map(|(p, _)| p)
         .collect();
     let removed = before.map_or(0, |b| b.keys().filter(|p| !files.contains_key(*p)).count());
@@ -373,6 +437,7 @@ fn refresh_task(
         return Ok(Snapshot {
             table: table.clone(),
             changed: 0,
+            failed: 0,
             removed,
             scanned_at: SystemTime::now(),
         });
@@ -404,20 +469,29 @@ fn refresh_task(
     merge(
         &completed.join("tags.csv"),
         previous.as_ref().map(|(_, p, _)| p.as_path()),
-        delta.as_deref(),
+        delta.as_ref(),
         &files,
         &changed,
     )?;
     let dir = task.dir.join(format!("snapshot-{number}"));
     let scanned_at = SystemTime::now();
+    let failed = delta.map(|d| d.failed).unwrap_or_default();
     let result = Snapshot {
         table: dir.join("tags.csv"),
-        changed: changed.len(),
+        changed: changed.len() - failed.len(),
+        failed: failed.len(),
         removed,
         scanned_at,
     };
     let mut writer = BufWriter::new(File::create(completed.join("index.json"))?);
-    serde_json::to_writer(&mut writer, &Index { scanned_at, files })?;
+    serde_json::to_writer(
+        &mut writer,
+        &Index {
+            scanned_at,
+            files,
+            failed: Some(failed),
+        },
+    )?;
     writer.flush()?;
     writer.get_ref().sync_all()?;
     drop(writer);
@@ -491,18 +565,34 @@ mod tests {
         let b = task.root.join("b.jpg.XMP");
         fs::write(&a, "Fox,Pika").unwrap();
         fs::write(&b, "").unwrap();
-        let read = |_: &Path, paths: &BTreeSet<&PathBuf>, stage: &Path| -> io::Result<PathBuf> {
-            let table = stage.join("out.csv");
-            let mut writer = csv::Writer::from_path(&table)?;
-            writer.write_record(["path", "species"])?;
-            for p in paths {
-                for s in fs::read_to_string(p)?.split(',') {
-                    writer.write_record([utf8(p)?, s])?;
+        let read =
+            |_: &Path, paths: &BTreeSet<&PathBuf>, stage: &Path| -> io::Result<Observation> {
+                let table = stage.join("out.csv");
+                let mut writer = csv::Writer::from_path(&table)?;
+                writer.write_record(["path", "species"])?;
+                for p in paths {
+                    for s in fs::read_to_string(p)?.split(',') {
+                        writer.write_record([utf8(p)?, s])?;
+                    }
                 }
-            }
-            writer.flush()?;
-            Ok(table)
-        };
+                writer.flush()?;
+                Ok(Observation {
+                    table,
+                    failed: BTreeSet::new(),
+                })
+            };
+        fs::write(task.root.join("clip.part.MP4"), "").unwrap();
+        fs::write(task.root.join("clip-6200.jpg.XMP"), "screenshot").unwrap();
+        let keep = task.root.join("clip_6200.jpg.xmp");
+        fs::write(&keep, "").unwrap();
+        let unmatched = task.root.join("other-6200.jpg.xmp");
+        fs::write(&unmatched, "").unwrap();
+        let inventory = enumerate(&task.root).unwrap();
+        assert_eq!(inventory.len(), 4);
+        assert!(inventory.contains_key(&keep));
+        assert!(inventory.contains_key(&unmatched));
+        fs::remove_file(keep).unwrap();
+        fs::remove_file(unmatched).unwrap();
         let first = refresh_task(&task, read).unwrap();
         assert_eq!(first.changed, 2);
         let untouched = refresh_task(&task, |_, _, _| panic!("unexpected observe")).unwrap();
@@ -576,8 +666,16 @@ mod integration {
             ["Fox".to_string(), "Snow leopard".to_string()].into()
         );
         fs::write(&file, "broken").unwrap();
-        assert!(scan().is_err());
-        assert_eq!(task.previous().unwrap().unwrap().1, updated.table);
+        fs::write(root.join("other.jpg.xmp"), xmp.replace("Fox", "Pika")).unwrap();
+        let partial = scan().unwrap();
+        assert_eq!((partial.changed, partial.failed), (1, 1));
+        let mut rows = csv::Reader::from_path(partial.table).unwrap();
+        let records = rows.records().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(&records[0][col], "Pika");
+        assert_eq!(scan().unwrap().failed, 1);
+        fs::write(&file, xmp).unwrap();
+        assert_eq!(scan().unwrap().changed, 1);
         fs::remove_dir_all(dir).unwrap();
     }
 }
