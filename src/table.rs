@@ -15,6 +15,7 @@ pub struct Record {
     pub path: String,
     /// Seconds since 1970-01-01, local time as written in the table.
     pub time: Option<i64>,
+    pub event_id: String,
     pub species: String,
     pub individual: String,
     pub rating: String,
@@ -25,6 +26,7 @@ pub struct TagTable {
     pub records: Vec<Record>,
     /// A Camtrap DP observations.csv: the deployment is the `deploymentID` column, no path level is needed.
     pub camtrap_dp: bool,
+    pub has_events: bool,
 }
 
 impl TagTable {
@@ -40,6 +42,7 @@ impl TagTable {
                 .position(|h| h.trim_start_matches('\u{feff}') == name)
         };
         let camtrap_dp = column("eventStart").is_some() && column("deploymentID").is_some();
+        let event_id = column("event_id");
         let rating = column("rating");
         let (path, time, species, individual) = if camtrap_dp {
             (
@@ -67,6 +70,7 @@ impl TagTable {
             records.push(Record {
                 path: cell(Some(path)),
                 time: parse_time(&cell(time)),
+                event_id: cell(event_id),
                 species: cell(species),
                 individual: cell(individual),
                 rating: cell(rating),
@@ -75,6 +79,7 @@ impl TagTable {
         Ok(TagTable {
             records,
             camtrap_dp,
+            has_events: !camtrap_dp && event_id.is_some(),
         })
     }
 

@@ -11,6 +11,7 @@ thing that writes data; Waxbill only reads (and writes repaired copies on reques
 - CSV inputs (extract, capture, translate, xmp update, xmp sync --csv) are read when chosen, in the background,
   with the `csv` and `encoding_rs` crates (no Polars, to keep Waxbill small). Budget: 100,000 rows in under a
   second on a local disk; larger files show "正在读取…" with a count.
+- Read tags accepts a folder or a CSV list through the same path field. The two pickers accept folders and files respectively. For CSV inputs, count rows and distinct paths in the background. Resolve relative entries against the CSV’s parent. Require a `path` column and support for `observe --files-from` in the selected Serval before enabling Run. Show the exact command with `--files-from <CSV>` and omit the positional folder.
 - Folder inputs (observe, align, xmp init/sync/copy/remove, rename) are walked with the same ignore rules as
   Serval, counting images, videos and XMP files ("找到 12,480 张图片、1,302 个视频 · 92% 有 XMP"). On a NAS this
   can take a while; the count updates as it goes and never blocks the form.
@@ -74,3 +75,5 @@ Ranked by value for the work Serval supports, cheapest first:
    the background). A table editor for the `xmp_update` columns remains an option for bulk corrections.
 5. **Project memory**: Waxbill remembers per data folder the last inputs, the identified species, the deployment
    level and the taglist, so a returning user starts where they left off.
+
+Extract accepts capture event tables. Choose whole events by species or ID. Rows with an empty event ID are skipped. The preview counts one copy per media path within each selected event. The output contains an event_<id> folder per event.

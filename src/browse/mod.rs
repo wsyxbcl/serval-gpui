@@ -4,7 +4,7 @@
 //! edited table comes back through 应用表格到文件 (`xmp write`).
 
 pub mod records;
-mod review;
+pub(crate) mod review;
 
 use crate::i18n::{Language, count, language, t};
 use crate::output;

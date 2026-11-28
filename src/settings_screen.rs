@@ -304,6 +304,11 @@ impl Waxbill {
             .child(self.serval_card(cx))
             .child(interface)
             .child(caracal)
+            .child(
+                self.progress
+                    .read(cx)
+                    .cache_settings(self.progress.clone(), cx),
+            )
             .child(about)
     }
 }

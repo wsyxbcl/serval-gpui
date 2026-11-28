@@ -18,6 +18,7 @@ pub enum ScreenId {
     Align,
     XmpInit,
     Browse,
+    Progress,
     Observe,
     Capture,
     Translate,
@@ -37,16 +38,17 @@ pub fn groups() -> [(&'static str, &'static [ScreenId]); 5] {
         (t("元数据", "Metadata"), &[XmpInit, XmpUpdate, XmpSync]),
         (t("文件导出", "Export"), &[Extract, XmpCopy]),
         (t("数据整理", "Data wrangling"), &[Rename, Align]),
-        (t("工具", "Tools"), &[XmpRemove, Translate]),
+        (t("工具", "Tools"), &[Progress, XmpRemove, Translate]),
     ]
 }
 
 impl ScreenId {
-    const ALL: [ScreenId; 13] = [
+    const ALL: [ScreenId; 14] = [
         ScreenId::Rename,
         ScreenId::Align,
         ScreenId::XmpInit,
         ScreenId::Browse,
+        ScreenId::Progress,
         ScreenId::Observe,
         ScreenId::Capture,
         ScreenId::Translate,
@@ -69,6 +71,7 @@ impl ScreenId {
             Rename => t("重命名", "Rename"),
             Align => t("路径对齐", "Align paths"),
             XmpInit => t("XMP 初始化", "Initialise XMP"),
+            Progress => t("标注进度", "Labeling progress"),
             Browse => t("查看媒体", "View media"),
             Observe => t("标签读取", "Read tags"),
             Capture => t("独立捕获", "Events"),
@@ -88,6 +91,7 @@ impl ScreenId {
             Rename => IconName::Pencil,
             Align => IconName::ArrowRightLeft,
             XmpInit => IconName::Plus,
+            Progress => IconName::ScanSearch,
             Browse => IconName::LayoutGrid,
             Observe => IconName::ScanSearch,
             Capture => IconName::Timer,

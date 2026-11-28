@@ -96,6 +96,7 @@ impl Running {
     pub fn start(program: &Path, args: &[String], cwd: &Path) -> std::io::Result<Running> {
         let mut command = background_command(program);
         command
+            .args(["--progress", "json"])
             .args(args)
             .current_dir(cwd)
             .stdin(Stdio::null())

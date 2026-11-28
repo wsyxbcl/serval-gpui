@@ -516,11 +516,6 @@ fn pick_file<V: 'static>(
     .detach();
 }
 
-/// `--progress json` before the positional arguments.
-fn progress(args: &mut Vec<String>) {
-    args.extend(["--progress".into(), "json".into()]);
-}
-
 fn files_line(found: Option<FolderCount>, sidecars: bool) -> String {
     let Some(found) = found else {
         return String::new();
@@ -557,7 +552,6 @@ pub static XMP_INIT: Spec = Spec {
     output_from: Some("dir"),
     build: |v| {
         let mut args = vec!["xmp".into(), "init".into()];
-        progress(&mut args);
         if let Some(out) = &v.output_dir {
             args.extend(["-o".into(), out.to_string_lossy().into()]);
         }
@@ -613,7 +607,6 @@ pub static RENAME: Spec = Spec {
         if v.flag("dryrun") {
             args.push("--dryrun".into());
         }
-        progress(&mut args);
         args.extend(v.path_arg("dir"));
         let ready = Ok(if v.flag("dryrun") {
             t("预览改名", "preview the renames")
@@ -699,7 +692,6 @@ pub static ALIGN: Spec = Spec {
                 args.push(arg.into());
             }
         }
-        progress(&mut args);
         if let Some(out) = &v.output_dir {
             args.extend(["-o".into(), out.to_string_lossy().into()]);
         }
@@ -727,7 +719,6 @@ pub static XMP_COPY: Spec = Spec {
     output_from: Some("dir"),
     build: |v| {
         let mut args = vec!["xmp".into(), "copy".into()];
-        progress(&mut args);
         args.extend(v.path_arg("dir"));
         if let Some(out) = &v.output_dir {
             args.push(out.to_string_lossy().into());
@@ -763,7 +754,6 @@ pub static XMP_REMOVE: Spec = Spec {
     output_from: None,
     build: |v| {
         let mut args = vec!["xmp".into(), "remove".into()];
-        progress(&mut args);
         args.extend(v.path_arg("dir"));
         let ready = if v.count("dir").is_some_and(|c| c.sidecars == 0) {
             Err(t(
@@ -817,7 +807,6 @@ pub static XMP_SYNC: Spec = Spec {
     output_from: None,
     build: |v| {
         let mut args = vec!["xmp".into(), "sync".into()];
-        progress(&mut args);
         let ready = match (v.path_arg("dir"), v.path_arg("csv")) {
             (Some(_), Some(_)) => Err(t(
                 "文件夹和表格只选一个",

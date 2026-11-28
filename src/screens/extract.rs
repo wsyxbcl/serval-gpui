@@ -28,6 +28,13 @@ const RATINGS: [Option<(f64, bool)>; 4] = [
     Some((5.0, true)),
 ];
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Unit {
+    Media,
+    SpeciesEvents,
+    EventIds,
+}
+
 enum TableState {
     Nothing,
     Reading,
@@ -38,6 +45,8 @@ enum TableState {
 /// What the current choice matches.
 #[derive(Default)]
 struct Matched {
+    events: usize,
+    first_event: String,
     records: usize,
     files: usize,
     deployments: usize,
@@ -49,6 +58,8 @@ pub struct ExtractForm {
     csv: Entity<InputState>,
     csv_check: Entity<TableCheck>,
     search: Entity<InputState>,
+    pub supports_events: bool,
+    unit: Unit,
     table: TableState,
     /// Species with their record counts under the rating choice, most first; untagged records counted apart.
     species: Vec<(String, usize)>,
@@ -73,10 +84,9 @@ impl ExtractForm {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let csv = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder(t("选择或拖入 tags.csv", "Choose or drop tags.csv"))
+                .placeholder(t("选择标签表或事件表", "Choose a tags or events table"))
         });
-        let search =
-            cx.new(|cx| InputState::new(window, cx).placeholder(t("搜索物种", "Search species")));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder(t("搜索", "Search")));
         let subscriptions = vec![
             cx.subscribe_in(&csv, window, |this, _, event: &InputEvent, _, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -93,6 +103,8 @@ impl ExtractForm {
             csv_check: cx.new(|cx| TableCheck::new(&csv, cx)),
             csv,
             search,
+            supports_events: false,
+            unit: Unit::Media,
             table: TableState::Nothing,
             species: Vec::new(),
             untagged: 0,
@@ -151,6 +163,7 @@ impl ExtractForm {
     fn table_read(&mut self, read: Result<TagTable, String>, cx: &mut Context<Self>) {
         match read {
             Ok(table) => {
+                self.unit = Unit::Media;
                 self.level = detect_level(table.records.iter().map(|r| r.path.as_str()));
                 // Keep from the deployment folder down, as the board suggests; the user can change it.
                 let depth = table
@@ -197,10 +210,18 @@ impl ExtractForm {
         let mut counts: HashMap<&str, usize> = HashMap::new();
         let mut untagged = 0;
         for record in table.records.iter().filter(|r| self.rating_matches(r)) {
-            if record.species.is_empty() {
+            if self.unit != Unit::Media && record.event_id.is_empty() {
+                continue;
+            }
+            let label = if self.unit == Unit::EventIds {
+                &record.event_id
+            } else {
+                &record.species
+            };
+            if label.is_empty() {
                 untagged += 1;
             } else {
-                *counts.entry(record.species.as_str()).or_default() += 1;
+                *counts.entry(label.as_str()).or_default() += 1;
             }
         }
         let mut species: Vec<(String, usize)> = counts
@@ -219,14 +240,43 @@ impl ExtractForm {
 
         let mut matched = Matched::default();
         let mut paths: Vec<&str> = Vec::new();
-        let mut seen: HashSet<&str> = HashSet::new();
+        let mut seen = HashSet::new();
         let mut deployments: HashSet<&str> = HashSet::new();
         let mut tags: HashMap<&str, (BTreeSet<&str>, BTreeSet<&str>)> = HashMap::new();
         let nothing_chosen = self.selected.is_empty() && self.rating == 0;
         if !nothing_chosen {
-            for record in table.records.iter().filter(|r| self.record_matches(r)) {
+            let events: HashSet<&str> = table
+                .records
+                .iter()
+                .filter(|r| {
+                    self.unit != Unit::Media
+                        && !r.event_id.is_empty()
+                        && self.selected.contains(if self.unit == Unit::EventIds {
+                            &r.event_id
+                        } else {
+                            &r.species
+                        })
+                })
+                .map(|r| r.event_id.as_str())
+                .collect();
+            matched.events = events.len();
+            for record in table.records.iter().filter(|r| {
+                if self.unit == Unit::Media {
+                    self.record_matches(r)
+                } else {
+                    events.contains(r.event_id.as_str())
+                }
+            }) {
                 matched.records += 1;
-                if seen.insert(record.path.as_str()) {
+                let group = if self.unit == Unit::Media {
+                    ""
+                } else {
+                    record.event_id.as_str()
+                };
+                if seen.insert((group, record.path.as_str())) {
+                    if paths.is_empty() {
+                        matched.first_event = group.to_string();
+                    }
                     paths.push(&record.path);
                 }
                 if let Some(deployment) = table.deployment(record, self.level) {
@@ -309,6 +359,18 @@ impl ExtractForm {
     /// Serval's filter for the choice: a single species as `-f species`, a rating alone as `-f rating` (a range), anything
     /// else as an advanced expression.
     fn filter(&self) -> Option<(&'static str, String)> {
+        if self.unit != Unit::Media {
+            return self.selected.first().map(|value| {
+                (
+                    if self.unit == Unit::EventIds {
+                        "event"
+                    } else {
+                        "species"
+                    },
+                    value.clone(),
+                )
+            });
+        }
         let rating = RATINGS[self.rating].map(|(min, exact)| {
             if exact {
                 format!("{min}")
@@ -362,6 +424,9 @@ impl ExtractForm {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
+        if self.unit != Unit::Media {
+            name = format!("events_{name}");
+        }
         format!(
             "{}_{}",
             date_of(today).replace('-', ""),
@@ -375,20 +440,25 @@ impl ExtractForm {
         if let Some((kind, value)) = self.filter() {
             args.extend(["-f".into(), kind.into(), "-v".into(), value]);
         }
+        if self.unit != Unit::Media {
+            args.extend(["--unit".into(), "event".into()]);
+            for value in self.selected.iter().skip(1) {
+                args.extend(["-v".into(), value.clone()]);
+            }
+        }
         if let Some(keep) = self.keep_dirs {
             args.extend(["--keep-dirs".into(), keep.to_string()]);
         }
         if self.rename {
             args.push("--rename".into());
         }
-        if self.species_folders {
+        if self.species_folders && self.unit == Unit::Media {
             args.extend([
                 "--use-subdir".into(),
                 "--subdir-type".into(),
                 "species".into(),
             ]);
         }
-        args.extend(["--progress".into(), "json".into()]);
         if let Some(csv) = &csv {
             let dir =
                 output::command_dir(&self.output_root(csv), "extract").join(self.run_folder());
@@ -410,9 +480,12 @@ impl ExtractForm {
             (_, TableState::Reading | TableState::Nothing) => {
                 Err(t("正在读取表格…", "reading the table…").to_string())
             }
-            _ if self.filter().is_none() => {
-                Err(t("选择要提取的物种或评分", "choose the species or a rating").to_string())
-            }
+            _ if self.unit != Unit::Media && !self.supports_events => Err(t(
+                "请在设置中选择支持事件提取的 Serval",
+                "Choose a Serval with event extraction in Settings",
+            )
+            .into()),
+            _ if self.filter().is_none() => Err(t("选择提取条件", "choose a filter").to_string()),
             _ if self.matched.records == 0 => {
                 Err(t("没有符合条件的记录", "nothing matches").to_string())
             }
@@ -436,6 +509,15 @@ impl ExtractForm {
     /// "1,412 个文件，约 8.3 GB"
     fn match_line(&self) -> String {
         let files = count(self.matched.files);
+        if self.unit != Unit::Media {
+            return format!(
+                "{} {} · {} {}",
+                count(self.matched.events),
+                t("个事件", "events"),
+                files,
+                t("个文件", "files")
+            );
+        }
         match (language(), self.bytes) {
             (Language::Chinese, Some(bytes)) => format!("{files} 个文件，约 {}", size_text(bytes)),
             (Language::Chinese, None) => format!("{files} 个文件"),
@@ -481,6 +563,16 @@ impl ExtractForm {
     }
 
     /// Fill the form like the boards (extract-from-data, extract-keep-dirs).
+    pub fn set_event_example(&mut self, file: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.csv
+            .update(cx, |input, cx| input.set_value(file.clone(), window, cx));
+        self.table_read(TagTable::read(Path::new(&file)), cx);
+        self.unit = Unit::SpeciesEvents;
+        self.selected = ["雪豹".to_string()].into();
+        self.keep_dirs = Some(0);
+        self.supports_events = true;
+        self.refresh(cx);
+    }
     pub fn set_example(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let path = "/data/2024_spring_serval_output/serval_observe/tags_2024_spring.csv";
         self.csv.update(cx, |input, cx| {
@@ -503,7 +595,10 @@ impl ExtractForm {
                     cx,
                 ),
                 _ => help_line(
-                    t("标签读取生成的 tags.csv", "The tags.csv from Read tags"),
+                    t(
+                        "标签读取生成的标签表，或独立捕获生成的事件表",
+                        "A tags table from Read tags or an events table from Capture",
+                    ),
                     Tone::Quiet,
                     cx,
                 ),
@@ -523,11 +618,15 @@ impl ExtractForm {
                     Language::Chinese => format!("{} 行", count(table.records.len())),
                     Language::English => format!("{} rows", count(table.records.len())),
                 }];
-                parts.push(match language() {
-                    Language::Chinese => format!("{} 个物种", count(species)),
-                    Language::English => format!("{} species", count(species)),
-                });
-                if self.level.is_some() {
+                if self.unit == Unit::EventIds {
+                    parts.push(format!("{} {}", count(species), t("个事件", "events")));
+                } else {
+                    parts.push(match language() {
+                        Language::Chinese => format!("{} 个物种", count(species)),
+                        Language::English => format!("{} species", count(species)),
+                    });
+                }
+                if self.unit == Unit::Media && self.level.is_some() {
                     parts.push(match language() {
                         Language::Chinese => format!("{} 个位点", count(deployments)),
                         Language::English => format!("{} deployments", count(deployments)),
@@ -676,6 +775,9 @@ impl ExtractForm {
             .bg(tokens.color("info-soft"))
             .child(figure(count(self.matched.files), t("个文件", "files")))
             .child(figure(count(self.matched.records), t("条记录", "records")));
+        if self.unit != Unit::Media {
+            row = row.child(figure(count(self.matched.events), t("个事件", "events")));
+        }
         if let Some(bytes) = self.bytes {
             let text = size_text(bytes);
             let (value, unit) = text.split_once(' ').unwrap_or((&text, ""));
@@ -696,7 +798,7 @@ impl ExtractForm {
                     ),
             );
         }
-        if self.level.is_some() {
+        if self.unit == Unit::Media && self.level.is_some() {
             row = row.child(div().text_color(cx.theme().muted_foreground).child(
                 match language() {
                     Language::Chinese => format!("来自 {} 个位点", count(self.matched.deployments)),
@@ -811,7 +913,7 @@ impl ExtractForm {
         };
         let example = top.map(|top| {
             let kept = components[top..last].join("/");
-            let subdir = if self.species_folders {
+            let subdir = if self.unit == Unit::Media && self.species_folders {
                 self.selected
                     .first()
                     .cloned()
@@ -824,10 +926,20 @@ impl ExtractForm {
                 if self.rename { prefix.as_str() } else { "" },
                 components[last]
             );
-            let parts: Vec<&str> = [kept.as_str(), subdir.as_str(), name.as_str()]
-                .into_iter()
-                .filter(|p| !p.is_empty())
-                .collect();
+            let event_dir = if self.unit == Unit::Media {
+                String::new()
+            } else {
+                format!("event_{}", self.matched.first_event)
+            };
+            let parts: Vec<&str> = [
+                event_dir.as_str(),
+                kept.as_str(),
+                subdir.as_str(),
+                name.as_str(),
+            ]
+            .into_iter()
+            .filter(|p| !p.is_empty())
+            .collect();
             format!("…/serval_extract/{}/{}", self.run_folder(), parts.join("/"))
         });
         Some(
@@ -899,6 +1011,36 @@ impl Render for ExtractForm {
                 },
             )));
             card(cx)
+                .when(
+                    matches!(&self.table,TableState::Read(t) if t.has_events),
+                    |card| {
+                        card.child(segmented(
+                            "extract-unit",
+                            &[
+                                t("按媒体", "Media"),
+                                t("按物种选事件", "Events by species"),
+                                t("按编号选事件", "Events by ID"),
+                            ],
+                            self.unit as usize,
+                            {
+                                let this = cx.entity().downgrade();
+                                move |index, _, cx| {
+                                    let _ = this.update(cx, |this, cx| {
+                                        this.unit =
+                                            [Unit::Media, Unit::SpeciesEvents, Unit::EventIds]
+                                                [index];
+                                        this.rating = 0;
+                                        this.selected.clear();
+                                        if this.unit != Unit::Media {
+                                            this.keep_dirs = Some(0);
+                                        }
+                                        this.refresh(cx);
+                                    });
+                                }
+                            },
+                        ))
+                    },
+                )
                 .child(
                     div()
                         .text_size(tokens.px("text-sm"))
@@ -911,7 +1053,9 @@ impl Render for ExtractForm {
                         .items_start()
                         .gap(tokens.px("space-5"))
                         .child(div().flex_1().child(self.render_species(cx)))
-                        .child(div().w(px(260.)).child(rating)),
+                        .when(self.unit == Unit::Media, |row| {
+                            row.child(div().w(px(260.)).child(rating))
+                        }),
                 )
                 .children(self.render_summary(cx))
         });
@@ -922,7 +1066,7 @@ impl Render for ExtractForm {
                     .child(
                         h_flex()
                             .gap(tokens.px("space-5"))
-                            .child(
+                            .when(self.unit == Unit::Media,|row| row.child(
                                 Checkbox::new("species-folders")
                                     .label(t("按物种分子文件夹", "A folder per species"))
                                     .checked(self.species_folders)
@@ -930,7 +1074,7 @@ impl Render for ExtractForm {
                                         this.species_folders = *checked;
                                         cx.notify();
                                     })),
-                            )
+                            ))
                             .child(
                                 Checkbox::new("rename")
                                     .label(t("文件名加上标签", "Add the tags to file names"))
@@ -1066,6 +1210,7 @@ fn example_table() -> TagTable {
             let dep = i % 42;
             let col = ["a", "b", "c"][dep % 3];
             records.push(Record {
+                event_id: String::new(),
                 path: format!(
                     "/data/2024_spring/col_{col}/dep{:02}_col_{col}/100MEDIA/IMG_{:04}.JPG",
                     dep + 1,
@@ -1087,5 +1232,39 @@ fn example_table() -> TagTable {
     TagTable {
         records,
         camtrap_dp: false,
+        has_events: false,
+    }
+}
+
+#[cfg(test)]
+mod event_tests {
+    use super::{ExtractForm, Unit};
+    use gpui_kit::TestAppContext;
+    use gpui_kit::component::theme::ThemeMode;
+    use std::path::Path;
+    #[gpui_kit::test]
+    fn selected_event_copies_and_command_agree(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::theme::init(ThemeMode::Light, cx);
+        });
+        let (form, cx) = cx.add_window_view(ExtractForm::new);
+        form.update_in(cx, |form, window, cx| {
+            let file =
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("Design/examples/events_species.csv");
+            form.set_event_example(file.to_string_lossy().into_owned(), window, cx);
+            assert_eq!((form.matched.events, form.matched.files), (2, 3));
+            let plan = form.plan(cx);
+            assert!(plan.ready.is_ok());
+            assert!(plan.args.windows(2).any(|a| a == ["--unit", "event"]));
+            assert!(!plan.args.iter().any(|s| s == "--progress"));
+            form.unit = Unit::EventIds;
+            form.selected = ["1".to_string()].into();
+            form.refresh(cx);
+            assert_eq!((form.matched.events, form.matched.files), (1, 2));
+            assert!(form.plan(cx).args.windows(2).any(|a| a == ["-f", "event"]));
+            form.supports_events = false;
+            assert!(form.plan(cx).ready.is_err());
+        });
     }
 }

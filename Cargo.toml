@@ -12,6 +12,7 @@ name = "waxbill"
 path = "src/main.rs"
 
 [dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 csv = "1"
 # GBK and UTF-16 tables from Excel (repair.rs).
 encoding_rs = "0.8"

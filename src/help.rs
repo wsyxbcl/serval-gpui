@@ -16,6 +16,7 @@ use std::path::PathBuf;
 fn text(screen: ScreenId) -> Option<&'static str> {
     use ScreenId::*;
     Some(match screen {
+        Progress => include_str!("../help/zh/progress.md"),
         Observe => include_str!("../help/zh/observe.md"),
         Capture => include_str!("../help/zh/capture.md"),
         Browse => include_str!("../help/zh/browse.md"),
@@ -36,7 +37,7 @@ fn text(screen: ScreenId) -> Option<&'static str> {
 fn commands(screen: ScreenId) -> &'static [&'static [&'static str]] {
     use ScreenId::*;
     match screen {
-        Observe => &[&["observe"]],
+        Progress | Observe => &[&["observe"]],
         Capture => &[&["capture"]],
         Browse | XmpUpdate => &[&["xmp", "update"], &["xmp", "write"]],
         XmpInit => &[&["xmp", "init"]],

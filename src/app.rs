@@ -54,6 +54,8 @@ pub const DESIGN_STATES: &[&str] = &[
     "settings-ready",
     "settings-unsupported",
     "capture-ready",
+    "volunteer-progress",
+    "extract-events",
     "extract-from-data",
     "extract-keep-dirs",
     "extract-conflicts",
@@ -80,6 +82,7 @@ pub struct Waxbill {
     /// Screens that are only paths, checkboxes and choices.
     simple: HashMap<ScreenId, Entity<SimpleForm>>,
     translate: Entity<TranslateForm>,
+    pub(crate) progress: Entity<crate::progress::Progress>,
     browse: Entity<crate::browse::Browse>,
     update: Entity<UpdateForm>,
     /// The choice in the conflicts dialog: skip, replace or rename (questions.md §3).
@@ -169,6 +172,7 @@ impl Waxbill {
             simple,
             translate,
             browse,
+            progress: cx.new(|_| Default::default()),
             update,
             conflict_choice: 0,
             id_species: None,
@@ -203,6 +207,22 @@ impl Waxbill {
             version: version.into(),
         };
         match design_state {
+            Some(state @ ("volunteer-progress" | "extract-events")) => {
+                let path = launch.open.unwrap_or_else(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("Design/examples/events_species.csv")
+                });
+                let file = path.to_string_lossy().into_owned();
+                app.serval = example_serval("0.8.2", "serval");
+                if state == "volunteer-progress" {
+                    app.screen = ScreenId::Progress;
+                    app.progress.update(cx, |form, cx| form.example(&path, cx));
+                } else {
+                    app.screen = ScreenId::Extract;
+                    app.extract
+                        .update(cx, |form, cx| form.set_event_example(file, window, cx));
+                }
+            }
             Some("first-run") => app.serval = ServalStatus::Missing,
             Some(state @ ("extract-from-data" | "extract-keep-dirs" | "extract-conflicts")) => {
                 app.serval = example_serval("0.8.0", "serval");
@@ -314,15 +334,44 @@ impl Waxbill {
 
     fn detect_serval(&mut self, program: Option<PathBuf>, run: bool, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
-            let status = cx
+            let (status, event_extract, list_input) = cx
                 .background_executor()
-                .spawn(async move { serval::find(program) })
+                .spawn(async move {
+                    let status = serval::find(program);
+                    let supports = |command: &str, flag: &str| {
+                        status.program().is_some_and(|program| {
+                            crate::runner::background_command(program)
+                                .args([command, "--help"])
+                                .output()
+                                .is_ok_and(|out| {
+                                    out.status.success()
+                                        && String::from_utf8_lossy(&out.stdout)
+                                            .split_whitespace()
+                                            .any(|word| word == flag)
+                                })
+                        })
+                    };
+                    let events = supports("extract", "--unit");
+                    let lists = supports("observe", "--files-from");
+                    (status, events, lists)
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 cx.set_global(crate::serval::ServalProgram(
                     status.program().map(Into::into),
                 ));
                 crate::log::line(format!("Serval: {status:?}"));
+                this.extract.update(cx, |form, cx| {
+                    form.supports_events = event_extract;
+                    cx.notify();
+                });
+                this.observe.update(cx, |form, cx| {
+                    form.supports_files_from = list_input;
+                    cx.notify();
+                });
+                this.progress.update(cx, |form, cx| {
+                    form.set_program(status.program(), list_input, cx)
+                });
                 this.serval = status;
                 // The write preview needs Serval.
                 this.update.update(cx, |form, cx| form.recheck(cx));
@@ -1050,7 +1099,19 @@ impl Waxbill {
     fn render_screen(&self, cx: &mut Context<Self>) -> AnyElement {
         let tokens = cx.tokens().clone();
         let form = self.form();
-        let content = if self.screen == ScreenId::Browse {
+        let content = if self.screen == ScreenId::Progress {
+            v_flex()
+                .gap(tokens.px("space-5"))
+                .child(self.render_heading(
+                    t(
+                        "查看任务文件夹中已标注和待标注的媒体。",
+                        "Check labeled and pending media in a task folder.",
+                    ),
+                    true,
+                    cx,
+                ))
+                .child(self.progress.clone())
+        } else if self.screen == ScreenId::Browse {
             // Browse hands the looking to other tools: no run bar of its own (browse.md).
             v_flex()
                 .gap(tokens.px("space-5"))
@@ -1163,7 +1224,7 @@ impl Render for Waxbill {
 
 /// The arguments of a run: the last run's (`last`: its form command and arguments) while the form still says
 /// `form_command`, else the form's; without `without`; with `extra`, an answer such as `--on-existing skip`, in place
-/// of an earlier answer to the same question and before the positional arguments at the end (`-o <dir> <input>`).
+/// of an earlier answer to the same question.
 fn run_args(
     last: Option<(String, Vec<String>)>,
     form_command: &str,
@@ -1181,13 +1242,7 @@ fn run_args(
             args.drain(i..(i + answer.len()).min(args.len()));
         }
     }
-    let at = args
-        .iter()
-        .position(|a| a == "--progress")
-        .unwrap_or(args.len());
-    for (i, arg) in extra.iter().enumerate() {
-        args.insert(at + i, arg.to_string());
-    }
+    args.extend(extra.iter().map(|arg| arg.to_string()));
     args
 }
 
@@ -1197,12 +1252,10 @@ mod tests {
 
     #[test]
     fn a_run_for_real_stays_for_real_when_continued_or_answered() {
-        let form: Vec<String> = ["align", "--dryrun", "--progress", "json", "/in"]
-            .map(String::from)
-            .to_vec();
+        let form: Vec<String> = ["align", "--dryrun", "/json"].map(String::from).to_vec();
         let command = crate::screens::display_command(&form);
         let real = run_args(None, &command, &form, &[], &["--dryrun"]);
-        assert_eq!(real.join(" "), "align --progress json /in");
+        assert_eq!(real.join(" "), "align /json");
         // Continued after a pause, then a conflict answered twice.
         let continued = run_args(Some((command.clone(), real)), &command, &form, &[], &[]);
         let answered = run_args(
@@ -1219,9 +1272,6 @@ mod tests {
             &["--on-existing", "replace"],
             &[],
         );
-        assert_eq!(
-            again.join(" "),
-            "align --on-existing replace --progress json /in"
-        );
+        assert_eq!(again.join(" "), "align /json --on-existing replace");
     }
 }

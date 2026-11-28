@@ -228,7 +228,6 @@ impl CaptureForm {
         if !self.exclude {
             args.push("--no-exclude".into());
         }
-        args.extend(["--progress".into(), "json".into()]);
         if let Some(csv) = &csv {
             args.push("-o".into());
             args.push(
@@ -691,6 +690,7 @@ fn example_table() -> TagTable {
         for (s, species) in ["岩羊", "赤狐", "雪豹"].iter().enumerate() {
             for i in 0..111 {
                 records.push(Record {
+                    event_id: String::new(),
                     path: path(dep, s * 111 + i),
                     time: Some(day(i as i64 - 200) + 3600 * (6 + s as i64)),
                     species: species.to_string(),
@@ -718,6 +718,7 @@ fn example_table() -> TagTable {
             None => day(i as i64 + 1) + 7 * 3600,
         };
         records.push(Record {
+            event_id: String::new(),
             path: path(6, 400 + i),
             time: Some(time),
             species: "雪豹".into(),
@@ -728,5 +729,6 @@ fn example_table() -> TagTable {
     TagTable {
         records,
         camtrap_dp: false,
+        has_events: false,
     }
 }

@@ -206,7 +206,6 @@ impl TranslateForm {
         if let (Some(from), Some(to)) = (&self.from, &self.to) {
             args.extend(["--from".into(), from.clone(), "--to".into(), to.clone()]);
         }
-        args.extend(["--progress".into(), "json".into()]);
         if let Some(table) = &table {
             let dir = output::command_dir(&self.output_root(table), "translate");
             args.extend([
