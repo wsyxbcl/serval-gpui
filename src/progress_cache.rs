@@ -352,7 +352,13 @@ fn merge(
         .chain(delta.map(|d| (d.table.as_path(), true)))
     {
         let mut reader = csv::Reader::from_path(path)?;
-        let columns = reader.headers()?.clone();
+        let mut columns = reader.headers()?.clone();
+        let status = columns.iter().position(|name| name == "read_status");
+        if status.is_none() {
+            // Successful rows in an older snapshot predate the two read-result columns.
+            columns.push_field("read_status");
+            columns.push_field("read_error");
+        }
         let column = columns
             .iter()
             .position(|c| c == "path")
@@ -367,13 +373,23 @@ fn merge(
         }
         header = Some(columns);
         for record in reader.records() {
-            let record = record?;
+            let mut record = record?;
+            if status.is_none() {
+                record.push_field("succeeded");
+                record.push_field("");
+            }
             let key = Path::new(&record[column]);
             if is_delta && !changed.contains(&key.to_owned()) {
                 return Err(io::Error::other(format!(
                     "Unexpected path in Serval output: {}",
                     key.display()
                 )));
+            }
+            if status.is_some_and(|i| &record[i] == "failed") {
+                if is_delta && !failed.is_some_and(|paths| paths.contains(key)) {
+                    return Err(io::Error::other("Missing Serval diagnostic for failed row"));
+                }
+                continue;
             }
             if files.contains_key(key) && (is_delta || !changed.contains(&key.to_owned())) {
                 rows.entry(key.to_owned()).or_default().push(record);
